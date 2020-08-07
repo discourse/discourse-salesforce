@@ -1,0 +1,21 @@
+plugins:
+  salesforce_enabled:
+    default: false
+  salesforce_client_id:
+    default: ''
+  salesforce_client_secret:
+    default: ''
+    secret: true
+  salesforce_username:
+    default: ''
+  salesforce_password:
+    default: ''
+    secret: true
+  salesforce_instance_url:
+    default: ''
+    client: true
+    hidden: true
+  salesforce_access_token:
+    default: ''
+    secret: true
+    hidden: true

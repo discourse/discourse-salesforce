@@ -1,0 +1,11 @@
+en:
+  site_settings:
+    salesforce_enabled: 'Enable the discourse-salesforce plugin'
+    salesforce_client_id: "Salesforce connected app's client id"
+    salesforce_client_secret: "Salesforce connected app's client secret"
+    salesforce_username: "Salesforce account username"
+    salesforce_password: "Salesforce account password"
+  salesforce:
+    error:
+      invalid_response: "Invalid response from Salesforce API"
+

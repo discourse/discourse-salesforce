@@ -1,0 +1,8 @@
+en:
+  js:
+    salesforce:
+      lead:
+        create: "Create Lead"
+        poster_icon:
+          title: "Salesforce Lead"
+          text: "Lead"

@@ -1,6 +1,10 @@
 plugins:
   salesforce_enabled:
     default: false
+  salesforce_login_enabled:
+    default: false
+    client: true
+    validator: 'SalesforceLoginEnabledValidator'
   salesforce_client_id:
     default: ''
   salesforce_client_secret:

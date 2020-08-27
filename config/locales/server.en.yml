@@ -1,10 +1,13 @@
 en:
   site_settings:
     salesforce_enabled: 'Enable the discourse-salesforce plugin'
+    salesforce_login_enabled: 'Enable Salesforce Social Login'
     salesforce_client_id: "Salesforce connected app's client id"
     salesforce_client_secret: "Salesforce connected app's client secret"
     salesforce_username: "Salesforce account username"
     salesforce_password: "Salesforce account password"
+    errors:
+      salesforce_client_credentials_required: "Salesforce client id and client secret settings are required"
   salesforce:
     error:
       invalid_response: "Invalid response from Salesforce API"

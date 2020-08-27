@@ -3,6 +3,12 @@ en:
     salesforce:
       lead:
         create: "Create Lead"
-        poster_icon:
+      contact:
+        create: "Create Contact"
+      poster_icon:
+        lead:
           title: "Salesforce Lead"
           text: "Lead"
+        contact:
+          title: "Salesforce Contact"
+          text: "Contact"

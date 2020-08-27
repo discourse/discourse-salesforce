@@ -30,13 +30,13 @@ after_initialize do
   end
 
   [
-    '../app/controllers/salesforce/leads_controller.rb',
-    '../app/models/salesforce/lead.rb',
+    '../app/controllers/salesforce/persons_controller.rb',
+    '../app/models/salesforce/person.rb',
     '../lib/salesforce/api.rb'
   ].each { |path| load File.expand_path(path, __FILE__) }
 
   Salesforce::Engine.routes.draw do
-    post "/leads/create" => "leads#create"
+    post "/persons/create" => "persons#create"
   end
 
   Discourse::Application.routes.append do

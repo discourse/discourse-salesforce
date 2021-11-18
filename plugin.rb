@@ -14,7 +14,11 @@ require 'base64'
 enabled_site_setting :salesforce_enabled
 
 register_asset 'stylesheets/salesforce.scss'
-register_svg_icon "fab-salesforce" if respond_to?(:register_svg_icon)
+
+if respond_to?(:register_svg_icon)
+  register_svg_icon "fab-salesforce"
+  register_svg_icon "user-tag"
+end
 
 require_relative 'lib/validators/salesforce_login_enabled_validator'
 

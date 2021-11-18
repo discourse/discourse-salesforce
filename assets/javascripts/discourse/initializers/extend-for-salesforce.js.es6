@@ -2,11 +2,12 @@ import { withPluginApi } from "discourse/lib/plugin-api";
 import { ajax } from "discourse/lib/ajax";
 import { popupAjaxError } from "discourse/lib/ajax-error";
 import I18n from "I18n";
+import { h } from "virtual-dom";
 
 function createPerson(type, context) {
   ajax(`/salesforce/persons/create`, {
     type: "POST",
-    data: { type, topic_id: context.topic.id },
+    data: { type, topic_id: context.attrs.id },
   }).catch(popupAjaxError);
 
   const op = context.topic
@@ -29,6 +30,79 @@ function initializeWithApi(api) {
 
   if (isStaff) {
     const salesforce_url = Discourse.SiteSettings.salesforce_instance_url;
+
+    api.addPostMenuButton("salesforce", (attrs) => {
+      return {
+        id: "salesforce",
+        action: "openSalesforceMenu",
+        icon: "fab-salesforce",
+        title: "salesforce.menu.title",
+      };
+    });
+
+    api.decorateWidget("post-menu:after", (dec) => {
+      if (dec.state.salesforceMenuVisible) {
+        return dec.attach("post-salesforce-menu");
+      }
+    });
+
+    api.attachWidgetAction("post-menu", "openSalesforceMenu", function () {
+      this.state.salesforceMenuVisible = true;
+    });
+
+    api.attachWidgetAction("post-menu", "closeSalesforceMenu", function () {
+      this.state.salesforceMenuVisible = false;
+    });
+
+    api.attachWidgetAction("post-menu", "createCase", function () {
+      createPerson("case", this);
+      alert("Case created");
+      this.state.salesforceMenuVisible = false;
+    });
+
+    api.createWidget("post-salesforce-menu", {
+      tagName: "div.post-admin-menu.post-salesforce-menu.popup-menu",
+
+      html() {
+        const contents = [];
+        const buttons = [
+          {
+            icon: "ticket-alt",
+            label: "salesforce.case.create",
+            action: "createCase",
+          },
+          {
+            icon: "user-tag",
+            label: "salesforce.lead.create",
+            action: "createLead",
+          },
+        ];
+
+        buttons.map((b) =>
+          contents.push(this.attach("post-salesforce-menu-button", b))
+        );
+        return h("ul", contents);
+      },
+
+      clickOutside() {
+        this.sendWidgetAction("closeSalesforceMenu");
+      },
+    });
+
+    api.createWidget("post-salesforce-menu-button", {
+      tagName: "li",
+
+      html(attrs) {
+        return this.attach("button", {
+          className: attrs.className,
+          action: attrs.action,
+          url: attrs.url,
+          icon: attrs.icon,
+          label: attrs.label,
+          secondaryAction: attrs.secondaryAction,
+        });
+      },
+    });
 
     api.registerTopicFooterButton({
       id: "salesforce-lead",

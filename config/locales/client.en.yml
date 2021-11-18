@@ -5,6 +5,8 @@ en:
         create: "Create Lead"
       contact:
         create: "Create Contact"
+      case:
+        create: "Create Case"
       poster_icon:
         lead:
           title: "Salesforce Lead"

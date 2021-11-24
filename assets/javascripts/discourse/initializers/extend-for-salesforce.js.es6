@@ -4,24 +4,29 @@ import { popupAjaxError } from "discourse/lib/ajax-error";
 import I18n from "I18n";
 import { h } from "virtual-dom";
 
-function createPerson(type, context) {
-  ajax(`/salesforce/persons/create`, {
+function createObject(type, context) {
+  ajax(`/salesforce/${type}s/create`, {
     type: "POST",
-    data: { type, topic_id: context.attrs.id },
-  }).catch(popupAjaxError);
-
-  const op = context.topic
-    .get("postStream.posts")
-    .find((p) => p.post_number === 1);
-  context.appEvents.trigger("post-stream:refresh", { id: op.id });
+    data: { type, post_id: context.attrs.id },
+  })
+    .then(() => {
+      context.appEvents.trigger("post-stream:refresh", {
+        id: context.attrs.id,
+      });
+    })
+    .catch(popupAjaxError);
 }
 
 function createLead() {
-  createPerson("lead", this);
+  createObject("lead", this);
 }
 
 function createContact() {
-  createPerson("contact", this);
+  createObject("contact", this);
+}
+
+function createCase(context) {
+  createObject("case", context);
 }
 
 function initializeWithApi(api) {
@@ -55,8 +60,7 @@ function initializeWithApi(api) {
     });
 
     api.attachWidgetAction("post-menu", "createCase", function () {
-      createPerson("case", this);
-      alert("Case created");
+      createCase(this);
       this.state.salesforceMenuVisible = false;
     });
 

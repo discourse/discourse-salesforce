@@ -5,16 +5,15 @@ module ::Salesforce
     DEFAULT_COMPANY_NAME = "None".freeze
     ORIGIN = "Web".freeze
 
-    attr_reader :type, :custom_field_name, :api_path, :opts
+    attr_reader :type, :api_path, :opts
 
-    def initialize(type, opts: {})
+    def initialize(type, opts = {})
       @type = type
-      @custom_field_name = "salesforce_#{type}_id"
       @api_path = "sobjects/#{type.capitalize}"
       @opts = opts
     end
 
-    def self.create!(payload)
+    def create!
       return if exists?
 
       payload = {}
@@ -24,8 +23,8 @@ module ::Salesforce
 
       data = Salesforce::Api.new.post(api_path, payload)
 
-      user.custom_fields[custom_field_name] = data["id"]
-      user.save_custom_fields
+      model.custom_fields[custom_field_name] = data["id"]
+      model.save_custom_fields
     end
 
     def exists?
@@ -34,7 +33,6 @@ module ::Salesforce
 
     def user_payload
       payload = {}
-      user = opts[:user]
       name = user.name || user.username
 
       if name.include?(" ")
@@ -50,6 +48,18 @@ module ::Salesforce
 
       payload.merge!(FirstName: first_name) if first_name.present?
       payload
+    end
+
+    def user
+      @user ||= opts[:user] || model
+    end
+
+    def model
+      @model ||= opts[:model]
+    end
+
+    def custom_field_name
+      self.class::CUSTOM_FIELD_NAME
     end
   end
 end

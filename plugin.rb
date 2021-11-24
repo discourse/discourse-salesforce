@@ -34,13 +34,15 @@ after_initialize do
   end
 
   [
-    '../app/controllers/salesforce/persons_controller.rb',
-    '../app/models/salesforce/person.rb',
+    '../app/controllers/salesforce/api_controller.rb',
+    '../app/models/salesforce/object.rb',
+    '../app/models/salesforce/case.rb',
+    '../app/models/salesforce/contact.rb',
     '../lib/salesforce/api.rb'
   ].each { |path| load File.expand_path(path, __FILE__) }
 
   Salesforce::Engine.routes.draw do
-    post "/persons/create" => "persons#create"
+    post "/cases/create" => "api#create_case"
   end
 
   Discourse::Application.routes.append do
@@ -53,6 +55,12 @@ after_initialize do
     option :client_options, site:  'https://login.salesforce.com',
                             authorize_url: '/services/oauth2/authorize',
                             token_url: '/services/oauth2/token'
+  end
+
+  class ::User
+    def salesforce_contact_id
+      custom_fields[Salesforce::Contact::CUSTOM_FIELD_NAME]
+    end
   end
 end
 

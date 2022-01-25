@@ -6,6 +6,8 @@
 # author: Vinoth Kannan
 # url: https://github.com/discourse/discourse-salesforce
 
+gem 'jwt', '2.3.0'
+
 require 'auth/oauth2_authenticator'
 require 'omniauth-oauth2'
 require 'openssl'

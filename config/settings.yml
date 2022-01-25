@@ -10,6 +10,9 @@ plugins:
   salesforce_client_secret:
     default: ''
     secret: true
+  salesforce_rsa_private_key:
+    default: ''
+    textarea: true
   salesforce_username:
     default: ''
   salesforce_password:

@@ -9,8 +9,8 @@ module ::Salesforce
 
   class Api
 
-    VERSION = "49.0".freeze
-    INVALID_RESPONSE = "salesforce.error.invalid_response".freeze
+    VERSION = "49.0"
+    INVALID_RESPONSE = "salesforce.error.invalid_response"
 
     attr_reader :faraday, :path
 
@@ -47,15 +47,13 @@ module ::Salesforce
     def set_access_token
       return if SiteSetting.salesforce_instance_url.present? && SiteSetting.salesforce_access_token.present?
 
-      response = Faraday.new(
-        url: 'https://login.salesforce.com'
-      ).post("/services/oauth2/token", {
-        grant_type: 'password',
-        client_id: SiteSetting.salesforce_client_id,
-        client_secret: SiteSetting.salesforce_client_secret,
-        username: SiteSetting.salesforce_username,
-        password: SiteSetting.salesforce_password
-      })
+      connection = Faraday.new(url: 'https://login.salesforce.com')
+      response = connection.post("/services/oauth2/token") do |req|
+        req.body = URI.encode_www_form({
+          grant_type: 'urn:ietf:params:oauth:grant-type:jwt-bearer',
+          assertion: JWT.encode(claims, private_key, 'RS256')
+        })
+      end
 
       if response.status != 200
         raise Salesforce::InvalidCredentials
@@ -65,9 +63,21 @@ module ::Salesforce
       SiteSetting.salesforce_access_token = data["access_token"]
       SiteSetting.salesforce_instance_url = data["instance_url"]
     end
-
-    def set_faraday
-      faraday 
+  
+    private
+  
+    def claims
+      {
+        iss: SiteSetting.salesforce_client_id,
+        sub: "team+salesforce-discourse-dev-ed@discourse.org",
+        aud: "https://login.salesforce.com",
+        iat: Time.now.utc.to_i,
+        exp: Time.now.utc.to_i + 180
+      }
+    end
+  
+    def private_key
+      OpenSSL::PKey::RSA.new(SiteSetting.salesforce_rsa_private_key)
     end
   end
 end

@@ -32,6 +32,7 @@ after_initialize do
   end
 
   [
+    '../app/controllers/salesforce/admin_controller.rb',
     '../app/controllers/salesforce/persons_controller.rb',
     '../app/models/salesforce/person.rb',
     '../lib/salesforce/api.rb'
@@ -41,8 +42,12 @@ after_initialize do
     post "/persons/create" => "persons#create"
   end
 
+  add_admin_route 'salesforce.title', 'salesforce'
+
   Discourse::Application.routes.append do
     mount ::Salesforce::Engine, at: "salesforce"
+    get '/admin/plugins/salesforce' => 'admin/plugins#index', constraints: AdminConstraint.new
+    get '/admin/plugins/salesforce/index' => 'salesforce/admin#index', constraints: AdminConstraint.new
   end
 
   class ::OmniAuth::Strategies::Salesforce

@@ -1,6 +1,7 @@
 en:
   js:
     salesforce:
+      title: Salesforce
       lead:
         create: "Create Lead"
       contact:

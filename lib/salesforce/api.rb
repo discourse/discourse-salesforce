@@ -69,7 +69,7 @@ module ::Salesforce
     def claims
       {
         iss: SiteSetting.salesforce_client_id,
-        sub: "team+salesforce-discourse-dev-ed@discourse.org",
+        sub: SiteSetting.salesforce_username,
         aud: "https://login.salesforce.com",
         iat: Time.now.utc.to_i,
         exp: Time.now.utc.to_i + 180

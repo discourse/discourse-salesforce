@@ -37,6 +37,9 @@ module ::Salesforce
           c.subject = topic.title
           c.description = topic.first_post.raw
           c.create!
+
+          topic.custom_fields["has_salesforce_case"] = true
+          topic.save_custom_fields
         end
 
         c.sync!

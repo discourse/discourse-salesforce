@@ -1,3 +1,5 @@
+# frozen_string_literal: true
+
 class Salesforce::PersonsController < Admin::AdminController
   before_action :find_topic
   attr_accessor :topic

@@ -33,14 +33,18 @@ after_initialize do
 
   [
     '../app/controllers/salesforce/admin_controller.rb',
+    '../app/controllers/salesforce/cases_controller.rb',
     '../app/controllers/salesforce/persons_controller.rb',
     '../app/models/salesforce/case.rb',
     '../app/models/salesforce/person.rb',
+    '../app/serializers/concerns/case_mixin.rb',
+    '../app/serializers/case_serializer.rb',
     '../lib/salesforce/api.rb'
   ].each { |path| load File.expand_path(path, __FILE__) }
 
   Salesforce::Engine.routes.draw do
     post "/persons/create" => "persons#create"
+    post "/cases/sync" => "cases#sync"
   end
 
   add_admin_route 'salesforce.title', 'salesforce'
@@ -53,6 +57,8 @@ after_initialize do
 
   reloadable_patch do |plugin|
     require_dependency 'user'
+    require_dependency 'topic'
+
     class ::User
       def salesforce_contact_id
         custom_fields[::Salesforce::Person::CONTACT_ID_FIELD]
@@ -62,7 +68,58 @@ after_initialize do
         ::Salesforce::Person.create!("contact", self)
       end
     end
+
+    class ::Topic
+      def has_salesforce_case
+        custom_fields["has_salesforce_case"] ? true : false
+      end
+
+      def salesforce_case
+        return unless has_salesforce_case
+        ::Salesforce::Case.find_by(topic_id: id)
+      end
+    end
+
+    require_dependency 'topic_list_item_serializer'
+    require_dependency 'search_topic_list_item_serializer'
+    require_dependency 'suggested_topic_serializer'
+    require_dependency 'user_summary_serializer'
+
+    class ::TopicListItemSerializer
+      include CaseMixin
+    end
+
+    class ::SearchTopicListItemSerializer
+      include CaseMixin
+    end
+
+    class ::SuggestedTopicSerializer
+      include CaseMixin
+    end
+
+    class ::UserSummarySerializer::TopicSerializer
+      include CaseMixin
+    end
+
+    class ::ListableTopicSerializer
+      include CaseMixin
+    end
+
+    require_dependency 'topic_view_serializer'
+    class ::TopicViewSerializer
+      attributes :salesforce_case
+
+      def include_salesforce_case?
+        SiteSetting.salesforce_enabled && object.topic.has_salesforce_case
+      end
+
+      def salesforce_case
+        ::Salesforce::CaseSerializer.new(object.topic.salesforce_case, root: false).as_json
+      end
+    end
   end
+
+  TopicList.preloaded_custom_fields << "has_salesforce_case" if TopicList.respond_to? :preloaded_custom_fields
 
   class ::OmniAuth::Strategies::Salesforce
     option :name, 'salesforce'

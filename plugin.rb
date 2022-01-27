@@ -34,6 +34,7 @@ after_initialize do
   [
     '../app/controllers/salesforce/admin_controller.rb',
     '../app/controllers/salesforce/persons_controller.rb',
+    '../app/models/salesforce/case.rb',
     '../app/models/salesforce/person.rb',
     '../lib/salesforce/api.rb'
   ].each { |path| load File.expand_path(path, __FILE__) }

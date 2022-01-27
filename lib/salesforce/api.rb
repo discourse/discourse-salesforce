@@ -45,8 +45,6 @@ module ::Salesforce
     end
 
     def set_access_token
-      return if SiteSetting.salesforce_instance_url.present? && SiteSetting.salesforce_access_token.present?
-
       connection = Faraday.new(url: 'https://login.salesforce.com')
       response = connection.post("/services/oauth2/token") do |req|
         req.body = URI.encode_www_form({

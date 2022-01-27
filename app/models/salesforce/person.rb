@@ -35,9 +35,12 @@ module ::Salesforce
       return if user.custom_fields[id_field].present?
 
       data = Salesforce::Api.new.post("sobjects/#{type.capitalize}", payload)
+      id = data["id"]
 
-      user.custom_fields[id_field] = data["id"]
+      user.custom_fields[id_field] = id
       user.save_custom_fields
+
+      id
     end
   end
 end

@@ -51,6 +51,19 @@ after_initialize do
     get '/admin/plugins/salesforce/index' => 'salesforce/admin#index', constraints: AdminConstraint.new
   end
 
+  reloadable_patch do |plugin|
+    require_dependency 'user'
+    class ::User
+      def salesforce_contact_id
+        custom_fields[::Salesforce::Person::CONTACT_ID_FIELD]
+      end
+
+      def create_salesforce_contact
+        ::Salesforce::Person.create!("contact", self)
+      end
+    end
+  end
+
   class ::OmniAuth::Strategies::Salesforce
     option :name, 'salesforce'
 

@@ -12,7 +12,7 @@ module ::Salesforce
     VERSION = "49.0"
     INVALID_RESPONSE = "salesforce.error.invalid_response"
 
-    attr_reader :faraday, :path
+    attr_reader :faraday, :prefix
 
     def initialize
       set_access_token
@@ -21,17 +21,24 @@ module ::Salesforce
         url: SiteSetting.salesforce_instance_url,
         headers: { 'Authorization' => "Bearer #{SiteSetting.salesforce_access_token}" }
       )
-      @path = "/services/data/v#{VERSION}"
+      @prefix = "/services/data/v#{VERSION}"
     end
 
-    def get(uri)
-      uri = File.join(path, uri)
-      response = faraday.get(uri)
+    def get(path)
+      call(path) do |uri|
+        faraday.get(uri)
+      end
     end
 
-    def post(uri, fields)
-      uri = File.join(path, uri)
-      response = faraday.post(uri, fields.to_json, 'Content-Type': 'application/json')
+    def post(path, fields)
+      call(path) do |uri|      
+        faraday.post(uri, fields.to_json, 'Content-Type': 'application/json')
+      end
+    end
+
+    def call(path)
+      uri = File.join(prefix, path)
+      response = yield(uri)
 
       case response.status
       when 200, 201

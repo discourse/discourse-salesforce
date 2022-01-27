@@ -2,7 +2,7 @@ import discourseComputed from "discourse-common/utils/decorators";
 import TopicListItem from "discourse/components/topic-list-item";
 
 export default {
-  name: "add-topic-list-class",
+  name: "salesforce-topic-list-class",
   initialize() {
     TopicListItem.reopen({
       @discourseComputed()

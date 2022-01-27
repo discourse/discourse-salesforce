@@ -10,6 +10,7 @@ class CreateSalesforceCasesTables < ActiveRecord::Migration[6.0]
       t.string :subject
       t.string :description
       t.string :status
+      t.datetime :last_synced_at
       t.timestamps
     end
   end

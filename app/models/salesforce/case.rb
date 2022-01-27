@@ -9,7 +9,8 @@ module ::Salesforce
       payload = {
         ContactId: self.contact_id,
         Subject: self.subject,
-        Description: self.description
+        Description: self.description,
+        Origin: "Web"
       }
 
       data = Salesforce::Api.new.post("sobjects/case", payload)
@@ -23,13 +24,17 @@ module ::Salesforce
 
       self.number = data["CaseNumber"]
       self.status = data["Status"]
+      self.last_synced_at = Time.zone.now
       save!
+
+      MessageBus.publish("/topic/#{topic_id}", reload_topic: true)
     end
 
     CASE_ID_FIELD = "salesforce_case_id"
 
     def self.sync!(topic)
-      find_or_initialize_by(topic_id: topic.id).tap do |c|
+      _case = find_or_initialize_by(topic_id: topic.id)
+      _case.tap do |c|
         user = topic.user
 
         if c.new_record?
@@ -44,6 +49,7 @@ module ::Salesforce
 
         c.sync!
       end
+      _case
     end
   end
 end

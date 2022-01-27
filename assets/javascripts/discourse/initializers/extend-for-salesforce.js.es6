@@ -5,6 +5,8 @@ import I18n from "I18n";
 import TopicStatus from "discourse/raw-views/topic-status";
 import TopicStatusIcons from "discourse/helpers/topic-status-icons";
 import PostCooked from "discourse/widgets/post-cooked";
+import { spinnerHTML } from "discourse/helpers/loading-spinner";
+import { iconHTML } from "discourse-common/lib/icon-library";
 
 export const PLUGIN_ID = "discourse-salesforce";
 
@@ -30,15 +32,24 @@ function createContact() {
 
 function syncCaseForTopic(context) {
   const topic = context.topic;
+  const op = context.topic
+    .get("postStream.posts")
+    .find((p) => p.post_number === 1);
+
+  topic.set("salesforce_case", spinnerHTML);
+  context.appEvents.trigger("post-stream:refresh", {
+    id: op.id,
+  });
+
   ajax(`/salesforce/cases/sync`, {
     type: "POST",
     data: { topic_id: topic.id },
   })
     .catch(popupAjaxError)
-    .then(() => {
-      const op = topic.get("postStream.posts").find((p) => p.post_number === 1);
+    .then((data) => {
+      topic.set("salesforce_case", data["case"]);
       context.appEvents.trigger("post-stream:refresh", {
-        force: true,
+        id: op.id,
       });
     });
 }
@@ -97,15 +108,28 @@ function initializeWithApi(api) {
           const salesforceCase = topic.salesforce_case;
 
           if (salesforceCase) {
-            const rawHtml = `
-              <aside class='quote salesforce-case' data-id="${salesforceCase.id}" data-topic="${topic.id}">
-                <div class='title'>
-                  Salesforce Case <a href="${salesforceUrl}/${salesforceCase.uid}">#${salesforceCase.number}</a> <div class="quote-controls"><\/div>
-                </div>
-                <blockquote>
-                  Status: <strong>${salesforceCase.status}</strong>
-                </blockquote>
-              </aside>`;
+            let rawHtml = "";
+
+            if (salesforceCase == spinnerHTML) {
+              rawHtml = spinnerHTML;
+            } else {
+              rawHtml = `
+                <aside class='quote salesforce-case' data-id="${
+                  salesforceCase.id
+                }" data-topic="${topic.id}">
+                  <div class='title'>
+                  ${iconHTML("briefcase", { class: "case" })}
+                    Salesforce Case <a href="${salesforceUrl}/${
+                salesforceCase.uid
+              }">#${
+                salesforceCase.number
+              }</a> <div class="quote-controls"><\/div>
+                  </div>
+                  <blockquote>
+                    Status: <strong>${salesforceCase.status}</strong>
+                  </blockquote>
+                </aside>`;
+            }
 
             const cooked = new PostCooked({ cooked: rawHtml }, dec);
             return dec.rawHtml(cooked.init());

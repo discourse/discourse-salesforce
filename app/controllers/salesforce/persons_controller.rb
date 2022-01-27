@@ -1,12 +1,12 @@
 # frozen_string_literal: true
 
 class Salesforce::PersonsController < Admin::AdminController
-  before_action :find_topic
-  attr_accessor :topic
+  before_action :find_user
+  attr_accessor :user
 
   def create
     begin
-      Salesforce::Person.create!(params.require(:type), topic.user)
+      Salesforce::Person.create!(params.require(:type), user)
       render json: success_json
     rescue => e
       render json: { errors: [e.message] }, status: 422
@@ -15,16 +15,16 @@ class Salesforce::PersonsController < Admin::AdminController
 
   def create_contact
     begin
-      Salesforce::Contact.create!(topic.user)
+      Salesforce::Contact.create!(user)
       render json: success_json
     rescue => e
       render json: { errors: [e.message] }, status: 422
     end
   end
 
-  def find_topic
-    params.require(:topic_id)
-    topic_id = params[:topic_id]
-    @topic = Topic.find_by(id: topic_id)
+  def find_user
+    params.require(:user_id)
+    user_id = params[:user_id]
+    @user = User.find_by(id: user_id)
   end
 end

@@ -16,7 +16,11 @@ require 'base64'
 enabled_site_setting :salesforce_enabled
 
 register_asset 'stylesheets/salesforce.scss'
-register_svg_icon "fab-salesforce" if respond_to?(:register_svg_icon)
+
+if respond_to?(:register_svg_icon)
+  register_svg_icon "fab-salesforce"
+  register_svg_icon "address-card"
+end
 
 require_relative 'lib/validators/salesforce_login_enabled_validator'
 
@@ -54,6 +58,9 @@ after_initialize do
     get '/admin/plugins/salesforce' => 'admin/plugins#index', constraints: AdminConstraint.new
     get '/admin/plugins/salesforce/index' => 'salesforce/admin#index', constraints: AdminConstraint.new
   end
+
+  allow_staff_user_custom_field(::Salesforce::Person::CONTACT_ID_FIELD)
+  allow_staff_user_custom_field(::Salesforce::Person::LEAD_ID_FIELD)
 
   reloadable_patch do |plugin|
     require_dependency 'user'

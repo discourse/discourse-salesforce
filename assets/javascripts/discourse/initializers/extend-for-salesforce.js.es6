@@ -6,20 +6,17 @@ import TopicStatus from "discourse/raw-views/topic-status";
 import TopicStatusIcons from "discourse/helpers/topic-status-icons";
 import PostCooked from "discourse/widgets/post-cooked";
 import { spinnerHTML } from "discourse/helpers/loading-spinner";
-import { iconHTML } from "discourse-common/lib/icon-library";
+import { iconHTML, iconNode } from "discourse-common/lib/icon-library";
 
 export const PLUGIN_ID = "discourse-salesforce";
 
 function createPerson(type, context) {
+  const post = context.model;
   ajax(`/salesforce/persons/create`, {
     type: "POST",
-    data: { type, topic_id: context.topic.id },
+    data: { type, user_id: post.user_id },
   }).catch(popupAjaxError);
-
-  const op = context.topic
-    .get("postStream.posts")
-    .find((p) => p.post_number === 1);
-  context.appEvents.trigger("post-stream:refresh", { id: op.id });
+  context.appEvents.trigger("post-stream:refresh", { id: post.id });
 }
 
 function createLead() {
@@ -62,27 +59,41 @@ function initializeWithApi(api) {
     TopicStatusIcons.addObject(["has_salesforce_case", "briefcase", "case"]);
     const salesforceUrl = Discourse.SiteSettings.salesforce_instance_url;
 
-    api.registerTopicFooterButton({
-      id: "salesforce-lead",
-      icon: "fab-salesforce",
-      label: "salesforce.lead.create",
-      action: createLead,
+    api.decorateWidget("post-admin-menu:after", (dec) => {
+      return dec.h(
+        "ul",
+        dec.attach("post-admin-menu-button", {
+          icon: "user-plus",
+          label: "salesforce.lead.create",
+          action: "createLead",
+          secondaryAction: "closeAdminMenu",
+          className: "create-lead",
+        })
+      );
     });
 
-    api.registerTopicFooterButton({
-      id: "salesforce-contact",
-      icon: "fab-salesforce",
-      label: "salesforce.contact.create",
-      action: createContact,
+    api.decorateWidget("post-admin-menu:after", (dec) => {
+      return dec.h(
+        "ul",
+        dec.attach("post-admin-menu-button", {
+          icon: "address-card",
+          label: "salesforce.contact.create",
+          action: "createContact",
+          secondaryAction: "closeAdminMenu",
+          className: "create-contact",
+        })
+      );
     });
+
+    api.attachWidgetAction("post", "createLead", createLead);
+    api.attachWidgetAction("post", "createContact", createContact);
 
     api.addPosterIcon((cfs, _) => {
       if (cfs.salesforce_lead_id) {
         return {
-          icon: "fab-salesforce",
-          className: "salesforce",
+          icon: "user-plus",
+          className: "salesforce-lead",
           title: I18n.t("salesforce.poster_icon.lead.title"),
-          text: I18n.t("salesforce.poster_icon.lead.text"),
           url: `${salesforceUrl}/${cfs.salesforce_lead_id}`,
         };
       }
@@ -91,10 +102,9 @@ function initializeWithApi(api) {
     api.addPosterIcon((cfs, _) => {
       if (cfs.salesforce_contact_id) {
         return {
-          icon: "fab-salesforce",
-          className: "salesforce",
+          icon: "address-card",
+          className: "salesforce-contact",
           title: I18n.t("salesforce.poster_icon.contact.title"),
-          text: I18n.t("salesforce.poster_icon.contact.text"),
           url: `${salesforceUrl}/${cfs.salesforce_contact_id}`,
         };
       }

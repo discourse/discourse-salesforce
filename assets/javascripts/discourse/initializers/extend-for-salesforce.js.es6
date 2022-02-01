@@ -2,11 +2,10 @@ import { withPluginApi } from "discourse/lib/plugin-api";
 import { ajax } from "discourse/lib/ajax";
 import { popupAjaxError } from "discourse/lib/ajax-error";
 import I18n from "I18n";
-import TopicStatus from "discourse/raw-views/topic-status";
 import TopicStatusIcons from "discourse/helpers/topic-status-icons";
 import PostCooked from "discourse/widgets/post-cooked";
 import { spinnerHTML } from "discourse/helpers/loading-spinner";
-import { iconHTML, iconNode } from "discourse-common/lib/icon-library";
+import { iconHTML } from "discourse-common/lib/icon-library";
 
 export const PLUGIN_ID = "discourse-salesforce";
 
@@ -56,6 +55,23 @@ function initializeWithApi(api) {
   const isStaff = currentUser && currentUser.staff;
 
   if (isStaff) {
+    api.modifyClass("raw-view:topic-status", {
+      statuses: Ember.computed(function () {
+        const results = this._super(...arguments);
+
+        if (this.topic.has_salesforce_case) {
+          results.push({
+            openTag: "span",
+            closeTag: "span",
+            title: I18n.t("topic_statuses.case.help"),
+            icon: "briefcase",
+            key: "case",
+          });
+        }
+        return results;
+      }),
+    });
+
     TopicStatusIcons.addObject(["has_salesforce_case", "briefcase", "case"]);
     const salesforceUrl = Discourse.SiteSettings.salesforce_instance_url;
 
@@ -185,23 +201,6 @@ function initializeWithApi(api) {
 export default {
   name: "extend-for-salesforce",
   initialize() {
-    api.modifyClass("raw-view:topic-status", {
-      statuses: Ember.computed(function () {
-        const results = this._super(...arguments);
-
-        if (this.topic.has_salesforce_case) {
-          results.push({
-            openTag: "span",
-            closeTag: "span",
-            title: I18n.t("topic_statuses.case.help"),
-            icon: "briefcase",
-            key: "case",
-          });
-        }
-        return results;
-      }),
-    });
-
     withPluginApi("0.1", initializeWithApi);
   },
 };

@@ -32,7 +32,6 @@ after_initialize do
   end
 
   [
-    '../app/controllers/salesforce/admin_controller.rb',
     '../app/controllers/salesforce/cases_controller.rb',
     '../app/controllers/salesforce/persons_controller.rb',
     '../app/models/salesforce/case.rb',

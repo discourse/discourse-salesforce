@@ -4,7 +4,7 @@ import TopicListItem from "discourse/components/topic-list-item";
 export default {
   name: "salesforce-topic-list-class",
   initialize() {
-    TopicListItem.reopen({
+    api.modifyClass("component:topic-list-item", {
       @discourseComputed()
       unboundClassNames() {
         let classList = this._super(...arguments);

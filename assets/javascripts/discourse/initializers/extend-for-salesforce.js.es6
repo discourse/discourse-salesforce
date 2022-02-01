@@ -185,7 +185,7 @@ function initializeWithApi(api) {
 export default {
   name: "extend-for-salesforce",
   initialize() {
-    TopicStatus.reopen({
+    api.modifyClass("raw-view:topic-status", {
       statuses: Ember.computed(function () {
         const results = this._super(...arguments);
 

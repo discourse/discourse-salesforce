@@ -35,7 +35,9 @@ after_initialize do
     '../app/controllers/salesforce/admin_controller.rb',
     '../app/controllers/salesforce/cases_controller.rb',
     '../app/controllers/salesforce/persons_controller.rb',
+    '../app/jobs/regular/sync_case_comments.rb',
     '../app/models/salesforce/case.rb',
+    '../app/models/salesforce/case_comment.rb',
     '../app/models/salesforce/person.rb',
     '../app/serializers/concerns/case_mixin.rb',
     '../app/serializers/case_serializer.rb',
@@ -58,6 +60,11 @@ after_initialize do
 
   allow_staff_user_custom_field(::Salesforce::Person::CONTACT_ID_FIELD)
   allow_staff_user_custom_field(::Salesforce::Person::LEAD_ID_FIELD)
+
+  on(:post_created) do |post, opts|
+    next unless post.topic.has_salesforce_case
+    Jobs.enqueue(:sync_case_comments, topic_id: post.topic_id, post_id: post.id)
+  end
 
   reloadable_patch do |plugin|
     require_dependency 'user'

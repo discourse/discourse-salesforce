@@ -43,6 +43,8 @@ module ::Salesforce
           c.description = topic.first_post.raw
           c.create!
 
+          Jobs.enqueue(:sync_case_comments, topic_id: topic.id)
+
           topic.custom_fields["has_salesforce_case"] = true
           topic.save_custom_fields
         end

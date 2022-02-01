@@ -6,8 +6,6 @@
 # author: Vinoth Kannan
 # url: https://github.com/discourse/discourse-salesforce
 
-gem 'jwt', '2.3.0'
-
 require 'auth/oauth2_authenticator'
 require 'omniauth-oauth2'
 require 'openssl'
@@ -17,10 +15,8 @@ enabled_site_setting :salesforce_enabled
 
 register_asset 'stylesheets/salesforce.scss'
 
-if respond_to?(:register_svg_icon)
-  register_svg_icon "fab-salesforce"
-  register_svg_icon "address-card"
-end
+register_svg_icon "fab-salesforce"
+register_svg_icon "address-card"
 
 require_relative 'lib/validators/salesforce_login_enabled_validator'
 
@@ -126,7 +122,7 @@ after_initialize do
     end
   end
 
-  TopicList.preloaded_custom_fields << "has_salesforce_case" if TopicList.respond_to? :preloaded_custom_fields
+  TopicList.preloaded_custom_fields << "has_salesforce_case"
 
   class ::OmniAuth::Strategies::Salesforce
     option :name, 'salesforce'

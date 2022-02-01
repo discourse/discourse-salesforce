@@ -32,6 +32,7 @@ after_initialize do
   end
 
   [
+    '../app/controllers/salesforce/admin_controller.rb',
     '../app/controllers/salesforce/cases_controller.rb',
     '../app/controllers/salesforce/persons_controller.rb',
     '../app/models/salesforce/case.rb',
@@ -44,15 +45,16 @@ after_initialize do
   Salesforce::Engine.routes.draw do
     post "/persons/create" => "persons#create"
     post "/cases/sync" => "cases#sync"
+    get "/admin/authorize" => "admin#authorize"
   end
 
   add_admin_route 'salesforce.title', 'salesforce'
 
   Discourse::Application.routes.append do
     mount ::Salesforce::Engine, at: "salesforce"
-    get '/admin/plugins/salesforce' => 'admin/plugins#index', constraints: AdminConstraint.new
-    get '/admin/plugins/salesforce/index' => 'salesforce/admin#index', constraints: AdminConstraint.new
   end
+
+  AdminDashboardData.problem_messages << ::Salesforce::Api::APP_NOT_APPROVED
 
   allow_staff_user_custom_field(::Salesforce::Person::CONTACT_ID_FIELD)
   allow_staff_user_custom_field(::Salesforce::Person::LEAD_ID_FIELD)
@@ -208,7 +210,11 @@ class OmniAuth::Strategies::Salesforce < OmniAuth::Strategies::OAuth2
 
 end
 
-class Auth::SalesforceAuthenticator < Auth::OAuth2Authenticator
+class Auth::SalesforceAuthenticator < Auth::ManagedAuthenticator
+  def name
+    "salesforce"
+  end
+
   def register_middleware(omniauth)
     omniauth.provider :salesforce,
                       setup: lambda { |env|
@@ -227,7 +233,6 @@ end
 auth_provider pretty_name: 'Salesforce',
               icon: 'fab-salesforce',
               title: 'with Salesforce',
-              message: 'Authentication with Salesforce (make sure pop up blockers are not enabled)',
               frame_width: 840,
               frame_height: 570,
-              authenticator: Auth::SalesforceAuthenticator.new('salesforce', trusted: true, auto_create_account: true)
+              authenticator: Auth::SalesforceAuthenticator.new

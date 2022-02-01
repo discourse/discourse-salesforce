@@ -16,9 +16,6 @@ plugins:
     textarea: true
   salesforce_username:
     default: ''
-  salesforce_password:
-    default: ''
-    secret: true
   salesforce_instance_url:
     default: ''
     client: true

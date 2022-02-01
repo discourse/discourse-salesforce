@@ -11,6 +11,7 @@ module ::Salesforce
 
     VERSION = "49.0"
     INVALID_RESPONSE = "salesforce.error.invalid_response"
+    APP_NOT_APPROVED = "dashboard.salesforce.app_not_approved"
 
     attr_reader :faraday, :prefix
 
@@ -52,6 +53,8 @@ module ::Salesforce
     end
 
     def set_access_token
+      AdminDashboardData.clear_problem_message(APP_NOT_APPROVED) if AdminDashboardData.problem_message_check(APP_NOT_APPROVED)
+
       connection = Faraday.new(url: 'https://login.salesforce.com')
       response = connection.post("/services/oauth2/token") do |req|
         req.body = URI.encode_www_form({
@@ -60,11 +63,13 @@ module ::Salesforce
         })
       end
 
-      if response.status != 200
-        raise Salesforce::InvalidCredentials
-      end
+      status = response.status
+      body = response.body
 
-      data = JSON.parse response.body
+      AdminDashboardData.add_problem_message(APP_NOT_APPROVED) if status == 400 && body.include?("user hasn't approved this consumer")
+      raise Salesforce::InvalidCredentials if status != 200
+
+      data = JSON.parse(body)
       SiteSetting.salesforce_access_token = data["access_token"]
       SiteSetting.salesforce_instance_url = data["instance_url"]
     end

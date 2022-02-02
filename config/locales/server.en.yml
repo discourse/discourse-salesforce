@@ -5,7 +5,7 @@ en:
     salesforce_client_id: "Salesforce connected app's client id"
     salesforce_client_secret: "Salesforce connected app's client secret"
     salesforce_username: "Salesforce account username"
-    salesforce_password: "Salesforce account password"
+    salesforce_max_feed_items_per_day: "Maximum number topic replies which can be posted as feed items on Salesforce objects (Case/Lead/Contact) per day"
     errors:
       salesforce_client_credentials_required: "Salesforce client id and client secret settings are required"
   salesforce:

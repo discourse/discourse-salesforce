@@ -20,3 +20,5 @@ plugins:
     default: ''
     client: true
     hidden: true
+  salesforce_max_feed_items_per_day:
+    default: -1

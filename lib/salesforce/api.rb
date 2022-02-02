@@ -20,7 +20,7 @@ module ::Salesforce
 
       @faraday = Faraday.new(
         url: SiteSetting.salesforce_instance_url,
-        headers: { 'Authorization' => "Bearer #{SiteSetting.salesforce_access_token}" }
+        headers: { 'Authorization' => "Bearer #{access_token}" }
       )
       @prefix = "/services/data/v#{VERSION}"
     end
@@ -54,6 +54,7 @@ module ::Salesforce
 
     def set_access_token
       AdminDashboardData.clear_problem_message(APP_NOT_APPROVED) if AdminDashboardData.problem_message_check(APP_NOT_APPROVED)
+      return if access_token.present?
 
       connection = Faraday.new(url: 'https://login.salesforce.com')
       response = connection.post("/services/oauth2/token") do |req|
@@ -70,11 +71,15 @@ module ::Salesforce
       raise Salesforce::InvalidCredentials if status != 200
 
       data = JSON.parse(body)
-      SiteSetting.salesforce_access_token = data["access_token"]
+      Discourse.redis.setex("salesforce_access_token", 10.minutes, data["access_token"])
       SiteSetting.salesforce_instance_url = data["instance_url"]
     end
   
     private
+
+    def access_token
+      Discourse.redis.get("salesforce_access_token")
+    end
   
     def claims
       {

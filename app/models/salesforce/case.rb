@@ -13,14 +13,14 @@ module ::Salesforce
         Origin: "Web"
       }
 
-      data = Salesforce::Api.new.post("sobjects/case", payload)
+      data = Salesforce::Api.new.post("sobjects/Case", payload)
 
       self.uid = data["id"]
       save!
     end
 
     def sync!
-      data = Salesforce::Api.new.get("sobjects/case/#{self.uid}")
+      data = Salesforce::Api.new.get("sobjects/Case/#{self.uid}")
 
       self.number = data["CaseNumber"]
       self.status = data["Status"]
@@ -38,9 +38,11 @@ module ::Salesforce
         user = topic.user
 
         if c.new_record?
+          post = topic.first_post
+          description = "#{post.full_url}\n\n#{post.raw}"
           c.contact_id = user.salesforce_contact_id || user.create_salesforce_contact
           c.subject = topic.title
-          c.description = topic.first_post.raw
+          c.description = description
           c.create!
 
           Jobs.enqueue(:sync_case_comments, topic_id: topic.id)

@@ -20,7 +20,8 @@ module ::Salesforce
       payload = {
         Email: user.email,
         LastName: last_name,
-        LeadSource: LEAD_SOURCE
+        LeadSource: LEAD_SOURCE,
+        Description: "#{Discourse.base_url}/u/#{UrlHelper.encode_component(user.username)}"
       }
 
       payload.merge!(FirstName: first_name) if first_name.present?

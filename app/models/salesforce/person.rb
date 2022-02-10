@@ -41,6 +41,12 @@ module ::Salesforce
       user.custom_fields[id_field] = id
       user.save_custom_fields
 
+      if type == "lead"
+        Salesforce.leads_group.add(user)
+      elsif type == "contact"
+        Salesforce.contacts_group.add(user)
+      end
+
       id
     end
   end

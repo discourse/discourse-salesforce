@@ -30,6 +30,19 @@ after_initialize do
       engine_name PLUGIN_NAME
       isolate_namespace Salesforce
     end
+
+    %i{
+      leads
+      contacts
+    }.each do |type|
+      define_singleton_method("#{type}_group") do
+        Group.joins(:_custom_fields).find_by(_custom_fields: {name: group_custom_field(type), value: "t"})
+      end
+    end
+
+    def self.group_custom_field(type)
+      "Salesforce #{type.capitalize} Group"
+    end
   end
 
   [

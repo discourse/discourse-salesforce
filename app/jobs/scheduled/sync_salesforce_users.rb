@@ -13,8 +13,11 @@ module ::Jobs
         ids = fields.pluck(:value)
         data = Salesforce::Api.new.get("composite/sobjects/Lead?fields=ConvertedContactId&ids=#{ids.join(",")}")
         data.each do |lead|
-          next if lead["ConvertedContactId"].blank?
-          lead_fields.where(value: lead["Id"]).update_all(value: lead["ConvertedContactId"], name: ::Salesforce::Person::CONTACT_ID_FIELD)
+          contact_id = lead["ConvertedContactId"]
+          next if contact_id.blank?
+
+          field = lead_fields.find_by(value: lead["Id"])
+          field.update(name: ::Salesforce::Person::CONTACT_ID_FIELD, value: contact_id)
         end
       end
 
@@ -23,8 +26,11 @@ module ::Jobs
         ids = fields.pluck(:value)
         data = Salesforce::Api.new.get("composite/sobjects/Contact?fields=MasterRecordId&ids=#{ids.join(",")}")
         data.each do |contact|
-          next if contact["MasterRecordId"].blank?
-          contact_fields.where(value: contact["Id"]).update_all(value: contact["MasterRecordId"])
+          new_contact_id = contact["MasterRecordId"]
+          next if new_contact_id.blank?
+
+          field = contact_fields.find_by(value: contact["Id"])
+          field.update(value: new_contact_id)
         end
       end
     end

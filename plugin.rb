@@ -21,6 +21,7 @@ register_svg_icon "address-card"
 require_relative 'lib/validators/salesforce_login_enabled_validator'
 
 after_initialize do
+  SeedFu.fixture_paths << Rails.root.join("plugins", "discourse-salesforce", "db", "fixtures").to_s
 
   module ::Salesforce
     PLUGIN_NAME = 'discourse-salesforce'.freeze
@@ -37,6 +38,7 @@ after_initialize do
     '../app/controllers/salesforce/persons_controller.rb',
     '../app/jobs/regular/create_feed_item.rb',
     '../app/jobs/regular/sync_case_comments.rb',
+    '../app/jobs/scheduled/sync_salesforce_users.rb',
     '../app/models/salesforce/case.rb',
     '../app/models/salesforce/feed_item.rb',
     '../app/models/salesforce/person.rb',

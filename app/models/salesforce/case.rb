@@ -27,6 +27,12 @@ module ::Salesforce
       self.last_synced_at = Time.zone.now
       save!
 
+      if SiteSetting.tagging_enabled
+        tags = [SiteSetting.salesforce_case_tag_name]
+        tags << SiteSetting.salesforce_new_case_tag_name if self.status  == "New"
+        DiscourseTagging.tag_topic_by_names(topic, Guardian.new(Discourse.system_user), tags)
+      end
+
       MessageBus.publish("/topic/#{topic_id}", reload_topic: true)
     end
 

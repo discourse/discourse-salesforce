@@ -18,8 +18,10 @@ plugins:
     default: ''
   salesforce_case_tag_name:
     default: 'salesforce-case'
-  salesforce_new_case_tag_name:
-    default: 'salesforce-case-new'
+  salesforce_case_status_tag_enabled:
+    default: true
+  salesforce_case_status_tag_prefix:
+    default: 'case'
   salesforce_instance_url:
     default: ''
     client: true

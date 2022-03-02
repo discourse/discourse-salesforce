@@ -28,8 +28,12 @@ module ::Salesforce
       save!
 
       if SiteSetting.tagging_enabled
-        tags = [SiteSetting.salesforce_case_tag_name]
-        tags << SiteSetting.salesforce_new_case_tag_name if self.status  == "New"
+        topic = Topic.find_by(id: topic_id)
+        return if topic.blank?
+
+        tags = []
+        tags << SiteSetting.salesforce_case_tag_name if SiteSetting.salesforce_case_tag_name.present?
+        tags << "#{SiteSetting.salesforce_case_status_tag_prefix}-#{self.status.downcase}" if SiteSetting.salesforce_case_status_tag_enabled
         DiscourseTagging.tag_topic_by_names(topic, Guardian.new(Discourse.system_user), tags)
       end
 

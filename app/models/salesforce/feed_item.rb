@@ -4,30 +4,40 @@ module ::Salesforce
   class FeedItem
     ID_FIELD = "salesforce_feed_item_id"
 
-    def self.create!(post, uid)
+    attr_reader :parent_id, :post, :max_feed_items
+
+    def initialize(uid, post)
+      @parent_id = uid
+      @post = post
+      @max_feed_items = SiteSetting.salesforce_max_feed_items_per_day
+    end
+
+    def create!
       return if post.post_type != Post.types[:regular]
 
-      max_feed_items = SiteSetting.salesforce_max_feed_items_per_day
-      limiter = RateLimiter.new(nil, "salesforce_feed_#{uid}", max_feed_items, 1.day)
-      limiter.performed! unless max_feed_items == -1 || limiter.can_perform?
+      limiter = RateLimiter.new(nil, "#{self.class::ID_FIELD}_#{parent_id}", max_feed_items, 1.day)
+      limiter.performed! if has_rate_limit? && !limiter.can_perform?
 
-      body = post.raw
-      body = yield(body) if block_given?
+      data = Api.new.post("sobjects/#{self.class.name.demodulize}", payload)
+      limiter.performed! if has_rate_limit?
 
-      payload = {
-        Body: body,
+      post.custom_fields[self.class::ID_FIELD] = data["id"]
+      post.save_custom_fields
+    end
+
+    def payload
+      {
+        Body: post.raw,
         LinkUrl: post.full_url,
         Title: post.topic.title,
         Type: "LinkPost",
         Visibility: "InternalUsers",
-        ParentId: uid
+        ParentId: parent_id
       }
+    end
 
-      data = Api.new.post("sobjects/FeedItem", payload)
-      limiter.performed! if max_feed_items > -1 && post.post_number > 1
-
-      post.custom_fields[ID_FIELD] = data["id"]
-      post.save_custom_fields
+    def has_rate_limit?
+      max_feed_items > -1 && post.post_number > 1
     end
   end
 end

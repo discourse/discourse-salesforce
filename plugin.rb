@@ -49,11 +49,13 @@ after_initialize do
     '../app/controllers/salesforce/admin_controller.rb',
     '../app/controllers/salesforce/cases_controller.rb',
     '../app/controllers/salesforce/persons_controller.rb',
+    '../app/jobs/regular/create_case_comment.rb',
     '../app/jobs/regular/create_feed_item.rb',
     '../app/jobs/regular/sync_case_comments.rb',
     '../app/jobs/scheduled/sync_salesforce_users.rb',
     '../app/models/salesforce/case.rb',
     '../app/models/salesforce/feed_item.rb',
+    '../app/models/salesforce/case_comment.rb',
     '../app/models/salesforce/person.rb',
     '../app/serializers/concerns/case_mixin.rb',
     '../app/serializers/case_serializer.rb',
@@ -78,7 +80,13 @@ after_initialize do
   allow_staff_user_custom_field(::Salesforce::Person::LEAD_ID_FIELD)
 
   on(:post_created) do |post, opts|
-    Jobs.enqueue(:create_feed_item, post_id: post.id)
+    topic = post.topic
+
+    if topic.has_salesforce_case
+      Jobs.enqueue(:create_case_comment, post_id: post.id)
+    else
+      Jobs.enqueue(:create_feed_item, post_id: post.id)
+    end
   end
 
   reloadable_patch do |plugin|

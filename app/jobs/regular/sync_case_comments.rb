@@ -11,16 +11,14 @@ module ::Jobs
       _case = ::Salesforce::Case.find_by(topic_id: topic_id)
       return if _case.blank?
 
-      posts = Post.joins("LEFT JOIN post_custom_fields ON posts.id = post_custom_fields.post_id AND post_custom_fields.name = '#{::Salesforce::FeedItem::ID_FIELD}'")
+      posts = Post.joins("LEFT JOIN post_custom_fields ON posts.id = post_custom_fields.post_id AND post_custom_fields.name = '#{::Salesforce::CaseComment::ID_FIELD}'")
                   .where(topic_id: topic_id, post_type: Post.types[:regular])
                   .where("post_custom_fields.value IS NULL")
                   .where.not(post_number: 1)
       posts = posts.where(id: post_id) if post_id.present?
 
       posts.find_each do |post|
-        ::Salesforce::FeedItem.create!(post, _case.uid) do |body|
-          "@#{post.user.username}: #{body}"
-        end
+        ::Salesforce::CaseComment.new(_case.uid, post).create!
       end
     end
   end

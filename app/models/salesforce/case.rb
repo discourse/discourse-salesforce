@@ -5,6 +5,8 @@ module ::Salesforce
   class Case < ::ActiveRecord::Base
     self.table_name = "salesforce_cases"
 
+    belongs_to :topic
+
     def create!
       payload = {
         ContactId: self.contact_id,

@@ -32,7 +32,7 @@ module ::Salesforce
     end
 
     def post(path, fields)
-      call(path) do |uri|      
+      call(path) do |uri|
         faraday.post(uri, fields.to_json, 'Content-Type': 'application/json')
       end
     end
@@ -54,13 +54,13 @@ module ::Salesforce
 
     def set_access_token
       AdminDashboardData.clear_problem_message(APP_NOT_APPROVED) if AdminDashboardData.problem_message_check(APP_NOT_APPROVED)
-      return if access_token.present?
+      return if access_token.present? && SiteSetting.salesforce_instance_url.present?
 
       connection = Faraday.new(url: 'https://login.salesforce.com')
       response = connection.post("/services/oauth2/token") do |req|
         req.body = URI.encode_www_form({
           grant_type: 'urn:ietf:params:oauth:grant-type:jwt-bearer',
-          assertion: JWT.encode(claims, private_key, 'RS256')
+          assertion: jwt_assertion
         })
       end
 
@@ -75,8 +75,6 @@ module ::Salesforce
       SiteSetting.salesforce_instance_url = data["instance_url"]
     end
   
-    private
-
     def access_token
       Discourse.redis.get("salesforce_access_token")
     end
@@ -93,6 +91,10 @@ module ::Salesforce
   
     def private_key
       OpenSSL::PKey::RSA.new(SiteSetting.salesforce_rsa_private_key)
+    end
+
+    def jwt_assertion
+      JWT.encode(claims, private_key, 'RS256')
     end
   end
 end

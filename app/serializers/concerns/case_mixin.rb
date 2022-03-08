@@ -10,6 +10,6 @@ module CaseMixin
   end
 
   def include_has_salesforce_case?
-    SiteSetting.salesforce_enabled
+    SiteSetting.salesforce_enabled && scope.is_staff?
   end
 end

@@ -90,8 +90,6 @@ after_initialize do
   end
 
   reloadable_patch do |plugin|
-    require_dependency 'user'
-    require_dependency 'topic'
 
     class ::User
       def salesforce_contact_id
@@ -146,11 +144,6 @@ after_initialize do
       end
     end
 
-    require_dependency 'topic_list_item_serializer'
-    require_dependency 'search_topic_list_item_serializer'
-    require_dependency 'suggested_topic_serializer'
-    require_dependency 'user_summary_serializer'
-
     class ::TopicListItemSerializer
       include CaseMixin
     end
@@ -171,12 +164,11 @@ after_initialize do
       include CaseMixin
     end
 
-    require_dependency 'topic_view_serializer'
     class ::TopicViewSerializer
       attributes :salesforce_case
 
       def include_salesforce_case?
-        SiteSetting.salesforce_enabled && object.topic.has_salesforce_case
+        SiteSetting.salesforce_enabled && scope.is_staff? && object.topic.has_salesforce_case
       end
 
       def salesforce_case

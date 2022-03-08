@@ -6,7 +6,7 @@ module ::Jobs
     sidekiq_options retry: false
 
     def execute(args)
-      return unless SiteSetting.salesforce_enabled && SiteSetting.salesforce_access_token && SiteSetting.salesforce_instance_url
+      return unless SiteSetting.salesforce_enabled
 
       lead_fields = UserCustomField.where(name: ::Salesforce::Person::LEAD_ID_FIELD)
       lead_fields.find_in_batches(batch_size: 100) do |fields|

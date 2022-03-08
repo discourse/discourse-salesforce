@@ -2,8 +2,8 @@
 
 Fabricator(:salesforce_case, from: "::Salesforce::Case") do
   topic
-  uid { sequence(:uid) }
-  contact_id { sequence(:contact_id) }
+  uid { sequence(:uid) { |i| "case#{i}" } }
+  contact_id { sequence(:contact_id) { |i| "contact#{i}" } }
   subject "This is case title"
   description "This is the description of the Salesforce case."
   number "345678"

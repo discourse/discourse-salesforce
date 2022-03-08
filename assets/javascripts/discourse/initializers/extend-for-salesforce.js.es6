@@ -11,11 +11,14 @@ export const PLUGIN_ID = "discourse-salesforce";
 
 function createPerson(type, context) {
   const post = context.model;
+  post.set("flair_url", "loading spinner");
   ajax(`/salesforce/persons/create`, {
     type: "POST",
     data: { type, user_id: post.user_id },
-  }).catch(popupAjaxError);
-  context.appEvents.trigger("post-stream:refresh", { id: post.id });
+  }).catch(popupAjaxError).then((_) => {
+    post.set("flair_url", "fab-salesforce");
+    context.appEvents.trigger("post-stream:refresh", { id: post.id });
+  });
 }
 
 function createLead() {

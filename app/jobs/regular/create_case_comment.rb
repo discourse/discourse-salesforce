@@ -7,8 +7,8 @@ module ::Jobs
       post_id = args[:post_id]
       return if post_id.blank?
 
-      post = Post.find_by(id: post_id)
-      return if post.blank? || post.post_type != Post.types[:regular] || post.custom_fields[::Salesforce::CaseComment::ID_FIELD].present?
+      post = Post.find_by(id: post_id, post_type: Post.types[:regular])
+      return if post.blank? || post.custom_fields[::Salesforce::CaseComment::ID_FIELD].present?
 
       topic = post.topic
       return unless topic.present? && topic.has_salesforce_case

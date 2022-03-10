@@ -10,7 +10,7 @@ RSpec.describe ::Salesforce::CasesController do
   fab!(:first_post) { Fabricate(:post, topic: topic) }
   fab!(:admin) { Fabricate(:admin) }
 
-  context "sync" do
+  describe "#sync" do
 
     it 'creates a new case object in Salesforce' do
       sign_in(admin)

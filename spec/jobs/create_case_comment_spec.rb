@@ -12,7 +12,7 @@ RSpec.describe Jobs::CreateCaseComment do
 
   it 'creates a case comment object on Salesforce' do
     topic.custom_fields["has_salesforce_case"] = true
-    topic.save!
+    topic.save_custom_fields
 
     ::Salesforce::CaseComment.any_instance.expects(:create!).once
     described_class.new.execute(post_id: post.id)

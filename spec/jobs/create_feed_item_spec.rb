@@ -11,7 +11,7 @@ RSpec.describe Jobs::CreateFeedItem do
 
   it 'creates a feed item on Salesforce lead object' do
     user.custom_fields[::Salesforce::Person::LEAD_ID_FIELD] = "lead_123"
-    user.save!
+    user.save_custom_fields
 
     ::Salesforce::FeedItem.any_instance.expects(:create!).once
     described_class.new.execute(post_id: post.id)

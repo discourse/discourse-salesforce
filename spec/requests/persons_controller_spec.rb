@@ -9,7 +9,7 @@ RSpec.describe ::Salesforce::PersonsController do
   fab!(:user) { Fabricate(:user) }
   fab!(:admin) { Fabricate(:admin) }
 
-  context "create" do
+  describe "#create" do
     before do
       sign_in(admin)
     end

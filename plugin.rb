@@ -6,7 +6,7 @@
 # author: Vinoth Kannan
 # url: https://github.com/discourse/discourse-salesforce
 
-require 'auth/oauth2_authenticator'
+require 'auth/managed_authenticator'
 require 'omniauth-oauth2'
 require 'openssl'
 require 'base64'
@@ -14,11 +14,14 @@ require 'base64'
 enabled_site_setting :salesforce_enabled
 
 register_asset 'stylesheets/salesforce.scss'
-register_svg_icon "fab-salesforce" if respond_to?(:register_svg_icon)
+
+register_svg_icon "fab-salesforce"
+register_svg_icon "address-card"
 
 require_relative 'lib/validators/salesforce_login_enabled_validator'
 
 after_initialize do
+  SeedFu.fixture_paths << Rails.root.join("plugins", "discourse-salesforce", "db", "fixtures").to_s
 
   module ::Salesforce
     PLUGIN_NAME = 'discourse-salesforce'.freeze
@@ -27,21 +30,155 @@ after_initialize do
       engine_name PLUGIN_NAME
       isolate_namespace Salesforce
     end
+
+    def self.leads_group
+      group_id = SiteSetting.salesforce_leads_group_id
+      return if group_id.blank?
+
+      Group.find_by(id: group_id)
+    end
+
+    def self.contacts_group
+      group_id = SiteSetting.salesforce_contacts_group_id
+      return if group_id.blank?
+
+      Group.find_by(id: group_id)
+    end
   end
 
   [
+    '../app/controllers/salesforce/admin_controller.rb',
+    '../app/controllers/salesforce/cases_controller.rb',
     '../app/controllers/salesforce/persons_controller.rb',
+    '../app/jobs/regular/create_case_comment.rb',
+    '../app/jobs/regular/create_feed_item.rb',
+    '../app/jobs/regular/sync_case_comments.rb',
+    '../app/jobs/scheduled/sync_salesforce_users.rb',
+    '../app/models/salesforce/case.rb',
+    '../app/models/salesforce/feed_item.rb',
+    '../app/models/salesforce/case_comment.rb',
     '../app/models/salesforce/person.rb',
+    '../app/serializers/concerns/case_mixin.rb',
+    '../app/serializers/case_serializer.rb',
     '../lib/salesforce/api.rb'
   ].each { |path| load File.expand_path(path, __FILE__) }
 
   Salesforce::Engine.routes.draw do
     post "/persons/create" => "persons#create"
+    post "/cases/sync" => "cases#sync"
+    get "/admin/authorize" => "admin#authorize"
   end
+
+  add_admin_route 'salesforce.title', 'salesforce'
 
   Discourse::Application.routes.append do
     mount ::Salesforce::Engine, at: "salesforce"
   end
+
+  AdminDashboardData.problem_messages << ::Salesforce::Api::APP_NOT_APPROVED
+
+  allow_staff_user_custom_field(::Salesforce::Person::CONTACT_ID_FIELD)
+  allow_staff_user_custom_field(::Salesforce::Person::LEAD_ID_FIELD)
+
+  on(:post_created) do |post, opts|
+    topic = post.topic
+
+    if topic.has_salesforce_case
+      Jobs.enqueue(:create_case_comment, post_id: post.id)
+    else
+      Jobs.enqueue(:create_feed_item, post_id: post.id)
+    end
+  end
+
+  reloadable_patch do |plugin|
+
+    class ::User
+      def salesforce_contact_id
+        custom_fields[::Salesforce::Person::CONTACT_ID_FIELD]
+      end
+
+      def salesforce_lead_id
+        custom_fields[::Salesforce::Person::LEAD_ID_FIELD]
+      end
+
+      def create_salesforce_contact
+        ::Salesforce::Person.create!("contact", self)
+      end
+
+      def salesforce_contact_payload
+        name = self.name || self.username
+
+        if name.include?(" ")
+          first_name, last_name = name.split(" ", 2)
+        else
+          last_name = name
+        end
+
+        payload = {
+          Email: self.email,
+          LastName: last_name,
+          LeadSource: ::Salesforce::Person::SOURCE,
+          Description: "#{Discourse.base_url}/u/#{UrlHelper.encode_component(self.username)}"
+        }
+
+        payload.merge!(FirstName: first_name) if first_name.present?
+
+        payload
+      end
+
+      def salesforce_lead_payload
+        salesforce_contact_payload.merge({
+          Company: ::Salesforce::Person::DEFAULT_COMPANY_NAME,
+          Website: self.user_profile&.website
+        })
+      end
+    end
+
+    class ::Topic
+      def has_salesforce_case
+        custom_fields["has_salesforce_case"] ? true : false
+      end
+
+      def salesforce_case
+        return unless has_salesforce_case
+        ::Salesforce::Case.find_by(topic_id: id)
+      end
+    end
+
+    class ::TopicListItemSerializer
+      include CaseMixin
+    end
+
+    class ::SearchTopicListItemSerializer
+      include CaseMixin
+    end
+
+    class ::SuggestedTopicSerializer
+      include CaseMixin
+    end
+
+    class ::UserSummarySerializer::TopicSerializer
+      include CaseMixin
+    end
+
+    class ::ListableTopicSerializer
+      include CaseMixin
+    end
+
+    class ::TopicViewSerializer
+      attributes :salesforce_case
+
+      def include_salesforce_case?
+        SiteSetting.salesforce_enabled && scope.is_staff? && object.topic.has_salesforce_case
+      end
+
+      def salesforce_case
+        ::Salesforce::CaseSerializer.new(object.topic.salesforce_case, root: false).as_json
+      end
+    end
+  end
+
+  TopicList.preloaded_custom_fields << "has_salesforce_case"
 
   class ::OmniAuth::Strategies::Salesforce
     option :name, 'salesforce'
@@ -128,7 +265,11 @@ class OmniAuth::Strategies::Salesforce < OmniAuth::Strategies::OAuth2
 
 end
 
-class Auth::SalesforceAuthenticator < Auth::OAuth2Authenticator
+class Auth::SalesforceAuthenticator < Auth::ManagedAuthenticator
+  def name
+    "salesforce"
+  end
+
   def register_middleware(omniauth)
     omniauth.provider :salesforce,
                       setup: lambda { |env|
@@ -147,7 +288,6 @@ end
 auth_provider pretty_name: 'Salesforce',
               icon: 'fab-salesforce',
               title: 'with Salesforce',
-              message: 'Authentication with Salesforce (make sure pop up blockers are not enabled)',
               frame_width: 840,
               frame_height: 570,
-              authenticator: Auth::SalesforceAuthenticator.new('salesforce', trusted: true, auto_create_account: true)
+              authenticator: Auth::SalesforceAuthenticator.new

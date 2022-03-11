@@ -1,6 +1,7 @@
 en:
   js:
     salesforce:
+      title: Salesforce
       lead:
         create: "Create Lead"
       contact:
@@ -12,3 +13,7 @@ en:
         contact:
           title: "Salesforce Contact"
           text: "Contact"
+    topic:
+      actions:
+        create_salesforce_case: "Create Case"
+        sync_salesforce_case: "Sync Case"

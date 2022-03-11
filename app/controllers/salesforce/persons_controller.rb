@@ -26,5 +26,6 @@ class Salesforce::PersonsController < Admin::AdminController
     params.require(:user_id)
     user_id = params[:user_id]
     @user = User.find_by(id: user_id)
+    raise Discourse::InvalidParameters.new(:user_id) if user.blank?
   end
 end

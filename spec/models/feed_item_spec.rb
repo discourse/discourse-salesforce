@@ -9,17 +9,19 @@ RSpec.describe Salesforce::FeedItem do
   fab!(:user) { Fabricate(:user) }
   fab!(:post) { Fabricate(:post, user: user) }
 
-  it 'creates a feed item on Salesforce lead object' do
-    user.custom_fields[::Salesforce::Person::LEAD_ID_FIELD] = "lead_123"
-    user.save!
+  describe '#create!' do
+    it 'creates a feed item on Salesforce lead object' do
+      user.custom_fields[::Salesforce::Person::LEAD_ID_FIELD] = "lead_123"
+      user.save!
 
-    feed_item = ::Salesforce::FeedItem.new(user.salesforce_lead_id, post)
-    stub_request(:post, "#{api_path}/FeedItem").
-         with(body: feed_item.payload.to_json).
-         to_return(status: 200, body: { id: "feed_item_123" }.to_json, headers: {})
+      feed_item = ::Salesforce::FeedItem.new(user.salesforce_lead_id, post)
+      stub_request(:post, "#{api_path}/FeedItem").
+          with(body: feed_item.payload.to_json).
+          to_return(status: 200, body: { id: "feed_item_123" }.to_json, headers: {})
 
-    feed_item.create!
+      feed_item.create!
 
-    expect(post.custom_fields[::Salesforce::FeedItem::ID_FIELD]).to eq("feed_item_123")
+      expect(post.custom_fields[::Salesforce::FeedItem::ID_FIELD]).to eq("feed_item_123")
+    end
   end
 end

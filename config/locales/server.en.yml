@@ -13,4 +13,4 @@ en:
       invalid_response: "Invalid response from Salesforce API"
   dashboard:
     salesforce:
-      app_not_approved: "The Discourse connected app is not yet authorized in Salesforce by the user mentioned in site setting `salesforce_username`. Please follow <a href='%{base_url}/login'>this link</a> to authorize it."
+      app_not_approved: "The Discourse connected app is not yet authorized in Salesforce by the user mentioned in site setting `salesforce_username`. Please follow <a href='%{base_url}/salesforce/admin/authorize'>this link</a> to authorize it."

@@ -10,11 +10,7 @@ if Salesforce.leads_group.blank?
     bio_raw: 'Members are automatically synced from Salesforce via API',
     full_name: 'Salesforce Leads'
   )
-  GroupCustomField.create!(
-    group_id: group.id,
-    name: Salesforce.group_custom_field(:leads),
-    value: "t"
-  )
+  SiteSetting.salesforce_leads_group_id = group.id
 end
 
 if Salesforce.contacts_group.blank?
@@ -27,9 +23,5 @@ if Salesforce.contacts_group.blank?
     bio_raw: 'Members are automatically synced from Salesforce via API',
     full_name: 'Salesforce Contacts'
   )
-  GroupCustomField.create!(
-    group_id: group.id,
-    name: Salesforce.group_custom_field(:contacts),
-    value: "t"
-  )
+  SiteSetting.salesforce_contacts_group_id = group.id
 end

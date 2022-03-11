@@ -29,3 +29,9 @@ plugins:
   salesforce_max_feed_items_per_day:
     default: -1
     min: -1
+  salesforce_leads_group_id:
+    default: ''
+    hidden: true
+  salesforce_contacts_group_id:
+    default: ''
+    hidden: true

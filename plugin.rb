@@ -31,17 +31,18 @@ after_initialize do
       isolate_namespace Salesforce
     end
 
-    %i{
-      leads
-      contacts
-    }.each do |type|
-      define_singleton_method("#{type}_group") do
-        Group.joins(:_custom_fields).find_by(_custom_fields: {name: group_custom_field(type), value: "t"})
-      end
+    def self.leads_group
+      group_id = SiteSetting.salesforce_leads_group_id
+      return if group_id.blank?
+
+      Group.find_by(id: group_id)
     end
 
-    def self.group_custom_field(type)
-      "Salesforce #{type.capitalize} Group"
+    def self.contacts_group
+      group_id = SiteSetting.salesforce_contacts_group_id
+      return if group_id.blank?
+
+      Group.find_by(id: group_id)
     end
   end
 

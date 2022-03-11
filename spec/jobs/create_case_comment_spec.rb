@@ -7,7 +7,7 @@ RSpec.describe Jobs::CreateCaseComment do
   include_context "spec helper"
 
   fab!(:topic) { Fabricate(:topic) }
-  fab!(:_case) { Fabricate(:salesforce_case, topic: topic) }
+  fab!(:salesforce_case) { Fabricate(:salesforce_case, topic: topic) }
   fab!(:post) { Fabricate(:post, topic: topic) }
 
   it 'creates a case comment object on Salesforce' do

@@ -4,6 +4,8 @@ module ::Jobs
   class CreateFeedItem < ::Jobs::Base
 
     def execute(args)
+      return unless SiteSetting.salesforce_enabled
+
       post_id = args[:post_id]
       return if post_id.blank?
 

@@ -6,8 +6,8 @@ module Salesforce
     def sync
       params.require(:topic_id)
       topic = Topic.find(params[:topic_id])
-      _case = Case.sync!(topic)
-      render_serialized(_case, CaseSerializer)
+      salesforce_case = Case.sync!(topic)
+      render_serialized(salesforce_case, CaseSerializer)
     end
   end
 end

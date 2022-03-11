@@ -7,7 +7,7 @@ RSpec.describe Jobs::SyncCaseComments do
   include_context "spec helper"
 
   fab!(:topic) { Fabricate(:topic) }
-  fab!(:_case) { Fabricate(:salesforce_case, topic: topic) }
+  fab!(:salesforce_case) { Fabricate(:salesforce_case, topic: topic) }
   fab!(:post) { Fabricate(:post, topic: topic) }
   fab!(:post2) { Fabricate(:post, topic: topic, post_number: 2) }
   fab!(:post3) { Fabricate(:post, topic: topic, post_number: 3) }

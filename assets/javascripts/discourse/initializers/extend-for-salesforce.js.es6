@@ -204,6 +204,6 @@ function initializeWithApi(api) {
 export default {
   name: "extend-for-salesforce",
   initialize() {
-    withPluginApi("0.1", initializeWithApi);
+    withPluginApi("1.1.0", initializeWithApi);
   },
 };

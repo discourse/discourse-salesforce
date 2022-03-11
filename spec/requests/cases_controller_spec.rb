@@ -31,9 +31,9 @@ RSpec.describe ::Salesforce::CasesController do
       }
 
       expect(response.status).to eq(200)
-      _case = ::Salesforce::Case.last
-      expect(_case.number).to eq("345678")
-      expect(_case.status).to eq("New")
+      salesforce_case = ::Salesforce::Case.last
+      expect(salesforce_case.number).to eq("345678")
+      expect(salesforce_case.status).to eq("New")
     end
   end
 end

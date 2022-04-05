@@ -16,8 +16,8 @@ RSpec.describe Salesforce::FeedItem do
 
       feed_item = ::Salesforce::FeedItem.new(user.salesforce_lead_id, post)
       stub_request(:post, "#{api_path}/FeedItem").
-          with(body: feed_item.payload.to_json).
-          to_return(status: 200, body: { id: "feed_item_123" }.to_json, headers: {})
+        with(body: feed_item.payload.to_json).
+        to_return(status: 200, body: { id: "feed_item_123" }.to_json, headers: {})
 
       feed_item.create!
 

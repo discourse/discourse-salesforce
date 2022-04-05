@@ -20,11 +20,11 @@ RSpec.describe ::Salesforce::CasesController do
         to_return(status: 200, body: %({"id":"123456"}), headers: {})
 
       stub_request(:post, "#{api_path}/Case").
-          with(body: %({"ContactId":"123456","Subject":"#{topic.title}","Description":"#{first_post.full_url}\\n\\n#{first_post.raw}","Origin":"Web"})).
-          to_return(status: 200, body: %({"id":"234567"}), headers: {})
+        with(body: %({"ContactId":"123456","Subject":"#{topic.title}","Description":"#{first_post.full_url}\\n\\n#{first_post.raw}","Origin":"Web"})).
+        to_return(status: 200, body: %({"id":"234567"}), headers: {})
 
       stub_request(:get, "#{api_path}/Case/234567").
-          to_return(status: 200, body: %({"CaseNumber":"345678","Status":"New"}), headers: {})
+        to_return(status: 200, body: %({"CaseNumber":"345678","Status":"New"}), headers: {})
 
       post "/salesforce/cases/sync.json", params: {
         topic_id: topic.id

@@ -10,8 +10,8 @@ RSpec.shared_context "spec helper" do
     SiteSetting.salesforce_client_id = "SALESFORCE_CLIENT_ID"
     Salesforce::Api.any_instance.stubs(:jwt_assertion).returns("SALESFORCE_PRIVATE_KEY")
     stub_request(:post, "https://login.salesforce.com/services/oauth2/token").
-         with(body: {"assertion"=>"SALESFORCE_PRIVATE_KEY", "grant_type"=>"urn:ietf:params:oauth:grant-type:jwt-bearer"}).
-         to_return(status: 200, body: %({"access_token":"#{access_token}","instance_url":"#{instance_url}"}), headers: {})
+      with(body: { "assertion" => "SALESFORCE_PRIVATE_KEY", "grant_type" => "urn:ietf:params:oauth:grant-type:jwt-bearer" }).
+      to_return(status: 200, body: %({"access_token":"#{access_token}","instance_url":"#{instance_url}"}), headers: {})
   end
 
   def api_path

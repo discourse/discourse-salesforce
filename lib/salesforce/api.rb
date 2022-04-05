@@ -43,7 +43,7 @@ module ::Salesforce
 
       case response.status
       when 200, 201
-        return JSON.parse response.body
+        JSON.parse response.body
       else
         e = ::Salesforce::InvalidApiResponse.new(response.body.presence || '')
         e.set_backtrace(caller)
@@ -74,11 +74,11 @@ module ::Salesforce
       Discourse.redis.setex("salesforce_access_token", 10.minutes, data["access_token"])
       SiteSetting.salesforce_instance_url = data["instance_url"]
     end
-  
+
     def access_token
       Discourse.redis.get("salesforce_access_token")
     end
-  
+
     def claims
       {
         iss: SiteSetting.salesforce_client_id,
@@ -88,7 +88,7 @@ module ::Salesforce
         exp: Time.now.utc.to_i + 180
       }
     end
-  
+
     def private_key
       OpenSSL::PKey::RSA.new(SiteSetting.salesforce_rsa_private_key)
     end

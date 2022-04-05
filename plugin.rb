@@ -2,9 +2,11 @@
 
 # name: discourse-salesforce
 # about: Integration features between Salesforce and Discourse
-# version: 1.0
+# version: 0.1.0
 # author: Vinoth Kannan
 # url: https://github.com/discourse/discourse-salesforce
+# required_version: 2.7.0
+# transpile_js: true
 
 require 'auth/managed_authenticator'
 require 'omniauth-oauth2'
@@ -183,9 +185,10 @@ after_initialize do
   class ::OmniAuth::Strategies::Salesforce
     option :name, 'salesforce'
 
-    option :client_options, site:  'https://login.salesforce.com',
-                            authorize_url: '/services/oauth2/authorize',
-                            token_url: '/services/oauth2/token'
+    option :client_options,
+            site: 'https://login.salesforce.com',
+            authorize_url: '/services/oauth2/authorize',
+            token_url: '/services/oauth2/token'
   end
 end
 
@@ -193,7 +196,7 @@ end
 # Class is mostly cut and paste from MIT https://raw.githubusercontent.com/realdoug/omniauth-salesforce/master/lib/omniauth/strategies/salesforce.rb
 class OmniAuth::Strategies::Salesforce < OmniAuth::Strategies::OAuth2
 
-  MOBILE_USER_AGENTS =  'webos|ipod|iphone|ipad|android|blackberry|mobile'.freeze
+  MOBILE_USER_AGENTS = 'webos|ipod|iphone|ipad|android|blackberry|mobile'
 
   option :authorize_options, [
     :scope,
@@ -229,23 +232,22 @@ class OmniAuth::Strategies::Salesforce < OmniAuth::Strategies::OAuth2
 
   info do
     {
-      'name'            => raw_info['display_name'],
-      'email'           => raw_info['email'],
-      'nickname'        => raw_info['nick_name'],
-      'first_name'      => raw_info['first_name'],
-      'last_name'       => raw_info['last_name'],
-      'location'        => '',
-      'description'     => '',
-      'image'           => raw_info['photos']['thumbnail'] + "?oauth_token=#{access_token.token}",
-      'phone'           => '',
-      'urls'            => raw_info['urls']
+      name: raw_info['display_name'],
+      email: raw_info['email'],
+      nickname: raw_info['nick_name'],
+      first_name: raw_info['first_name'],
+      last_name: raw_info['last_name'],
+      location: '',
+      description: '',
+      image: raw_info['photos']['thumbnail'] + "?oauth_token=#{access_token.token}",
+      phone: '',
+      urls: raw_info['urls']
     }
   end
 
   credentials do
-    hash = {'token' => access_token.token}
-    hash.merge!('instance_url' => access_token.params["instance_url"])
-    hash.merge!('refresh_token' => access_token.refresh_token) if access_token.refresh_token
+    hash = { token: access_token.token, instance_url: access_token.params["instance_url"] }
+    hash.merge!(refresh_token: access_token.refresh_token) if access_token.refresh_token
     hash
   end
 

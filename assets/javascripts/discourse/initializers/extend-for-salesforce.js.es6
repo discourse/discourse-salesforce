@@ -15,10 +15,12 @@ function createPerson(type, context) {
   ajax(`/salesforce/persons/create`, {
     type: "POST",
     data: { type, user_id: post.user_id },
-  }).catch(popupAjaxError).then(() => {
-    post.set("flair_url", "fab-salesforce");
-    context.appEvents.trigger("post-stream:refresh", { id: post.id });
-  });
+  })
+    .catch(popupAjaxError)
+    .then(() => {
+      post.set("flair_url", "fab-salesforce");
+      context.appEvents.trigger("post-stream:refresh", { id: post.id });
+    });
 }
 
 function createLead() {

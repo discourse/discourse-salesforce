@@ -69,8 +69,6 @@ after_initialize do
     get "/admin/authorize" => "admin#authorize"
   end
 
-  add_admin_route 'salesforce.title', 'salesforce'
-
   Discourse::Application.routes.append do
     mount ::Salesforce::Engine, at: "salesforce"
   end

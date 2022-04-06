@@ -79,6 +79,8 @@ after_initialize do
 
   allow_staff_user_custom_field(::Salesforce::Person::CONTACT_ID_FIELD)
   allow_staff_user_custom_field(::Salesforce::Person::LEAD_ID_FIELD)
+  register_topic_custom_field_type(::CaseMixin::HAS_SALESFORCE_CASE, :boolean)
+  CategoryList.preloaded_topic_custom_fields << ::CaseMixin::HAS_SALESFORCE_CASE
 
   on(:post_created) do |post, opts|
     topic = post.topic

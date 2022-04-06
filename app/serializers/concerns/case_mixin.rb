@@ -1,6 +1,8 @@
 # frozen_string_literal: true
 
 module CaseMixin
+  HAS_SALESFORCE_CASE ||= "has_salesforce_case"
+
   def self.included(klass)
     klass.attributes :has_salesforce_case
   end

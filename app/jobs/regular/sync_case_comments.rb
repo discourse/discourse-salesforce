@@ -14,9 +14,9 @@ module ::Jobs
       return if salesforce_case.blank?
 
       posts = Post.joins("LEFT JOIN post_custom_fields ON posts.id = post_custom_fields.post_id AND post_custom_fields.name = '#{::Salesforce::CaseComment::ID_FIELD}'")
-                  .where(topic_id: topic_id, post_type: Post.types[:regular])
-                  .where("post_custom_fields.value IS NULL")
-                  .where.not(post_number: 1)
+        .where(topic_id: topic_id, post_type: Post.types[:regular])
+        .where("post_custom_fields.value IS NULL")
+        .where.not(post_number: 1)
       posts = posts.where(id: post_id) if post_id.present?
 
       posts.find_each do |post|

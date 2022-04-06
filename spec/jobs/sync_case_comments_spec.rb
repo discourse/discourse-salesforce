@@ -18,7 +18,7 @@ RSpec.describe Jobs::SyncCaseComments do
     ::Salesforce::CaseComment.any_instance.expects(:create!).never
     described_class.new.execute(topic_id: topic.id)
   end
-  
+
   it 'creates multiple case comment objects on Salesforce' do
     topic.custom_fields["has_salesforce_case"] = true
     topic.save_custom_fields

@@ -14,8 +14,8 @@ RSpec.describe Salesforce::CaseComment do
     it 'creates a case comment object on Salesforce' do
       case_comment = ::Salesforce::CaseComment.new(salesforce_case.uid, post)
       stub_request(:post, "#{api_path}/CaseComment").
-          with(body: case_comment.payload.to_json).
-          to_return(status: 200, body: { id: "case_comment_123" }.to_json, headers: {})
+        with(body: case_comment.payload.to_json).
+        to_return(status: 200, body: { id: "case_comment_123" }.to_json, headers: {})
 
       topic.custom_fields["has_salesforce_case"] = true
       topic.save!

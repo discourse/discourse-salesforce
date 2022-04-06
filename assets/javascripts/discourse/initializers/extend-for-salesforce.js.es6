@@ -15,10 +15,12 @@ function createPerson(type, context) {
   ajax(`/salesforce/persons/create`, {
     type: "POST",
     data: { type, user_id: post.user_id },
-  }).catch(popupAjaxError).then((_) => {
-    post.set("flair_url", "fab-salesforce");
-    context.appEvents.trigger("post-stream:refresh", { id: post.id });
-  });
+  })
+    .catch(popupAjaxError)
+    .then(() => {
+      post.set("flair_url", "fab-salesforce");
+      context.appEvents.trigger("post-stream:refresh", { id: post.id });
+    });
 }
 
 function createLead() {
@@ -59,6 +61,7 @@ function initializeWithApi(api) {
 
   if (isStaff) {
     api.modifyClass("raw-view:topic-status", {
+      // eslint-disable-next-line no-undef
       statuses: Ember.computed(function () {
         const results = this._super(...arguments);
 
@@ -76,6 +79,7 @@ function initializeWithApi(api) {
     });
 
     TopicStatusIcons.addObject(["has_salesforce_case", "briefcase", "case"]);
+    // eslint-disable-next-line no-undef
     const salesforceUrl = Discourse.SiteSettings.salesforce_instance_url;
 
     api.decorateWidget("post-admin-menu:after", (dec) => {
@@ -107,7 +111,7 @@ function initializeWithApi(api) {
     api.attachWidgetAction("post", "createLead", createLead);
     api.attachWidgetAction("post", "createContact", createContact);
 
-    api.addPosterIcon((cfs, _) => {
+    api.addPosterIcon((cfs) => {
       if (cfs.salesforce_lead_id) {
         return {
           icon: "user-plus",
@@ -118,7 +122,7 @@ function initializeWithApi(api) {
       }
     });
 
-    api.addPosterIcon((cfs, _) => {
+    api.addPosterIcon((cfs) => {
       if (cfs.salesforce_contact_id) {
         return {
           icon: "address-card",
@@ -139,7 +143,7 @@ function initializeWithApi(api) {
           if (salesforceCase) {
             let rawHtml = "";
 
-            if (salesforceCase == spinnerHTML) {
+            if (salesforceCase === spinnerHTML) {
               rawHtml = spinnerHTML;
             } else {
               rawHtml = `

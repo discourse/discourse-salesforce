@@ -1,0 +1,11 @@
+{
+  "name": "discourse-salesforce",
+  "version": "0.1.0",
+  "repository": "git@github.com:discourse/discourse-salesforce.git",
+  "author": "Vinoth Kannan",
+  "license": "MIT",
+  "devDependencies": {
+    "@arkweid/lefthook": "^0.7.2",
+    "eslint-config-discourse": "^3.0.0"
+  }
+}

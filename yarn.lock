@@ -760,7 +760,7 @@ ember-rfc176-data@^0.3.15:
   resolved "https://registry.yarnpkg.com/ember-rfc176-data/-/ember-rfc176-data-0.3.17.tgz#d4fc6c33abd6ef7b3440c107a28e04417b49860a"
   integrity sha512-EVzTTKqxv9FZbEh6Ktw56YyWRAA0MijKvl7H8C06wVF+8f/cRRz3dXxa4nkwjzyVwx4rzKGuIGq77hxJAQhWWw==
 
-ember-template-lint-plugin-discourse@latest:
+ember-template-lint-plugin-discourse@^2.0.0:
   version "2.0.0"
   resolved "https://registry.yarnpkg.com/ember-template-lint-plugin-discourse/-/ember-template-lint-plugin-discourse-2.0.0.tgz#9805dff60763fae68b5df82b92fb431eb739c13e"
   integrity sha512-2bPz/47OfuYGj4w2RNyDcXCYA/4JtRAXRIsaA6PTm4Uc44exK/GBd4RfT2ywmq0CImvj2kGkqpuUgkAtVf6aZQ==
@@ -823,16 +823,16 @@ escape-string-regexp@^4.0.0:
   resolved "https://registry.yarnpkg.com/escape-string-regexp/-/escape-string-regexp-4.0.0.tgz#14ba83a5d373e3d311e5afca29cf5bfad965bf34"
   integrity sha512-TtpcNJ3XAzx3Gq8sWRzJaVajRs0uVxA2YAkdb1jm2YkPz4G6egUFAyA3n5vtEIZefPk5Wa4UXbKuS5fKkJWdgA==
 
-eslint-config-discourse@^2.0.0:
-  version "2.1.0"
-  resolved "https://registry.yarnpkg.com/eslint-config-discourse/-/eslint-config-discourse-2.1.0.tgz#2f6bce37c9f57677837add56e5cb1dbfd93b843f"
-  integrity sha512-U4w8oOJZIOpDrEY91mO5Zwz28q/aDqYHIvlHzKMKqGGntN+L5ZXy3BVd4Jianjo1UaRYCVfMBOq+AQIr/J2D0A==
+eslint-config-discourse@^3.0.0:
+  version "3.0.0"
+  resolved "https://registry.yarnpkg.com/eslint-config-discourse/-/eslint-config-discourse-3.0.0.tgz#4683291dfbd7ed00020661f0f1f6f1328f54ca77"
+  integrity sha512-iwqFZiWy8B9d6cgP/7qP8UmGYELXu7PclpI7LV4HEAtBzP9lkcXdB9XOmify7liOhnajEcNUrEL30uYrTrl+cQ==
   dependencies:
     "@babel/core" "^7.17.5"
     "@babel/eslint-parser" "^7.17.0"
     "@babel/plugin-proposal-decorators" "^7.17.2"
     ember-template-lint "^4.2.0"
-    ember-template-lint-plugin-discourse latest
+    ember-template-lint-plugin-discourse "^2.0.0"
     eslint "^8.10.0"
     eslint-plugin-discourse-ember latest
     eslint-plugin-ember "^10.5.9"

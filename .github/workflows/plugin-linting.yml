@@ -48,6 +48,13 @@ jobs:
             yarn prettier --list-different "test/**/*.{js,es6}"
           fi
 
+      - name: Ember template lint
+        if: ${{ always() }}
+        run: |
+          if [ 0 -lt $(find assets/javascripts -type f -name "*.hbs" 2> /dev/null | wc -l) ]; then
+            yarn ember-template-lint assets/javascripts
+          fi
+
       - name: Rubocop
         if: ${{ always() }}
         run: bundle exec rubocop .

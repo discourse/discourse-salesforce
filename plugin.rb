@@ -287,9 +287,7 @@ class Auth::SalesforceAuthenticator < Auth::ManagedAuthenticator
   end
 end
 
-auth_provider pretty_name: 'Salesforce',
-              icon: 'fab-salesforce',
-              title: 'with Salesforce',
+auth_provider icon: 'fab-salesforce',
               frame_width: 840,
               frame_height: 570,
               authenticator: Auth::SalesforceAuthenticator.new

@@ -1,5 +1,9 @@
 en:
   js:
+    login:
+      salesforce:
+        name: "Salesforce"
+        title: "Login with Salesforce"
     salesforce:
       title: Salesforce
       lead:

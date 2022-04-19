@@ -6,6 +6,10 @@
 
 fa_IR:
   js:
+    login:
+      salesforce:
+        name: "سلزفورس"
+        title: "ورود با سلزفورس"
     salesforce:
       poster_icon:
         contact:

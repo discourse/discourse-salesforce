@@ -6,8 +6,9 @@ import TopicStatusIcons from "discourse/helpers/topic-status-icons";
 import PostCooked from "discourse/widgets/post-cooked";
 import { spinnerHTML } from "discourse/helpers/loading-spinner";
 import { iconHTML } from "discourse-common/lib/icon-library";
+import discourseComputed from "discourse-common/utils/decorators";
 
-export const PLUGIN_ID = "discourse-salesforce";
+const PLUGIN_ID = "discourse-salesforce";
 
 function createPerson(type, context) {
   const post = context.model;
@@ -55,14 +56,16 @@ function syncCaseForTopic(context) {
     });
 }
 
-function initializeWithApi(api) {
+function initializeWithApi(api, container) {
   const currentUser = api.getCurrentUser();
-  const isStaff = currentUser && currentUser.staff;
+  const isStaff = currentUser?.staff;
 
   if (isStaff) {
     api.modifyClass("raw-view:topic-status", {
-      // eslint-disable-next-line no-undef
-      statuses: Ember.computed(function () {
+      pluginId: PLUGIN_ID,
+
+      @discourseComputed
+      statuses() {
         const results = this._super(...arguments);
 
         if (this.topic.has_salesforce_case) {
@@ -75,12 +78,12 @@ function initializeWithApi(api) {
           });
         }
         return results;
-      }),
+      },
     });
 
     TopicStatusIcons.addObject(["has_salesforce_case", "briefcase", "case"]);
-    // eslint-disable-next-line no-undef
-    const salesforceUrl = Discourse.SiteSettings.salesforce_instance_url;
+    const siteSettings = container.lookup("site-settings:main");
+    const salesforceUrl = siteSettings.salesforce_instance_url;
 
     api.decorateWidget("post-admin-menu:after", (dec) => {
       return dec.h(
@@ -207,7 +210,7 @@ function initializeWithApi(api) {
 
 export default {
   name: "extend-for-salesforce",
-  initialize() {
-    withPluginApi("1.1.0", initializeWithApi);
+  initialize(container) {
+    withPluginApi("1.1.0", (api) => initializeWithApi(api, container));
   },
 };

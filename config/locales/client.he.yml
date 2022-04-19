@@ -6,6 +6,10 @@
 
 he:
   js:
+    login:
+      salesforce:
+        name: "Salesforce"
+        title: "כניסה עם Salesforce"
     salesforce:
       poster_icon:
         contact:

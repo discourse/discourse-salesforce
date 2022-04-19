@@ -6,7 +6,24 @@
 
 sv:
   js:
+    login:
+      salesforce:
+        name: "Salesforce"
+        title: "Logga in med Salesforce"
     salesforce:
+      title: Salesforce
+      lead:
+        create: "Skapa Lead"
+      contact:
+        create: "Skapa kontakt"
       poster_icon:
+        lead:
+          title: "Salesforce Lead"
+          text: "Lead"
         contact:
+          title: "Salesforce-kontakt"
           text: "Kontakt"
+    topic:
+      actions:
+        create_salesforce_case: "Skapa scenario"
+        sync_salesforce_case: "Synkronisera scenario"

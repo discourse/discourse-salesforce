@@ -10,10 +10,10 @@ RSpec.describe Jobs::SyncSalesforceUsers do
   fab!(:user2) { Fabricate(:user) }
 
   before do
-    user1.custom_fields[::Salesforce::Person::LEAD_ID_FIELD] = "lead_123"
+    user1.salesforce_lead_id = "lead_123"
     user1.save!
 
-    user2.custom_fields[::Salesforce::Person::CONTACT_ID_FIELD] = "contact_123"
+    user2.salesforce_contact_id = "contact_123"
     user2.save!
 
     path = api_path.sub("sobjects", "composite/sobjects")
@@ -27,9 +27,9 @@ RSpec.describe Jobs::SyncSalesforceUsers do
     described_class.new.execute({})
 
     fields = user1.reload.custom_fields
-    expect(fields[::Salesforce::Person::LEAD_ID_FIELD]).to eq(nil)
-    expect(fields[::Salesforce::Person::CONTACT_ID_FIELD]).to eq("contact_456")
+    expect(fields[::Salesforce::Lead::ID_FIELD]).to eq(nil)
+    expect(fields[::Salesforce::Contact::ID_FIELD]).to eq("contact_456")
 
-    expect(user2.reload.custom_fields[::Salesforce::Person::CONTACT_ID_FIELD]).to eq("contact_789")
+    expect(user2.reload.salesforce_contact_id).to eq("contact_789")
   end
 end

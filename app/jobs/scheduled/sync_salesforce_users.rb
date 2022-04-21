@@ -9,7 +9,7 @@ module ::Jobs
       return unless SiteSetting.salesforce_enabled
 
       api_client = Salesforce::Api.new
-      lead_fields = UserCustomField.where(name: ::Salesforce::Person::LEAD_ID_FIELD)
+      lead_fields = UserCustomField.where(name: ::Salesforce::Lead::ID_FIELD)
       lead_fields.find_in_batches(batch_size: 100) do |fields|
         ids = fields.pluck(:value)
         begin
@@ -19,14 +19,14 @@ module ::Jobs
             next if contact_id.blank?
 
             field = lead_fields.find_by(value: lead["Id"])
-            field.update(name: ::Salesforce::Person::CONTACT_ID_FIELD, value: contact_id)
+            field.update(name: ::Salesforce::Contact::ID_FIELD, value: contact_id)
           end
         rescue => e
           Discourse.warn_exception(e, message: "Failed to sync Salesforce leads")
         end
       end
 
-      contact_fields = UserCustomField.where(name: ::Salesforce::Person::CONTACT_ID_FIELD)
+      contact_fields = UserCustomField.where(name: ::Salesforce::Contact::ID_FIELD)
       contact_fields.find_in_batches(batch_size: 100) do |fields|
         ids = fields.pluck(:value)
         begin

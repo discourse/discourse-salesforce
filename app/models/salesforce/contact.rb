@@ -10,7 +10,7 @@ module ::Salesforce
       Salesforce.contacts_group
     end
 
-    def self.payload
+    def self.payload(user)
       user.salesforce_contact_payload
     end
   end

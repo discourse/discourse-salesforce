@@ -10,7 +10,7 @@ module ::Salesforce
       Salesforce.leads_group
     end
 
-    def self.payload
+    def self.payload(user)
       user.salesforce_lead_payload
     end
   end

@@ -2,38 +2,41 @@
 
 module ::Salesforce
   class Person
-    LEAD_ID_FIELD = "salesforce_lead_id".freeze
-    CONTACT_ID_FIELD = "salesforce_contact_id".freeze
-    DEFAULT_COMPANY_NAME = "None".freeze
-    SOURCE = "Web".freeze
+    OBJECT_NAME = ""
+    ID_FIELD = ""
 
-    def self.create!(type, user)
-      id_field = nil
-      payload = nil
+    def self.create!(user)
+      return if user.custom_fields[self::ID_FIELD].present?
 
-      if type == "lead"
-        id_field = LEAD_ID_FIELD
-        payload = user.salesforce_lead_payload
-      elsif type == "contact"
-        id_field = CONTACT_ID_FIELD
-        payload = user.salesforce_contact_payload
-      end
-
-      return if user.custom_fields[id_field].present?
-
-      data = Salesforce::Api.new.post("sobjects/#{type.capitalize}", payload)
+      data = Salesforce::Api.new.post("sobjects/#{self::OBJECT_NAME}", payload)
       id = data["id"]
 
-      user.custom_fields[id_field] = id
+      user.custom_fields[self::ID_FIELD] = id
       user.save_custom_fields
 
-      if type == "lead"
-        Salesforce.leads_group.add(user)
-      elsif type == "contact"
-        Salesforce.contacts_group.add(user)
-      end
+      group.add(user)
 
       id
+    end
+
+    def self.find_id_by_email(email)
+      result = Salesforce.api.query("SELECT Id FROM #{self::OBJECT_NAME} WHERE Email = '#{email}'")
+      return if result["totalSize"] == 0
+      result["records"][0]["Id"]
+    end
+
+    def self.group
+      not_implemented
+    end
+
+    def self.payload
+      not_implemented
+    end
+
+    private
+
+    def self.not_implemented
+      raise "Not implemented."
     end
   end
 end

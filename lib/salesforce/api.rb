@@ -25,6 +25,11 @@ module ::Salesforce
       @prefix = "/services/data/v#{VERSION}"
     end
 
+    def query(soql)
+      soql = URI::Parser.new.escape(soql.gsub(" ", "+"))
+      get("query/?q=#{soql}")
+    end
+
     def get(path)
       call(path) do |uri|
         faraday.get(uri)

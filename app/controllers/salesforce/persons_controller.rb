@@ -6,7 +6,12 @@ class Salesforce::PersonsController < Admin::AdminController
 
   def create
     begin
-      Salesforce::Person.create!(params.require(:type), user)
+      type = params.require(:type)
+      if type == "lead"
+        Salesforce::Lead.create!(user)
+      elsif type == "contact"
+        Salesforce::Contact.create!(user)
+      end
       render json: success_json
     rescue => e
       render json: { errors: [e.message] }, status: 422

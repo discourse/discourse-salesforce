@@ -11,7 +11,7 @@ RSpec.describe Salesforce::FeedItem do
 
   describe '#create!' do
     it 'creates a feed item on Salesforce lead object' do
-      user.custom_fields[::Salesforce::Person::LEAD_ID_FIELD] = "lead_123"
+      user.salesforce_lead_id = "lead_123"
       user.save!
 
       feed_item = ::Salesforce::FeedItem.new(user.salesforce_lead_id, post)

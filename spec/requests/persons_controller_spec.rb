@@ -25,7 +25,7 @@ RSpec.describe ::Salesforce::PersonsController do
       }
 
       expect(response.status).to eq(200)
-      expect(user.custom_fields[::Salesforce::Person::CONTACT_ID_FIELD]).to eq("123456")
+      expect(user.salesforce_contact_id).to eq("123456")
     end
 
     it 'creates a new lead object in Salesforce' do
@@ -39,7 +39,7 @@ RSpec.describe ::Salesforce::PersonsController do
       }
 
       expect(response.status).to eq(200)
-      expect(user.custom_fields[::Salesforce::Person::LEAD_ID_FIELD]).to eq("123456")
+      expect(user.salesforce_lead_id).to eq("123456")
     end
   end
 end

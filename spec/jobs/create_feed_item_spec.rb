@@ -18,7 +18,7 @@ RSpec.describe Jobs::CreateFeedItem do
     post.custom_fields[::Salesforce::FeedItem::ID_FIELD] = "feed_123"
     post.save_custom_fields
 
-    user.custom_fields[::Salesforce::Person::LEAD_ID_FIELD] = "lead_123"
+    user.salesforce_lead_id = "lead_123"
     user.save_custom_fields
 
     ::Salesforce::FeedItem.any_instance.expects(:create!).never
@@ -26,7 +26,7 @@ RSpec.describe Jobs::CreateFeedItem do
   end
 
   it 'creates a feed item on Salesforce lead object' do
-    user.custom_fields[::Salesforce::Person::LEAD_ID_FIELD] = "lead_123"
+    user.salesforce_lead_id = "lead_123"
     user.save_custom_fields
 
     ::Salesforce::FeedItem.any_instance.expects(:create!).once

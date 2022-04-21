@@ -26,11 +26,15 @@ after_initialize do
   SeedFu.fixture_paths << Rails.root.join("plugins", "discourse-salesforce", "db", "fixtures").to_s
 
   module ::Salesforce
-    PLUGIN_NAME = 'discourse-salesforce'.freeze
+    PLUGIN_NAME = 'discourse-salesforce'
 
     class Engine < ::Rails::Engine
       engine_name PLUGIN_NAME
       isolate_namespace Salesforce
+    end
+
+    def self.api
+      @api ||= Api.new
     end
 
     def self.leads_group
@@ -60,6 +64,8 @@ after_initialize do
     '../app/models/salesforce/feed_item.rb',
     '../app/models/salesforce/case_comment.rb',
     '../app/models/salesforce/person.rb',
+    '../app/models/salesforce/lead.rb',
+    '../app/models/salesforce/contact.rb',
     '../app/serializers/concerns/case_mixin.rb',
     '../app/serializers/case_serializer.rb',
     '../lib/salesforce/api.rb'
@@ -77,10 +83,18 @@ after_initialize do
 
   AdminDashboardData.problem_messages << ::Salesforce::Api::APP_NOT_APPROVED
 
-  allow_staff_user_custom_field(::Salesforce::Person::CONTACT_ID_FIELD)
-  allow_staff_user_custom_field(::Salesforce::Person::LEAD_ID_FIELD)
+  allow_staff_user_custom_field(::Salesforce::Contact::ID_FIELD)
+  allow_staff_user_custom_field(::Salesforce::Lead::ID_FIELD)
   register_topic_custom_field_type(::CaseMixin::HAS_SALESFORCE_CASE, :boolean)
   CategoryList.preloaded_topic_custom_fields << ::CaseMixin::HAS_SALESFORCE_CASE
+
+  on(:user_created) do |user, opts|
+    if user.salesforce_contact_id = Salesforce.Contact.find_id_by_email(user.email)
+      user.save_custom_fields
+    elsif user.salesforce_lead_id = Salesforce.Lead.find_id_by_email(user.email)
+      user.save_custom_fields
+    end
+  end
 
   on(:post_created) do |post, opts|
     topic = post.topic
@@ -96,15 +110,23 @@ after_initialize do
 
     class ::User
       def salesforce_contact_id
-        custom_fields[::Salesforce::Person::CONTACT_ID_FIELD]
+        custom_fields[::Salesforce::Contact::ID_FIELD]
       end
 
       def salesforce_lead_id
-        custom_fields[::Salesforce::Person::LEAD_ID_FIELD]
+        custom_fields[::Salesforce::Lead::ID_FIELD]
+      end
+
+      def salesforce_contact_id=(value)
+        custom_fields[::Salesforce::Contact::ID_FIELD] = value
+      end
+
+      def salesforce_lead_id=(value)
+        custom_fields[::Salesforce::Lead::ID_FIELD] = value
       end
 
       def create_salesforce_contact
-        ::Salesforce::Person.create!("contact", self)
+        ::Salesforce::Contact.create!(self)
       end
 
       def salesforce_contact_payload
@@ -119,7 +141,7 @@ after_initialize do
         payload = {
           Email: self.email,
           LastName: last_name,
-          LeadSource: ::Salesforce::Person::SOURCE,
+          LeadSource: ::Salesforce::Contact::SOURCE,
           Description: "#{Discourse.base_url}/u/#{UrlHelper.encode_component(self.username)}"
         }
 
@@ -130,7 +152,7 @@ after_initialize do
 
       def salesforce_lead_payload
         salesforce_contact_payload.merge({
-          Company: ::Salesforce::Person::DEFAULT_COMPANY_NAME,
+          Company: ::Salesforce::Lead::DEFAULT_COMPANY_NAME,
           Website: self.user_profile&.website
         })
       end

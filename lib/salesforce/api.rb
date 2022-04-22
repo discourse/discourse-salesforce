@@ -47,8 +47,8 @@ module ::Salesforce
       response = yield(uri)
 
       case response.status
-      when 200, 201
-        JSON.parse response.body
+      when 200, 201, 204
+        JSON.parse response.body.presence || "{}"
       else
         e = ::Salesforce::InvalidApiResponse.new(response.body.presence || '')
         e.set_backtrace(caller)

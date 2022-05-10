@@ -5,3 +5,6 @@
 # https://translate.discourse.org/
 
 he:
+  salesforce:
+    error:
+      invalid_response: "תגובה שגויה מה־API של Salesforce"

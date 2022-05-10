@@ -11,6 +11,7 @@ he:
         name: "Salesforce"
         title: "כניסה עם Salesforce"
     salesforce:
+      title: Salesforce
       poster_icon:
         contact:
           text: "איש/אשת קשר"

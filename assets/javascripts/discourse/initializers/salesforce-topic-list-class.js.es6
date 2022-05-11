@@ -3,6 +3,8 @@ import { withPluginApi } from "discourse/lib/plugin-api";
 
 function initializeWithApi(api) {
   api.modifyClass("component:topic-list-item", {
+    pluginId: "discourse-salesforce",
+
     @discourseComputed()
     unboundClassNames() {
       let classList = this._super(...arguments);

@@ -5,6 +5,9 @@
 # https://translate.discourse.org/
 
 he:
+  site_settings:
+    salesforce_enabled: 'הפעלת התוסף discourse-salesforce'
+    salesforce_username: "שם משתמש לחשבון ב־Salesforce"
   salesforce:
     error:
       invalid_response: "תגובה שגויה מה־API של Salesforce"

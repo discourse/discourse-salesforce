@@ -12,6 +12,18 @@ he:
         title: "כניסה עם Salesforce"
     salesforce:
       title: Salesforce
+      lead:
+        create: "יצירת ליד"
+      contact:
+        create: "יצירת איש קשר"
       poster_icon:
+        lead:
+          title: "ליד מ־Salesforce"
+          text: "ליד"
         contact:
+          title: "איש קשר ב־Salesforce"
           text: "איש/אשת קשר"
+    topic:
+      actions:
+        create_salesforce_case: "יצירת מקרה"
+        sync_salesforce_case: "סנכרון מקרה"

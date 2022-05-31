@@ -6,7 +6,19 @@
 
 es:
   js:
+    login:
+      salesforce:
+        name: "Salesforce"
+        title: "Iniciar sesión con Salesforce"
     salesforce:
+      title: Salesforce
+      contact:
+        create: "Crear contacto"
       poster_icon:
         contact:
+          title: "Contacto de Salesforce"
           text: "Contacto"
+    topic:
+      actions:
+        create_salesforce_case: "Crear caso"
+        sync_salesforce_case: "Sincronizar caso"

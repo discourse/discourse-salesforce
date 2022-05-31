@@ -5,3 +5,12 @@
 # https://translate.discourse.org/
 
 es:
+  site_settings:
+    salesforce_enabled: 'Activar el plugin discourse-salesforce'
+    salesforce_login_enabled: 'Habilitar el inicio de sesión con Salesforce'
+    salesforce_client_id: "ID de cliente de la aplicación conectada a Salesforce"
+    salesforce_client_secret: "Secreto de cliente de la aplicación conectada de Salesforce"
+    salesforce_username: "Nombre de usuario de la cuenta de Salesforce"
+  salesforce:
+    error:
+      invalid_response: "Respuesta inválida de la API de Salesforce"

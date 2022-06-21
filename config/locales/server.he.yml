@@ -7,7 +7,16 @@
 he:
   site_settings:
     salesforce_enabled: 'הפעלת התוסף discourse-salesforce'
+    salesforce_login_enabled: 'הפעלת התחברות חברתית עם Salesforce'
+    salesforce_client_id: "מזהה לקוח של יישום Salesforce מחובר"
+    salesforce_client_secret: "סוד לקוח של יישום Salesforce מחובר"
     salesforce_username: "שם משתמש לחשבון ב־Salesforce"
+    salesforce_rsa_private_key: "מפתח RSA פרטי ללקוח של יישום Salesforce מחובר"
+    salesforce_case_tag_name: "שם תגית להוספה לנושאים עם מקרים של Salesforce"
+    salesforce_case_status_tag_enabled: "יש להפעיל כדי להוסיף תגיות שמבוססות על מצב המקרה ב־Salesforce"
+    salesforce_case_status_tag_prefix: "תוספת לפני תגיות מצב המקרה ב־Salesforce. למשל, אם הקידומת היא ‚case’ (מקרה) אז התגיות תתווספנה בצורה case-open,‏ case-closed וכו׳."
+    errors:
+      salesforce_client_credentials_required: "מזהה לקוח וסוד לקוח של Salesforce נחוצים"
   salesforce:
     error:
       invalid_response: "תגובה שגויה מה־API של Salesforce"

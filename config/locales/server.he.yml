@@ -11,6 +11,7 @@ he:
     salesforce_client_id: "מזהה לקוח של יישום Salesforce מחובר"
     salesforce_client_secret: "סוד לקוח של יישום Salesforce מחובר"
     salesforce_username: "שם משתמש לחשבון ב־Salesforce"
+    salesforce_max_feed_items_per_day: "מספר התגובות המרביות לנושאים שניתן לפרסם בפריטי ערוצים של פריטי Salesforce (מקרה/פנייה/קשר) ליום."
     salesforce_rsa_private_key: "מפתח RSA פרטי ללקוח של יישום Salesforce מחובר"
     salesforce_case_tag_name: "שם תגית להוספה לנושאים עם מקרים של Salesforce"
     salesforce_case_status_tag_enabled: "יש להפעיל כדי להוסיף תגיות שמבוססות על מצב המקרה ב־Salesforce"
@@ -20,3 +21,6 @@ he:
   salesforce:
     error:
       invalid_response: "תגובה שגויה מה־API של Salesforce"
+  dashboard:
+    salesforce:
+      app_not_approved: "היישום המקושר של Discourse עדיין לא עבר אישור ב־Salesforce על ידי המשתמש שהוזכר בהגדרת האתר `salesforce_username` (שם משתמש בסיילספורס). יש לפנות ל<a href='%{base_url}/salesforce/admin/authorize'>קישור הזה</a> כדי לאמת אותו."

@@ -1,6 +1,6 @@
 # frozen_string_literal: true
 
-Fabricator(:salesforce_case, from: "::Salesforce::Case") do
+Fabricator(:salesforce_case, class_name: ::Salesforce::Case) do
   topic
   uid { sequence(:uid) { |i| "case#{i}" } }
   contact_id { sequence(:contact_id) { |i| "contact#{i}" } }

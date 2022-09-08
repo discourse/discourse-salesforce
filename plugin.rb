@@ -208,7 +208,7 @@ after_initialize do
     option :name, 'salesforce'
 
     option :client_options,
-            site: 'https://login.salesforce.com',
+            site: SiteSetting.salesforce_authorization_server_url,
             authorize_url: '/services/oauth2/authorize',
             token_url: '/services/oauth2/token'
   end

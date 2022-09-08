@@ -4,9 +4,10 @@ en:
     salesforce_login_enabled: 'Enable Salesforce Social Login'
     salesforce_client_id: "Salesforce connected app's client id"
     salesforce_client_secret: "Salesforce connected app's client secret"
+    salesforce_rsa_private_key: "Salesforce connected app's RSA private key"
+    salesforce_authorization_server_url: "Salesforce authorization server's URL"
     salesforce_username: "Salesforce account username"
     salesforce_max_feed_items_per_day: "Maximum number topic replies which can be posted as feed items on Salesforce objects (Case/Lead/Contact) per day"
-    salesforce_rsa_private_key: "Salesforce connected app's RSA private key"
     salesforce_case_tag_name: "Tag name to add in topics with a Salesforce case"
     salesforce_case_status_tag_enabled: "Enable to add tags based on Salesforce case status"
     salesforce_case_status_tag_prefix: "Prefix to add before Salesforce case status tags. For example, if prefix is 'case' then the tags will be added like case-open, case-closed, etc.,"

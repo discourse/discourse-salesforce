@@ -61,7 +61,7 @@ module ::Salesforce
       AdminDashboardData.clear_problem_message(APP_NOT_APPROVED) if AdminDashboardData.problem_message_check(APP_NOT_APPROVED)
       return if access_token.present? && SiteSetting.salesforce_instance_url.present?
 
-      connection = Faraday.new(url: 'https://login.salesforce.com')
+      connection = Faraday.new(url: SiteSetting.salesforce_authorization_server_url)
       response = connection.post("/services/oauth2/token") do |req|
         req.body = URI.encode_www_form({
           grant_type: 'urn:ietf:params:oauth:grant-type:jwt-bearer',
@@ -88,7 +88,7 @@ module ::Salesforce
       {
         iss: SiteSetting.salesforce_client_id,
         sub: SiteSetting.salesforce_username,
-        aud: "https://login.salesforce.com",
+        aud: SiteSetting.salesforce_authorization_server_url,
         iat: Time.now.utc.to_i,
         exp: Time.now.utc.to_i + 180
       }

@@ -89,9 +89,9 @@ after_initialize do
   CategoryList.preloaded_topic_custom_fields << ::CaseMixin::HAS_SALESFORCE_CASE
 
   on(:user_created) do |user, opts|
-    if user.salesforce_contact_id = Salesforce.Contact.find_id_by_email(user.email)
+    if user.salesforce_contact_id = ::Salesforce::Contact.find_id_by_email(user.email)
       user.save_custom_fields
-    elsif user.salesforce_lead_id = Salesforce.Lead.find_id_by_email(user.email)
+    elsif user.salesforce_lead_id = ::Salesforce::Lead.find_id_by_email(user.email)
       user.save_custom_fields
     end
   end

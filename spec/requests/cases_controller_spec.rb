@@ -4,7 +4,7 @@ require "rails_helper"
 require_relative '../spec_helper'
 
 RSpec.describe ::Salesforce::CasesController do
-  include_context "spec helper"
+  include_context "salesforce spec helper"
 
   fab!(:topic) { Fabricate(:topic) }
   fab!(:first_post) { Fabricate(:post, topic: topic) }

@@ -1,7 +1,6 @@
 # frozen_string_literal: true
 
-RSpec.shared_context "spec helper" do
-
+RSpec.shared_context "salesforce spec helper" do
   let(:access_token) { "SALESFORCE_ACCESS_TOKEN" }
   let(:instance_url) { "https://test.my.salesforce.com/" }
 
@@ -17,5 +16,4 @@ RSpec.shared_context "spec helper" do
   def api_path
     "#{instance_url}services/data/v49.0/sobjects"
   end
-
 end

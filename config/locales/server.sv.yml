@@ -10,9 +10,9 @@ sv:
     salesforce_login_enabled: 'Aktivera social inloggning med Salesforce'
     salesforce_client_id: "Salesforce-anslutna appens klient-id"
     salesforce_client_secret: "Salesforce-anslutna appens klienthemlighet"
+    salesforce_rsa_private_key: "Salesforce-anslutna appens privata RSA-nyckel"
     salesforce_username: "Salesforce-kontots användarnamn"
     salesforce_max_feed_items_per_day: "Maximalt antal ämnessvar som kan läggas upp som flödesobjekt för Salesforce-objekt (scenario/lead/kontakt) per dag"
-    salesforce_rsa_private_key: "Salesforce-anslutna appens privata RSA-nyckel"
     salesforce_case_tag_name: "Taggnamn att lägga till i ämnen med ett Salesforce-scenario"
     salesforce_case_status_tag_enabled: "Aktivera för att lägga till taggar baserat på Salesforce-scenariostatus"
     salesforce_case_status_tag_prefix: "Prefix att lägga till före Salesforce-scenarios statustaggar. Till exempel, om prefixet är 'scenario' kommer taggarna att läggas till som scenario-öppen, scenario-stängd, etc.,"

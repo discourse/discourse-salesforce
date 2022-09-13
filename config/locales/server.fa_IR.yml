@@ -5,3 +5,5 @@
 # https://translate.discourse.org/
 
 fa_IR:
+  site_settings:
+    salesforce_authorization_server_url: "نشانی اینترنتی سرور مجوز Salesforce"

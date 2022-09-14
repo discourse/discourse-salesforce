@@ -19,6 +19,10 @@ module ::Salesforce
       id
     end
 
+    def self.update(id, fields)
+      Salesforce.api.post("sobjects/#{self::OBJECT_NAME}/#{id}?_HttpMethod=PATCH", fields)
+    end
+
     def self.find_id_by_email(email)
       result = Salesforce.api.query("SELECT Id FROM #{self::OBJECT_NAME} WHERE Email = '#{email}'")
       return if result["totalSize"] == 0

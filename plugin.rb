@@ -87,6 +87,7 @@ after_initialize do
   allow_staff_user_custom_field(::Salesforce::Lead::ID_FIELD)
   register_topic_custom_field_type(::CaseMixin::HAS_SALESFORCE_CASE, :boolean)
   CategoryList.preloaded_topic_custom_fields << ::CaseMixin::HAS_SALESFORCE_CASE
+  Search.preloaded_topic_custom_fields << ::CaseMixin::HAS_SALESFORCE_CASE
 
   on(:user_created) do |user, opts|
     if user.salesforce_contact_id = ::Salesforce::Contact.find_id_by_email(user.email)

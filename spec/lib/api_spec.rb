@@ -4,7 +4,7 @@ require 'rails_helper'
 require_relative '../spec_helper'
 
 RSpec.describe ::Salesforce::Api do
-  include_context "salesforce spec helper"
+  include_context "with salesforce spec helper"
 
   it "sets Salesforce access token and instance URL" do
     api = described_class.new

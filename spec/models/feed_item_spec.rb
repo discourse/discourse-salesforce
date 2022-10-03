@@ -4,7 +4,7 @@ require 'rails_helper'
 require_relative '../spec_helper'
 
 RSpec.describe Salesforce::FeedItem do
-  include_context "salesforce spec helper"
+  include_context "with salesforce spec helper"
 
   fab!(:user) { Fabricate(:user) }
   fab!(:post) { Fabricate(:post, user: user) }

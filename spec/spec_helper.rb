@@ -1,6 +1,6 @@
 # frozen_string_literal: true
 
-RSpec.shared_context "salesforce spec helper" do
+RSpec.shared_context "with salesforce spec helper" do
   let(:access_token) { "SALESFORCE_ACCESS_TOKEN" }
   let(:instance_url) { "https://test.my.salesforce.com/" }
 

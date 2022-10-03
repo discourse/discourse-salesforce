@@ -4,7 +4,7 @@ require 'rails_helper'
 require_relative '../spec_helper'
 
 RSpec.describe Jobs::SyncSalesforceUsers do
-  include_context "salesforce spec helper"
+  include_context "with salesforce spec helper"
 
   fab!(:user1) { Fabricate(:user) }
   fab!(:user2) { Fabricate(:user) }

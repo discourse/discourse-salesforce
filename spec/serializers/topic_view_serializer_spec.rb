@@ -4,7 +4,7 @@ require "rails_helper"
 require_relative '../spec_helper'
 
 describe TopicViewSerializer do
-  include_context "salesforce spec helper"
+  include_context "with salesforce spec helper"
 
   fab!(:topic) { Fabricate(:topic) }
   fab!(:salesforce_case) { Fabricate(:salesforce_case, topic: topic) }

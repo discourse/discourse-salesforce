@@ -6,6 +6,10 @@
 
 ru:
   js:
+    login:
+      salesforce:
+        name: "отдел продаж"
+        title: "Login with Salesforce"
     salesforce:
       poster_icon:
         contact:

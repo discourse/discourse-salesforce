@@ -59,6 +59,7 @@ after_initialize do
     '../app/jobs/regular/create_case_comment.rb',
     '../app/jobs/regular/create_feed_item.rb',
     '../app/jobs/regular/sync_case_comments.rb',
+    '../app/jobs/regular/sync_case.rb',
     '../app/jobs/scheduled/sync_salesforce_users.rb',
     '../app/models/salesforce/case.rb',
     '../app/models/salesforce/feed_item.rb',
@@ -105,6 +106,20 @@ after_initialize do
     else
       Jobs.enqueue(:create_feed_item, post_id: post.id)
     end
+  end
+
+  automatic_case_sync = ->(topic) do
+    sync_tags = SiteSetting.salesforce_automatic_case_sync_tags.split('|')
+
+    return if sync_tags.empty?
+    return if sync_tags.intersection(topic.tags.pluck(:name)).empty?
+
+    Jobs.enqueue(:sync_case, topic_id: topic.id)
+  end
+
+  on(:topic_created, &automatic_case_sync)
+  on(:post_edited) do |post|
+    automatic_case_sync.call(post.topic)
   end
 
   reloadable_patch do |plugin|

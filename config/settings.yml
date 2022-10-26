@@ -37,3 +37,7 @@ plugins:
   salesforce_contacts_group_id:
     default: ''
     hidden: true
+  salesforce_automatic_case_sync_tags:
+    type: tag_list
+    client: true
+    default: ""

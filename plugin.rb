@@ -108,7 +108,7 @@ after_initialize do
     end
   end
 
-  automatic_case_sync = ->(topic) do
+  automatic_case_sync = ->(topic, *extras) do
     sync_tags = SiteSetting.salesforce_automatic_case_sync_tags.split('|')
 
     return if sync_tags.empty?

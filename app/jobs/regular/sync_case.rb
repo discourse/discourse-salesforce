@@ -7,7 +7,7 @@ module ::Jobs
       return unless SiteSetting.salesforce_enabled
 
       topic = Topic.find(args[:topic_id])
-      Case.sync!(topic)
+      ::Salesforce::Case.sync!(topic)
     end
   end
 end

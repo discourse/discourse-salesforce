@@ -6,7 +6,7 @@ module ::Jobs
     def execute(args)
       return unless SiteSetting.salesforce_enabled
 
-      topic = Topic.find(params[:topic_id])
+      topic = Topic.find(args[:topic_id])
       Case.sync!(topic)
     end
   end

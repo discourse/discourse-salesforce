@@ -5,3 +5,23 @@
 # https://translate.discourse.org/
 
 fr:
+  site_settings:
+    salesforce_enabled: 'Activer le plugin discours-salesforce'
+    salesforce_login_enabled: 'Activer la connexion de réseau social Salesforce'
+    salesforce_client_id: "ID client de l'application connectée Salesforce"
+    salesforce_client_secret: "Clé secrète client de l'application connectée Salesforce"
+    salesforce_rsa_private_key: "Clé privée RSA de l'application connectée Salesforce"
+    salesforce_authorization_server_url: "URL du serveur d'autorisation Salesforce"
+    salesforce_username: "Nom d'utilisateur du compte Salesforce"
+    salesforce_max_feed_items_per_day: "Nombre maximal de réponses aux sujets pouvant être publiées sous forme d'éléments de fil sur les objets Salesforce (cas/prospect/contact) par jour"
+    salesforce_case_tag_name: "Nom d'étiquette à ajouter aux sujets avec un cas Salesforce"
+    salesforce_case_status_tag_enabled: "Activer pour ajouter des étiquettes en fonction du statut du cas Salesforce"
+    salesforce_case_status_tag_prefix: "Préfixe à ajouter avant les étiquettes de statut de cas Salesforce. Par exemple, si le préfixe est « cas », les étiquettes seront ajoutées, comme case-open, case-closed, etc."
+    errors:
+      salesforce_client_credentials_required: "Les paramètres d'identifiant client et de secret client Salesforce sont requis"
+  salesforce:
+    error:
+      invalid_response: "Réponse invalide de l'API Salesforce"
+  dashboard:
+    salesforce:
+      app_not_approved: "L'application connectée Discourse n'est pas encore autorisée dans Salesforce par l'utilisateur mentionné dans le paramètre de site salesforce_username. Veuillez suivre <a href='%{base_url}/salesforce/admin/authorize'>ce lien</a> pour l'autoriser."

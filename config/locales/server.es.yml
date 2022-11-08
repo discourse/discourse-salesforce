@@ -10,7 +10,18 @@ es:
     salesforce_login_enabled: 'Habilitar el inicio de sesión con Salesforce'
     salesforce_client_id: "ID de cliente de la aplicación conectada a Salesforce"
     salesforce_client_secret: "Secreto de cliente de la aplicación conectada de Salesforce"
+    salesforce_rsa_private_key: "Clave privada RSA de la aplicación conectada de Salesforce"
+    salesforce_authorization_server_url: "URL del servidor de autorización de Salesforce"
     salesforce_username: "Nombre de usuario de la cuenta de Salesforce"
+    salesforce_max_feed_items_per_day: "Número máximo de respuestas a temas que pueden publicarse como elementos de feed en los objetos de Salesforce (Caso/Cliente potencial/Contacto) por día"
+    salesforce_case_tag_name: "Nombre de la etiqueta para añadir en los temas con un caso de Salesforce"
+    salesforce_case_status_tag_enabled: "Habilitar la adición de etiquetas basadas en el estado del caso de Salesforce"
+    salesforce_case_status_tag_prefix: "Prefijo a añadir antes de las etiquetas de estado de los casos de Salesforce. Por ejemplo, si el prefijo es «caso», se añadirán las etiquetas como caso-abierto, caso-cerrado, etc,"
+    errors:
+      salesforce_client_credentials_required: "Se requiere la configuración del ID de cliente y el secreto de cliente de Salesforce"
   salesforce:
     error:
       invalid_response: "Respuesta inválida de la API de Salesforce"
+  dashboard:
+    salesforce:
+      app_not_approved: "La aplicación conectada a Discourse aún no está autorizada en Salesforce por el usuario mencionado en la configuración del sitio «salesforce_username». Por favor, sigue <a href='%{base_url}/salesforce/admin/authorize'>este enlace</a> para autorizarla."

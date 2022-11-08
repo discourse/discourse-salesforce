@@ -12,9 +12,14 @@ es:
         title: "Iniciar sesión con Salesforce"
     salesforce:
       title: Salesforce
+      lead:
+        create: "Crear cliente potencial"
       contact:
         create: "Crear contacto"
       poster_icon:
+        lead:
+          title: "Cliente potencial de Salesforce"
+          text: "Cliente potencial"
         contact:
           title: "Contacto de Salesforce"
           text: "Contacto"

@@ -6,7 +6,24 @@
 
 it:
   js:
+    login:
+      salesforce:
+        name: "Salesforce"
+        title: "Accedi con Salesforce"
     salesforce:
+      title: Salesforce
+      lead:
+        create: "Crea lead"
+      contact:
+        create: "Crea contatto"
       poster_icon:
+        lead:
+          title: "Lead di Salesforce"
+          text: "Lead"
         contact:
+          title: "Contatto Salesforce"
           text: "Contatto"
+    topic:
+      actions:
+        create_salesforce_case: "Crea caso"
+        sync_salesforce_case: "Sincronizza caso"

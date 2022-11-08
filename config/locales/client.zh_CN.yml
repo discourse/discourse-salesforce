@@ -6,7 +6,24 @@
 
 zh_CN:
   js:
+    login:
+      salesforce:
+        name: "Salesforce"
+        title: "使用 Salesforce 登录"
     salesforce:
+      title: Salesforce
+      lead:
+        create: "创建潜在客户"
+      contact:
+        create: "创建联系人"
       poster_icon:
+        lead:
+          title: "Salesforce 潜在客户"
+          text: "潜在客户"
         contact:
+          title: "Salesforce 联系人"
           text: "联系"
+    topic:
+      actions:
+        create_salesforce_case: "创建案例"
+        sync_salesforce_case: "同步案例"

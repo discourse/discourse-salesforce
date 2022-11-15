@@ -5,3 +5,23 @@
 # https://translate.discourse.org/
 
 ar:
+  site_settings:
+    salesforce_enabled: 'تفعيل المكوِّن الإضافي discourse-salesforce'
+    salesforce_login_enabled: 'تفعيل تسجيل الدخول من خلال Salesforce'
+    salesforce_client_id: "معرِّف العميل لتطبيق Salesforce المربوط"
+    salesforce_client_secret: "سر العميل لتطبيق Salesforce المرتبط"
+    salesforce_rsa_private_key: "معرِّف RSA الخاص لتطبيق Salesforce المربوط"
+    salesforce_authorization_server_url: "عنوان URL لخادم تفويض Salesforce"
+    salesforce_username: "اسم المستخدم لحساب Salesforce"
+    salesforce_max_feed_items_per_day: "الحد الأقصى لعدد ردود الموضوع التي يمكن نشرها كعناصر موجز في كائنات Salesforce (سيناريو/عميل محتمل/هة اتصال) في اليوم"
+    salesforce_case_tag_name: "قم بالإشارة إلى الاسم لإضافته إلى الموضوعات ذات سيناريو Salesforce"
+    salesforce_case_status_tag_enabled: "قم بالتفعيل لإضافة الوسوم حسب حالة سيناريو Salesforce"
+    salesforce_case_status_tag_prefix: "بادئة للإضافة قبل وسوم حالة سيناريو Salesforce. على سبيل المثال، إذا كانت البادئة هي \"case\"، فستتم إضافة الوسوم مثل case-open (سيناريو مفتوح)، وcase-closed (سيناريو مغلق)، إلى آخره.،"
+    errors:
+      salesforce_client_credentials_required: "إعدادات معرِّف عميل Salesforce وسر العميل مطلوبة"
+  salesforce:
+    error:
+      invalid_response: "استجابة غير صالحة من واجهة برمجة تطبيقات Salesforce"
+  dashboard:
+    salesforce:
+      app_not_approved: "تطبيق Discourse المربوط غير مصرَّح به حتى الآن في Salesforce من قِبل المستخدم المُشار إليه في إعداد الموقع `salesforce_username`. يُرجى اتباع <a href='%{base_url}/salesforce/admin/authorize'>هذا الرابط</a> لتفويضه."

@@ -6,7 +6,24 @@
 
 de:
   js:
+    login:
+      salesforce:
+        name: "Salesforce"
+        title: "Mit Salesforce anmelden"
     salesforce:
+      title: Salesforce
+      lead:
+        create: "Lead erstellen"
+      contact:
+        create: "Kontakt erstellen"
       poster_icon:
+        lead:
+          title: "Salesforce-Lead"
+          text: "Lead"
         contact:
+          title: "Salesforce-Kontakt"
           text: "Kontakt"
+    topic:
+      actions:
+        create_salesforce_case: "Kundenvorgang erstellen"
+        sync_salesforce_case: "Kundenvorgang synchronisieren"

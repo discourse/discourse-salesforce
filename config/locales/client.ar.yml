@@ -6,7 +6,24 @@
 
 ar:
   js:
+    login:
+      salesforce:
+        name: "Salesforce"
+        title: "تسجيل الدخول من خلال Salesforce"
     salesforce:
+      title: Salesforce
+      lead:
+        create: "إنشاء عميل محتمل"
+      contact:
+        create: "إنشاء جهة اتصال"
       poster_icon:
+        lead:
+          title: "عميل محتمل في Salesforce"
+          text: "عميل محتمل"
         contact:
+          title: "جهة اتصال في Salesforce"
           text: "تواصل معنا"
+    topic:
+      actions:
+        create_salesforce_case: "إنشاء سيناريو"
+        sync_salesforce_case: "مزامنة السيناريو"

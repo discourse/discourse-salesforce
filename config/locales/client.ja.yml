@@ -6,7 +6,24 @@
 
 ja:
   js:
+    login:
+      salesforce:
+        name: "Salesforce"
+        title: "Salesforce でログイン"
     salesforce:
+      title: Salesforce
+      lead:
+        create: "リードを作成"
+      contact:
+        create: "取引先責任者を作成"
       poster_icon:
+        lead:
+          title: "Salesforce リード"
+          text: "リード"
         contact:
+          title: "Salesforce 取引先責任者"
           text: "連絡先"
+    topic:
+      actions:
+        create_salesforce_case: "ケースを作成"
+        sync_salesforce_case: "ケースを同期"

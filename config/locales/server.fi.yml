@@ -5,3 +5,23 @@
 # https://translate.discourse.org/
 
 fi:
+  site_settings:
+    salesforce_enabled: 'Ota discourse-salesforce-lisäosa käyttöön'
+    salesforce_login_enabled: 'Ota Salesforcen yhteisökirjautuminen käyttöön'
+    salesforce_client_id: "Salesforcen yhdistetyn sovelluksen asiakastunnus"
+    salesforce_client_secret: "Salesforcen yhdistetyn sovelluksen asiakkaan salatunnus"
+    salesforce_rsa_private_key: "Salesforcen yhdistetyn sovelluksen RSA-yksityisavain"
+    salesforce_authorization_server_url: "Salesforcen valtuutuspalvelimen URL-osoite"
+    salesforce_username: "Salesforce-tilin käyttäjänimi"
+    salesforce_max_feed_items_per_day: "Enimmäismäärä ketjun vastauksia, jotka voidaan lähettää syötekohteina Salesforce-objekteissa (tapaus/liidi/yhteystieto) päivässä"
+    salesforce_case_tag_name: "Tunnisteen nimi, joka lisätään ketjuihin, joissa on Salesforce-tapaus"
+    salesforce_case_status_tag_enabled: "Ota käyttöön tunnisteiden lisääminen Salesforce-tapauksen tilan perusteella"
+    salesforce_case_status_tag_prefix: "Etuliite, joka lisätään ennen Salesforce-tapauksen tilatunnisteita. Jos esimerkiksi etuliite on \"tapaus\", tunnisteet lisätään seuraavasti: tapaus-avoin, tapaus-suljettu jne."
+    errors:
+      salesforce_client_credentials_required: "Salesforcen asiakastunnuksen ja asiakkaan salatunnuksen asetukset ovat pakollisia"
+  salesforce:
+    error:
+      invalid_response: "Virheellinen vastaus Salesforce APIsta"
+  dashboard:
+    salesforce:
+      app_not_approved: "Käyttäjä, joka on mainittu \"salesforce_username\"-sivustoasetuksessa, ei ole vielä valtuuttanut Discourseen yhdistettyä sovellusta Salesforcessa. Valtuuta se <a href='%{base_url}/salesforce/admin/authorize'>tämän linkin</a> kautta."

@@ -22,7 +22,7 @@ zh_CN:
           text: "潜在客户"
         contact:
           title: "Salesforce 联系人"
-          text: "联系"
+          text: "联系人"
     topic:
       actions:
         create_salesforce_case: "创建案例"

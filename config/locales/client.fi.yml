@@ -6,7 +6,24 @@
 
 fi:
   js:
+    login:
+      salesforce:
+        name: "Salesforce"
+        title: "Kirjaudu sisään Salesforce-tilillä"
     salesforce:
+      title: Salesforce
+      lead:
+        create: "Luo liidi"
+      contact:
+        create: "Luo yhteystieto"
       poster_icon:
+        lead:
+          title: "Salesforce-liidi"
+          text: "Liidi"
         contact:
+          title: "Salesforce-yhteystieto"
           text: "Yhteystiedot"
+    topic:
+      actions:
+        create_salesforce_case: "Luo tapaus"
+        sync_salesforce_case: "Synkronoi tapaus"

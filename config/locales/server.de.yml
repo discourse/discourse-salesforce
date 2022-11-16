@@ -5,3 +5,23 @@
 # https://translate.discourse.org/
 
 de:
+  site_settings:
+    salesforce_enabled: '„discourse-salesforce“-Plug-in aktivieren'
+    salesforce_login_enabled: 'Salesforce-Social-Log-in aktivieren'
+    salesforce_client_id: "Client-ID der verbundenen Salesforce-App"
+    salesforce_client_secret: "Client-Geheimnis der verbundenen Salesforce-App"
+    salesforce_rsa_private_key: "RSA-Private-Key der verbundenen Salesforce-App"
+    salesforce_authorization_server_url: "URL des Salesforce-Autorisierungsservers"
+    salesforce_username: "Benutzername des Salesforce-Kontos"
+    salesforce_max_feed_items_per_day: "Maximale Anzahl von Themenantworten, die pro Tag als Feed-Elemente zu Salesforce-Objekten (Kundenvorgang/Lead/Kontakt) gepostet werden können"
+    salesforce_case_tag_name: "Schlagwort-Name zum Hinzufügen in Themen mit einem Salesforce-Kundenvorgang"
+    salesforce_case_status_tag_enabled: "Aktivieren, um Schlagwörter basierend auf dem Salesforce-Kundenvorgangsstatus hinzuzufügen"
+    salesforce_case_status_tag_prefix: "Präfix, das vor Salesforce-Kundenvorgangsstatus-Schlagwörtern hinzugefügt werden soll. Wenn das Präfix beispielsweise „kundenvorgang“ ist, werden die Schlagwörter kundenvorgang-offen, kundenvorgang-geschlossen usw. hinzugefügt."
+    errors:
+      salesforce_client_credentials_required: "Salesforce-Client-ID- und Salesforce-Client-Geheimnis-Einstellungen sind erforderlich"
+  salesforce:
+    error:
+      invalid_response: "Ungültige Antwort von Salesforce-API"
+  dashboard:
+    salesforce:
+      app_not_approved: "Die mit Discourse verbundene App ist noch nicht in Salesforce vom Benutzer autorisiert, der unter der Website-Einstellung `salesforce_username` erwähnt wird. Bitte folge <a href='%{base_url}/salesforce/admin/authorize'>diesem Link</a>, um ihn zu autorisieren."

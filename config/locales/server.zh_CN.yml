@@ -8,14 +8,14 @@ zh_CN:
   site_settings:
     salesforce_enabled: '启用 discourse-salesforce 插件'
     salesforce_login_enabled: '启用 Salesforce 社交登录'
-    salesforce_client_id: "Salesforce 连接的应用的客户端 ID"
-    salesforce_client_secret: "Salesforce 连接的应用的客户端密钥"
-    salesforce_rsa_private_key: "Salesforce 连接的应用的 RSA 私钥"
+    salesforce_client_id: "Salesforce 关联应用的客户端 ID"
+    salesforce_client_secret: "Salesforce 关联应用的客户端密钥"
+    salesforce_rsa_private_key: "Salesforce 关联应用的 RSA 私钥"
     salesforce_authorization_server_url: "Salesforce 授权服务器的 URL"
     salesforce_username: "Salesforce 帐户用户名"
     salesforce_max_feed_items_per_day: "每天可以在 Salesforce 对象（案例/潜在客户/联系人）上作为 Feed 条目发布的最大话题回复数"
     salesforce_case_tag_name: "要在具有 Salesforce 案例的话题中添加的标签名称"
-    salesforce_case_status_tag_enabled: "允许以根据 Salesforce 案例状态添加标签"
+    salesforce_case_status_tag_enabled: "启用以基于 Salesforce 案例状态添加标签"
     salesforce_case_status_tag_prefix: "要在 Salesforce 案例状态标签之前添加的前缀。例如，如果前缀是“case”，则添加诸如 case-open、case-closed 等标签"
     errors:
       salesforce_client_credentials_required: "需要 Salesforce 客户端 ID 和客户端密钥设置"
@@ -24,4 +24,4 @@ zh_CN:
       invalid_response: "来自 Salesforce API 的响应无效"
   dashboard:
     salesforce:
-      app_not_approved: "站点设置“salesforce_username”中提到的用户尚未在 Salesforce 中授权 Discourse 连接的应用。请按照<a href='%{base_url}/salesforce/admin/authorize'>此链接</a>来授权。"
+      app_not_approved: "站点设置 `salesforce_username` 中提到的用户在 Salesforce 中尚未获得 Discourse 关联应用的授权。请按照<a href='%{base_url}/salesforce/admin/authorize'>此链接</a>进行授权。"

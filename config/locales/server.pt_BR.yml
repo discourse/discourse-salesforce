@@ -5,3 +5,23 @@
 # https://translate.discourse.org/
 
 pt_BR:
+  site_settings:
+    salesforce_enabled: 'Ativar o plug-in discourse-salesforce'
+    salesforce_login_enabled: 'Ativar o login social do Salesforce'
+    salesforce_client_id: "ID do cliente do aplicativo conectado ao Salesforce"
+    salesforce_client_secret: "Segredo de Cliente do aplicativo conectado ao Salesforce"
+    salesforce_rsa_private_key: "Chave privada RSA do aplicativo conectado ao Salesforce"
+    salesforce_authorization_server_url: "URL do servidor de autorização do Salesforce"
+    salesforce_username: "Nome de usuário da conta do Salesforce"
+    salesforce_max_feed_items_per_day: "Número máximo de respostas de tópicos que podem ser postadas como itens de feed em objetos do Salesforce (Caso/Lead/Contato) por dia"
+    salesforce_case_tag_name: "Nome da etiqueta para adicionar tópicos com um caso do Salesforce"
+    salesforce_case_status_tag_enabled: "Ativar a adição de etiquetas com base no status do caso do Salesforce"
+    salesforce_case_status_tag_prefix: "Prefixo a ser adicionado antes das etiquetas de status do caso do Salesforce. Por exemplo, se o prefixo for 'case', as etiquetas serão adicionadas como case-open, case-closed, etc.,"
+    errors:
+      salesforce_client_credentials_required: "As configurações de ID do cliente e segredo do cliente do Salesforce são obrigatórias"
+  salesforce:
+    error:
+      invalid_response: "Resposta inválida da API do Salesforce"
+  dashboard:
+    salesforce:
+      app_not_approved: "O aplicativo conectado ao Discourse ainda não foi autorizado no Salesforce pelo usuário mencionado na configuração do site `salesforce_username`. Para autorizá-lo, siga <a href='%{base_url}/salesforce/admin/authorize'>este link</a>."

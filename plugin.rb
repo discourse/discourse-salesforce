@@ -224,7 +224,6 @@ after_initialize do
     option :name, 'salesforce'
 
     option :client_options,
-            site: SiteSetting.salesforce_authorization_server_url,
             authorize_url: '/services/oauth2/authorize',
             token_url: '/services/oauth2/token'
   end
@@ -317,11 +316,18 @@ class Auth::SalesforceAuthenticator < Auth::ManagedAuthenticator
                         strategy.options[:client_id] = SiteSetting.salesforce_client_id
                         strategy.options[:client_secret] = SiteSetting.salesforce_client_secret
                         strategy.options[:redirect_uri] = "#{Discourse.base_url}/auth/salesforce/callback"
+                        strategy.options[:client_options][:site] = SiteSetting.salesforce_authorization_server_url
                       }
   end
 
   def enabled?
     SiteSetting.salesforce_login_enabled
+  end
+
+  # salesforce doesn't return unverfied emails in their API so we can assume
+  # the email we get from them is verified
+  def primary_email_verified?(auth_token)
+    true
   end
 end
 

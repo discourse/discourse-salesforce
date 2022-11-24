@@ -324,7 +324,7 @@ class Auth::SalesforceAuthenticator < Auth::ManagedAuthenticator
     SiteSetting.salesforce_login_enabled
   end
 
-  # salesforce doesn't return unverfied emails in their API so we can assume
+  # salesforce doesn't return unverified emails in their API so we can assume
   # the email we get from them is verified
   def primary_email_verified?(auth_token)
     true

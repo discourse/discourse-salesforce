@@ -6,7 +6,24 @@
 
 nl:
   js:
+    login:
+      salesforce:
+        name: "Salesforce"
+        title: "Aanmelden met Salesforce"
     salesforce:
+      title: Salesforce
+      lead:
+        create: "Lead maken"
+      contact:
+        create: "Contact maken"
       poster_icon:
+        lead:
+          title: "Salesforce-lead"
+          text: "Lead"
         contact:
+          title: "Salesforce-contact"
           text: "Contact"
+    topic:
+      actions:
+        create_salesforce_case: "Case maken"
+        sync_salesforce_case: "Case synchroniseren"

@@ -65,7 +65,7 @@ after_initialize do
           )
         SiteSetting.salesforce_leads_group_id = group.id
       end
-      
+
       if contacts_group.blank?
         group = Group.where(name: 'salesforce-contacts')
           .first_or_create!(

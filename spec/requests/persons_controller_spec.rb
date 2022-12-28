@@ -12,6 +12,7 @@ RSpec.describe ::Salesforce::PersonsController do
   describe "#create" do
     before do
       sign_in(admin)
+      Salesforce.seed_groups!
     end
 
     it 'creates a new contact object in Salesforce' do

@@ -14,6 +14,7 @@ RSpec.describe ::Salesforce::CasesController do
 
     it 'creates a new case object in Salesforce' do
       sign_in(admin)
+      Salesforce.seed_groups!
 
       stub_request(:post, "#{api_path}/Contact").
         with(body: topic.user.salesforce_contact_payload.to_json).

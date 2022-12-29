@@ -1,7 +1,7 @@
 # frozen_string_literal: true
 
 require "rails_helper"
-require_relative '../spec_helper'
+require_relative "../spec_helper"
 
 describe TopicViewSerializer do
   include_context "with salesforce spec helper"

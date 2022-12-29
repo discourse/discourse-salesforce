@@ -1,7 +1,7 @@
 # frozen_string_literal: true
 
-require 'rails_helper'
-require_relative '../spec_helper'
+require "rails_helper"
+require_relative "../spec_helper"
 
 RSpec.describe Jobs::SyncCaseComments do
   include_context "with salesforce spec helper"
@@ -13,13 +13,13 @@ RSpec.describe Jobs::SyncCaseComments do
   fab!(:post3) { Fabricate(:post, topic: topic, post_number: 3) }
   fab!(:post4) { Fabricate(:post, topic: topic, post_number: 4) }
 
-  it 'will not create comments if topic not linked to Salesforce case' do
+  it "will not create comments if topic not linked to Salesforce case" do
     salesforce_case.destroy!
     ::Salesforce::CaseComment.any_instance.expects(:create!).never
     described_class.new.execute(topic_id: topic.id)
   end
 
-  it 'creates multiple case comment objects on Salesforce' do
+  it "creates multiple case comment objects on Salesforce" do
     topic.custom_fields["has_salesforce_case"] = true
     topic.save_custom_fields
 

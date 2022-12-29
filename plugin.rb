@@ -8,25 +8,25 @@
 # required_version: 2.7.0
 # transpile_js: true
 
-require 'auth/managed_authenticator'
-require 'omniauth-oauth2'
-require 'openssl'
-require 'base64'
+require "auth/managed_authenticator"
+require "omniauth-oauth2"
+require "openssl"
+require "base64"
 
 enabled_site_setting :salesforce_enabled
 
-register_asset 'stylesheets/salesforce.scss'
+register_asset "stylesheets/salesforce.scss"
 
 register_svg_icon "fab-salesforce"
 register_svg_icon "address-card"
 
-require_relative 'lib/validators/salesforce_login_enabled_validator'
+require_relative "lib/validators/salesforce_login_enabled_validator"
 
 after_initialize do
   SeedFu.fixture_paths << Rails.root.join("plugins", "discourse-salesforce", "db", "fixtures").to_s
 
   module ::Salesforce
-    PLUGIN_NAME = 'discourse-salesforce'
+    PLUGIN_NAME = "discourse-salesforce"
 
     class Engine < ::Rails::Engine
       engine_name PLUGIN_NAME
@@ -53,53 +53,53 @@ after_initialize do
 
     def self.seed_groups!
       if leads_group.blank?
-        group = Group.where(name: 'salesforce-leads')
-          .first_or_create!(
-            name: 'salesforce-leads',
+        group =
+          Group.where(name: "salesforce-leads").first_or_create!(
+            name: "salesforce-leads",
             visibility_level: Group.visibility_levels[:staff],
             primary_group: true,
-            title: 'Lead',
-            flair_icon: 'fab-salesforce',
-            bio_raw: 'Members are automatically synced from Salesforce via API',
-            full_name: 'Salesforce Leads'
+            title: "Lead",
+            flair_icon: "fab-salesforce",
+            bio_raw: "Members are automatically synced from Salesforce via API",
+            full_name: "Salesforce Leads",
           )
         SiteSetting.salesforce_leads_group_id = group.id
       end
 
       if contacts_group.blank?
-        group = Group.where(name: 'salesforce-contacts')
-          .first_or_create!(
-            name: 'salesforce-contacts',
+        group =
+          Group.where(name: "salesforce-contacts").first_or_create!(
+            name: "salesforce-contacts",
             visibility_level: Group.visibility_levels[:staff],
             primary_group: true,
-            title: 'Contact',
-            flair_icon: 'fab-salesforce',
-            bio_raw: 'Members are automatically synced from Salesforce via API',
-            full_name: 'Salesforce Contacts'
+            title: "Contact",
+            flair_icon: "fab-salesforce",
+            bio_raw: "Members are automatically synced from Salesforce via API",
+            full_name: "Salesforce Contacts",
           )
         SiteSetting.salesforce_contacts_group_id = group.id
       end
     end
   end
 
-  [
-    '../app/controllers/salesforce/admin_controller.rb',
-    '../app/controllers/salesforce/cases_controller.rb',
-    '../app/controllers/salesforce/persons_controller.rb',
-    '../app/jobs/regular/create_case_comment.rb',
-    '../app/jobs/regular/create_feed_item.rb',
-    '../app/jobs/regular/sync_case_comments.rb',
-    '../app/jobs/regular/sync_case.rb',
-    '../app/jobs/scheduled/sync_salesforce_users.rb',
-    '../app/models/salesforce/case.rb',
-    '../app/models/salesforce/feed_item.rb',
-    '../app/models/salesforce/case_comment.rb',
-    '../app/models/salesforce/person.rb',
-    '../app/models/salesforce/lead.rb',
-    '../app/models/salesforce/contact.rb',
-    '../app/serializers/concerns/case_mixin.rb',
-    '../app/serializers/case_serializer.rb',
-    '../lib/salesforce/api.rb'
+  %w[
+    ../app/controllers/salesforce/admin_controller.rb
+    ../app/controllers/salesforce/cases_controller.rb
+    ../app/controllers/salesforce/persons_controller.rb
+    ../app/jobs/regular/create_case_comment.rb
+    ../app/jobs/regular/create_feed_item.rb
+    ../app/jobs/regular/sync_case_comments.rb
+    ../app/jobs/regular/sync_case.rb
+    ../app/jobs/scheduled/sync_salesforce_users.rb
+    ../app/models/salesforce/case.rb
+    ../app/models/salesforce/feed_item.rb
+    ../app/models/salesforce/case_comment.rb
+    ../app/models/salesforce/person.rb
+    ../app/models/salesforce/lead.rb
+    ../app/models/salesforce/contact.rb
+    ../app/serializers/concerns/case_mixin.rb
+    ../app/serializers/case_serializer.rb
+    ../lib/salesforce/api.rb
   ].each { |path| load File.expand_path(path, __FILE__) }
 
   Salesforce::Engine.routes.draw do
@@ -108,9 +108,7 @@ after_initialize do
     get "/admin/authorize" => "admin#authorize"
   end
 
-  Discourse::Application.routes.append do
-    mount ::Salesforce::Engine, at: "salesforce"
-  end
+  Discourse::Application.routes.append { mount ::Salesforce::Engine, at: "salesforce" }
 
   AdminDashboardData.problem_messages << ::Salesforce::Api::APP_NOT_APPROVED
 
@@ -139,7 +137,7 @@ after_initialize do
   end
 
   automatic_case_sync = ->(topic, *extras) do
-    sync_tags = SiteSetting.salesforce_automatic_case_sync_tags.split('|')
+    sync_tags = SiteSetting.salesforce_automatic_case_sync_tags.split("|")
 
     return if sync_tags.empty?
     return if sync_tags.intersection(topic.tags.pluck(:name)).empty?
@@ -148,12 +146,9 @@ after_initialize do
   end
 
   on(:topic_created, &automatic_case_sync)
-  on(:post_edited) do |post|
-    automatic_case_sync.call(post.topic)
-  end
+  on(:post_edited) { |post| automatic_case_sync.call(post.topic) }
 
   reloadable_patch do |plugin|
-
     class ::User
       def salesforce_contact_id
         custom_fields[::Salesforce::Contact::ID_FIELD]
@@ -188,7 +183,7 @@ after_initialize do
           Email: self.email,
           LastName: last_name,
           LeadSource: ::Salesforce::Contact::SOURCE,
-          Description: "#{Discourse.base_url}/u/#{UrlHelper.encode_component(self.username)}"
+          Description: "#{Discourse.base_url}/u/#{UrlHelper.encode_component(self.username)}",
         }
 
         payload.merge!(FirstName: first_name) if first_name.present?
@@ -197,10 +192,12 @@ after_initialize do
       end
 
       def salesforce_lead_payload
-        salesforce_contact_payload.merge({
-          Company: ::Salesforce::Lead::DEFAULT_COMPANY_NAME,
-          Website: self.user_profile&.website
-        })
+        salesforce_contact_payload.merge(
+          {
+            Company: ::Salesforce::Lead::DEFAULT_COMPANY_NAME,
+            Website: self.user_profile&.website,
+          },
+        )
       end
     end
 
@@ -251,29 +248,20 @@ after_initialize do
   TopicList.preloaded_custom_fields << "has_salesforce_case"
 
   class ::OmniAuth::Strategies::Salesforce
-    option :name, 'salesforce'
+    option :name, "salesforce"
 
     option :client_options,
-            authorize_url: '/services/oauth2/authorize',
-            token_url: '/services/oauth2/token'
+           authorize_url: "/services/oauth2/authorize",
+           token_url: "/services/oauth2/token"
   end
 end
 
 #
 # Class is mostly cut and paste from MIT https://raw.githubusercontent.com/realdoug/omniauth-salesforce/master/lib/omniauth/strategies/salesforce.rb
 class OmniAuth::Strategies::Salesforce < OmniAuth::Strategies::OAuth2
+  MOBILE_USER_AGENTS = "webos|ipod|iphone|ipad|android|blackberry|mobile"
 
-  MOBILE_USER_AGENTS = 'webos|ipod|iphone|ipad|android|blackberry|mobile'
-
-  option :authorize_options, [
-    :scope,
-    :display,
-    :immediate,
-    :state,
-    :prompt,
-    :redirect_uri,
-    :login_hint
-  ]
+  option :authorize_options, %i[scope display immediate state prompt redirect_uri login_hint]
 
   def request_phase
     req = Rack::Request.new(@env)
@@ -281,34 +269,35 @@ class OmniAuth::Strategies::Salesforce < OmniAuth::Strategies::OAuth2
     ua = req.user_agent.to_s
     if !options.has_key?(:display)
       mobile_request = ua.downcase =~ Regexp.new(MOBILE_USER_AGENTS)
-      options[:display] = mobile_request ? 'touch' : 'page'
+      options[:display] = mobile_request ? "touch" : "page"
     end
     super
   end
 
   def auth_hash
-    signed_value = access_token.params['id'] + access_token.params['issued_at']
-    raw_expected_signature = OpenSSL::HMAC.digest('sha256', options.client_secret.to_s, signed_value)
+    signed_value = access_token.params["id"] + access_token.params["issued_at"]
+    raw_expected_signature =
+      OpenSSL::HMAC.digest("sha256", options.client_secret.to_s, signed_value)
     expected_signature = Base64.strict_encode64 raw_expected_signature
-    signature = access_token.params['signature']
+    signature = access_token.params["signature"]
     fail! "Salesforce user id did not match signature!" unless signature == expected_signature
     super
   end
 
-  uid { raw_info['id'] }
+  uid { raw_info["id"] }
 
   info do
     {
-      name: raw_info['display_name'],
-      email: raw_info['email'],
-      nickname: raw_info['nick_name'],
-      first_name: raw_info['first_name'],
-      last_name: raw_info['last_name'],
-      location: '',
-      description: '',
-      image: raw_info['photos']['thumbnail'] + "?oauth_token=#{access_token.token}",
-      phone: '',
-      urls: raw_info['urls']
+      name: raw_info["display_name"],
+      email: raw_info["email"],
+      nickname: raw_info["nick_name"],
+      first_name: raw_info["first_name"],
+      last_name: raw_info["last_name"],
+      location: "",
+      description: "",
+      image: raw_info["photos"]["thumbnail"] + "?oauth_token=#{access_token.token}",
+      phone: "",
+      urls: raw_info["urls"],
     }
   end
 
@@ -320,18 +309,19 @@ class OmniAuth::Strategies::Salesforce < OmniAuth::Strategies::OAuth2
 
   def raw_info
     access_token.options[:mode] = :header
-    @raw_info ||= access_token.post(access_token['id']).parsed
+    @raw_info ||= access_token.post(access_token["id"]).parsed
   end
 
   extra do
-    raw_info.merge({
-      'instance_url' => access_token.params['instance_url'],
-      'pod' => access_token.params['instance_url'],
-      'signature' => access_token.params['signature'],
-      'issued_at' => access_token.params['issued_at']
-    })
+    raw_info.merge(
+      {
+        "instance_url" => access_token.params["instance_url"],
+        "pod" => access_token.params["instance_url"],
+        "signature" => access_token.params["signature"],
+        "issued_at" => access_token.params["issued_at"],
+      },
+    )
   end
-
 end
 
 class Auth::SalesforceAuthenticator < Auth::ManagedAuthenticator
@@ -341,13 +331,18 @@ class Auth::SalesforceAuthenticator < Auth::ManagedAuthenticator
 
   def register_middleware(omniauth)
     omniauth.provider :salesforce,
-                      setup: lambda { |env|
-                        strategy = env['omniauth.strategy']
-                        strategy.options[:client_id] = SiteSetting.salesforce_client_id
-                        strategy.options[:client_secret] = SiteSetting.salesforce_client_secret
-                        strategy.options[:redirect_uri] = "#{Discourse.base_url}/auth/salesforce/callback"
-                        strategy.options[:client_options][:site] = SiteSetting.salesforce_authorization_server_url
-                      }
+                      setup:
+                        lambda { |env|
+                          strategy = env["omniauth.strategy"]
+                          strategy.options[:client_id] = SiteSetting.salesforce_client_id
+                          strategy.options[:client_secret] = SiteSetting.salesforce_client_secret
+                          strategy.options[
+                            :redirect_uri
+                          ] = "#{Discourse.base_url}/auth/salesforce/callback"
+                          strategy.options[:client_options][
+                            :site
+                          ] = SiteSetting.salesforce_authorization_server_url
+                        }
   end
 
   def enabled?
@@ -361,7 +356,7 @@ class Auth::SalesforceAuthenticator < Auth::ManagedAuthenticator
   end
 end
 
-auth_provider icon: 'fab-salesforce',
+auth_provider icon: "fab-salesforce",
               frame_width: 840,
               frame_height: 570,
               authenticator: Auth::SalesforceAuthenticator.new

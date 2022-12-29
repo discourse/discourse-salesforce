@@ -13,7 +13,8 @@ module ::Jobs
       lead_fields.find_in_batches(batch_size: 100) do |fields|
         ids = fields.pluck(:value)
         begin
-          data = api_client.get("composite/sobjects/Lead?fields=ConvertedContactId&ids=#{ids.join(",")}")
+          data =
+            api_client.get("composite/sobjects/Lead?fields=ConvertedContactId&ids=#{ids.join(",")}")
           data.each do |lead|
             contact_id = lead["ConvertedContactId"]
             next if contact_id.blank?
@@ -30,7 +31,8 @@ module ::Jobs
       contact_fields.find_in_batches(batch_size: 100) do |fields|
         ids = fields.pluck(:value)
         begin
-          data = api_client.get("composite/sobjects/Contact?fields=MasterRecordId&ids=#{ids.join(",")}")
+          data =
+            api_client.get("composite/sobjects/Contact?fields=MasterRecordId&ids=#{ids.join(",")}")
           data.each do |contact|
             new_contact_id = contact["MasterRecordId"]
             next if new_contact_id.blank?

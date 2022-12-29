@@ -1,14 +1,14 @@
 # frozen_string_literal: true
 
-require 'json'
+require "json"
 
 module ::Salesforce
-
-  class InvalidApiResponse < ::StandardError; end
-  class InvalidCredentials < ::StandardError; end
+  class InvalidApiResponse < ::StandardError
+  end
+  class InvalidCredentials < ::StandardError
+  end
 
   class Api
-
     VERSION = "49.0"
     INVALID_RESPONSE = "salesforce.error.invalid_response"
     APP_NOT_APPROVED = "dashboard.salesforce.app_not_approved"
@@ -18,10 +18,13 @@ module ::Salesforce
     def initialize
       set_access_token
 
-      @faraday = Faraday.new(
-        url: SiteSetting.salesforce_instance_url,
-        headers: { 'Authorization' => "Bearer #{access_token}" }
-      )
+      @faraday =
+        Faraday.new(
+          url: SiteSetting.salesforce_instance_url,
+          headers: {
+            "Authorization" => "Bearer #{access_token}",
+          },
+        )
       @prefix = "/services/data/v#{VERSION}"
     end
 
@@ -31,15 +34,11 @@ module ::Salesforce
     end
 
     def get(path)
-      call(path) do |uri|
-        faraday.get(uri)
-      end
+      call(path) { |uri| faraday.get(uri) }
     end
 
     def post(path, fields)
-      call(path) do |uri|
-        faraday.post(uri, fields.to_json, 'Content-Type': 'application/json')
-      end
+      call(path) { |uri| faraday.post(uri, fields.to_json, "Content-Type": "application/json") }
     end
 
     def call(path)
@@ -50,7 +49,7 @@ module ::Salesforce
       when 200, 201
         JSON.parse response.body
       else
-        e = ::Salesforce::InvalidApiResponse.new(response.body.presence || '')
+        e = ::Salesforce::InvalidApiResponse.new(response.body.presence || "")
         e.set_backtrace(caller)
         Discourse.warn_exception(e, message: I18n.t(INVALID_RESPONSE), env: { api_uri: uri })
         raise e
@@ -58,21 +57,29 @@ module ::Salesforce
     end
 
     def set_access_token
-      AdminDashboardData.clear_problem_message(APP_NOT_APPROVED) if AdminDashboardData.problem_message_check(APP_NOT_APPROVED)
+      if AdminDashboardData.problem_message_check(APP_NOT_APPROVED)
+        AdminDashboardData.clear_problem_message(APP_NOT_APPROVED)
+      end
       return if access_token.present? && SiteSetting.salesforce_instance_url.present?
 
       connection = Faraday.new(url: SiteSetting.salesforce_authorization_server_url)
-      response = connection.post("/services/oauth2/token") do |req|
-        req.body = URI.encode_www_form({
-          grant_type: 'urn:ietf:params:oauth:grant-type:jwt-bearer',
-          assertion: jwt_assertion
-        })
-      end
+      response =
+        connection.post("/services/oauth2/token") do |req|
+          req.body =
+            URI.encode_www_form(
+              {
+                grant_type: "urn:ietf:params:oauth:grant-type:jwt-bearer",
+                assertion: jwt_assertion,
+              },
+            )
+        end
 
       status = response.status
       body = response.body
 
-      AdminDashboardData.add_problem_message(APP_NOT_APPROVED) if status == 400 && body.include?("user hasn't approved this consumer")
+      if status == 400 && body.include?("user hasn't approved this consumer")
+        AdminDashboardData.add_problem_message(APP_NOT_APPROVED)
+      end
       raise Salesforce::InvalidCredentials if status != 200
 
       data = JSON.parse(body)
@@ -90,7 +97,7 @@ module ::Salesforce
         sub: SiteSetting.salesforce_username,
         aud: SiteSetting.salesforce_authorization_server_url,
         iat: Time.now.utc.to_i,
-        exp: Time.now.utc.to_i + 180
+        exp: Time.now.utc.to_i + 180,
       }
     end
 
@@ -99,7 +106,7 @@ module ::Salesforce
     end
 
     def jwt_assertion
-      JWT.encode(claims, private_key, 'RS256')
+      JWT.encode(claims, private_key, "RS256")
     end
   end
 end

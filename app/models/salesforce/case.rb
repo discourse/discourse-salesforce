@@ -1,7 +1,6 @@
 # frozen_string_literal: true
 
 module ::Salesforce
-
   class Case < ::ActiveRecord::Base
     self.table_name = "salesforce_cases"
 
@@ -12,7 +11,7 @@ module ::Salesforce
         ContactId: self.contact_id,
         Subject: self.subject,
         Description: self.description,
-        Origin: "Web"
+        Origin: "Web",
       }
 
       data = Salesforce::Api.new.post("sobjects/Case", payload)
@@ -34,9 +33,15 @@ module ::Salesforce
         return if topic.blank?
 
         tags = []
-        tags << SiteSetting.salesforce_case_tag_name if SiteSetting.salesforce_case_tag_name.present?
-        tags << "#{SiteSetting.salesforce_case_status_tag_prefix}-#{self.status.downcase}" if SiteSetting.salesforce_case_status_tag_enabled
-        DiscourseTagging.tag_topic_by_names(topic, Guardian.new(Discourse.system_user), tags) if tags.present?
+        if SiteSetting.salesforce_case_tag_name.present?
+          tags << SiteSetting.salesforce_case_tag_name
+        end
+        if SiteSetting.salesforce_case_status_tag_enabled
+          tags << "#{SiteSetting.salesforce_case_status_tag_prefix}-#{self.status.downcase}"
+        end
+        if tags.present?
+          DiscourseTagging.tag_topic_by_names(topic, Guardian.new(Discourse.system_user), tags)
+        end
       end
 
       MessageBus.publish("/topic/#{topic_id}", reload_topic: true)

@@ -32,7 +32,7 @@ module ::Salesforce
         Title: post.topic.title,
         Type: "LinkPost",
         Visibility: "InternalUsers",
-        ParentId: parent_id
+        ParentId: parent_id,
       }
     end
 

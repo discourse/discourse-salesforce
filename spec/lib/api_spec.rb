@@ -1,7 +1,7 @@
 # frozen_string_literal: true
 
-require 'rails_helper'
-require_relative '../spec_helper'
+require "rails_helper"
+require_relative "../spec_helper"
 
 RSpec.describe ::Salesforce::Api do
   include_context "with salesforce spec helper"

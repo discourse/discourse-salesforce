@@ -6,12 +6,14 @@ class SalesforceLoginEnabledValidator
   end
 
   def valid_value?(val)
-    return true if val == 'f'
-    return false if SiteSetting.salesforce_client_id.blank? || SiteSetting.salesforce_client_secret.blank?
+    return true if val == "f"
+    if SiteSetting.salesforce_client_id.blank? || SiteSetting.salesforce_client_secret.blank?
+      return false
+    end
     true
   end
 
   def error_message
-    I18n.t('site_settings.errors.salesforce_client_credentials_required')
+    I18n.t("site_settings.errors.salesforce_client_credentials_required")
   end
 end

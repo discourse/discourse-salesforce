@@ -2,7 +2,6 @@
 
 module ::Jobs
   class CreateCaseComment < ::Jobs::Base
-
     def execute(args)
       return unless SiteSetting.salesforce_enabled
 

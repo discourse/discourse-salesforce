@@ -7,7 +7,7 @@ module ::Salesforce
     def payload
       {
         CommentBody: "@#{post.user.username}: #{post.raw}\n\n#{post.full_url}",
-        ParentId: parent_id
+        ParentId: parent_id,
       }
     end
   end

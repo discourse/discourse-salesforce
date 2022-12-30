@@ -58,8 +58,6 @@ after_initialize do
             name: "salesforce-leads",
             visibility_level: Group.visibility_levels[:staff],
             primary_group: true,
-            title: "Lead",
-            flair_icon: "fab-salesforce",
             bio_raw: "Members are automatically synced from Salesforce via API",
             full_name: "Salesforce Leads",
           )
@@ -72,8 +70,6 @@ after_initialize do
             name: "salesforce-contacts",
             visibility_level: Group.visibility_levels[:staff],
             primary_group: true,
-            title: "Contact",
-            flair_icon: "fab-salesforce",
             bio_raw: "Members are automatically synced from Salesforce via API",
             full_name: "Salesforce Contacts",
           )

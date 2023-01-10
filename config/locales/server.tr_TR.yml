@@ -5,3 +5,23 @@
 # https://translate.discourse.org/
 
 tr_TR:
+  site_settings:
+    salesforce_enabled: 'discourse-salesforce eklentisini etkinleştirin'
+    salesforce_login_enabled: 'Salesforce Sosyal Girişi Etkinleştirin'
+    salesforce_client_id: "Salesforce bağlantılı uygulamanın istemci kimliği"
+    salesforce_client_secret: "Salesforce bağlantılı uygulamanın istemci sırrı"
+    salesforce_rsa_private_key: "Salesforce bağlantılı uygulamanın RSA özel anahtarı"
+    salesforce_authorization_server_url: "Salesforce yetkilendirme sunucusunun URL'si"
+    salesforce_username: "Salesforce hesabı kullanıcı adı"
+    salesforce_max_feed_items_per_day: "Günlük olarak Salesforce nesnelerinde (Vaka/Potansiyel Müşteri/Kişi) besleme ögeleri olarak gönderilebilecek maksimum konu yanıtı sayısı"
+    salesforce_case_tag_name: "Salesforce vakası olan konulara eklenecek etiket adı"
+    salesforce_case_status_tag_enabled: "Salesforce vaka durumuna göre etiket eklemeyi etkinleştirin"
+    salesforce_case_status_tag_prefix: "Salesforce vaka durumu etiketlerinden önce eklenecek ön ek. Örneğin, ön ek \"case\" ise, etiketler case-open, case-closed vb. şeklinde eklenir"
+    errors:
+      salesforce_client_credentials_required: "Salesforce istemci kimliği ve istemci sırrı ayarları gerekli"
+  salesforce:
+    error:
+      invalid_response: "Salesforce API'den geçersiz yanıt"
+  dashboard:
+    salesforce:
+      app_not_approved: "Discourse bağlantılı uygulama, \"salesforce_username\" site ayarında belirtilen kullanıcı tarafından Salesforce'ta henüz yetkilendirilmemiş. Lütfen yetkilendirmek için <a href='%{base_url}/salesforce/admin/authorize'>bu bağlantıyı</a> ziyaret edin."

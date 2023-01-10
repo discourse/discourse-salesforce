@@ -6,7 +6,24 @@
 
 tr_TR:
   js:
+    login:
+      salesforce:
+        name: "Salesforce"
+        title: "Salesforce ile Giriş Yapın"
     salesforce:
+      title: Salesforce
+      lead:
+        create: "Potansiyel Müşteri Oluştur"
+      contact:
+        create: "Kişi Oluştur"
       poster_icon:
+        lead:
+          title: "Salesforce Potansiyel Müşterisi"
+          text: "Potansiyel Müşteri"
         contact:
+          title: "Salesforce Kişisi"
           text: "İletişim"
+    topic:
+      actions:
+        create_salesforce_case: "Vaka Oluştur"
+        sync_salesforce_case: "Vakayı Senkronize Et"

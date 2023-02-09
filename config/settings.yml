@@ -41,3 +41,5 @@ plugins:
     type: tag_list
     client: true
     default: ""
+  salesforce_case_origin:
+    default: 'Web'

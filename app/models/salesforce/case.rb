@@ -11,7 +11,7 @@ module ::Salesforce
         ContactId: self.contact_id,
         Subject: self.subject,
         Description: self.description,
-        Origin: "Web",
+        Origin: SiteSetting.salesforce_case_origin,
       }
 
       data = Salesforce::Api.new.post("sobjects/Case", payload)

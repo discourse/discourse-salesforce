@@ -8,8 +8,8 @@ ru:
   js:
     login:
       salesforce:
-        name: "отдел продаж"
-        title: "Login with Salesforce"
+        name: "Salesforce"
+        title: "Вход через Salesforce"
     salesforce:
       poster_icon:
         contact:

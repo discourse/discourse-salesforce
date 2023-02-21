@@ -11,6 +11,7 @@ fa_IR:
         name: "سلزفورس"
         title: "ورود با سلزفورس"
     salesforce:
+      title: سلزفورس
       poster_icon:
         contact:
           text: "تماس"

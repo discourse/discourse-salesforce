@@ -11,6 +11,7 @@ ru:
         name: "Salesforce"
         title: "Вход через Salesforce"
     salesforce:
+      title: Salesforce
       poster_icon:
         contact:
           text: "Контакты"

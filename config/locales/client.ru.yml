@@ -12,6 +12,18 @@ ru:
         title: "Вход через Salesforce"
     salesforce:
       title: Salesforce
+      lead:
+        create: "Создать интерес"
+      contact:
+        create: "Создать контакт"
       poster_icon:
+        lead:
+          title: "Интерес Salesforce"
+          text: "Интерес"
         contact:
+          title: "Контакт Salesforce"
           text: "Контакты"
+    topic:
+      actions:
+        create_salesforce_case: "Создать обращение"
+        sync_salesforce_case: "Синхронизировать обращение"

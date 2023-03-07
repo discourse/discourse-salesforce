@@ -16,7 +16,6 @@ zh_CN:
     salesforce_max_feed_items_per_day: "每天可以在 Salesforce 对象（案例/潜在客户/联系人）上作为 Feed 条目发布的最大话题回复数"
     salesforce_case_tag_name: "要在具有 Salesforce 案例的话题中添加的标签名称"
     salesforce_case_status_tag_enabled: "启用以基于 Salesforce 案例状态添加标签"
-    salesforce_case_status_tag_prefix: "要在 Salesforce 案例状态标签之前添加的前缀。例如，如果前缀是“case”，则添加诸如 case-open、case-closed 等标签"
     errors:
       salesforce_client_credentials_required: "需要 Salesforce 客户端 ID 和客户端密钥设置"
   salesforce:

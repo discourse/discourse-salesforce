@@ -16,7 +16,6 @@ fr:
     salesforce_max_feed_items_per_day: "Nombre maximal de réponses aux sujets pouvant être publiées sous forme d'éléments de fil sur les objets Salesforce (cas/prospect/contact) par jour"
     salesforce_case_tag_name: "Nom d'étiquette à ajouter aux sujets avec un cas Salesforce"
     salesforce_case_status_tag_enabled: "Activer pour ajouter des étiquettes en fonction du statut du cas Salesforce"
-    salesforce_case_status_tag_prefix: "Préfixe à ajouter avant les étiquettes de statut de cas Salesforce. Par exemple, si le préfixe est « cas », les étiquettes seront ajoutées, comme case-open, case-closed, etc."
     errors:
       salesforce_client_credentials_required: "Les paramètres d'identifiant client et de secret client Salesforce sont requis"
   salesforce:

@@ -16,7 +16,6 @@ fi:
     salesforce_max_feed_items_per_day: "Enimmäismäärä ketjun vastauksia, jotka voidaan lähettää syötekohteina Salesforce-objekteissa (tapaus/liidi/yhteystieto) päivässä"
     salesforce_case_tag_name: "Tunnisteen nimi, joka lisätään ketjuihin, joissa on Salesforce-tapaus"
     salesforce_case_status_tag_enabled: "Ota käyttöön tunnisteiden lisääminen Salesforce-tapauksen tilan perusteella"
-    salesforce_case_status_tag_prefix: "Etuliite, joka lisätään ennen Salesforce-tapauksen tilatunnisteita. Jos esimerkiksi etuliite on \"tapaus\", tunnisteet lisätään seuraavasti: tapaus-avoin, tapaus-suljettu jne."
     errors:
       salesforce_client_credentials_required: "Salesforcen asiakastunnuksen ja asiakkaan salatunnuksen asetukset ovat pakollisia"
   salesforce:

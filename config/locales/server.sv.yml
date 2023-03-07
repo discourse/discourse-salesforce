@@ -15,7 +15,7 @@ sv:
     salesforce_max_feed_items_per_day: "Maximalt antal ämnessvar som kan läggas upp som flödesobjekt för Salesforce-objekt (scenario/lead/kontakt) per dag"
     salesforce_case_tag_name: "Taggnamn att lägga till i ämnen med ett Salesforce-scenario"
     salesforce_case_status_tag_enabled: "Aktivera för att lägga till taggar baserat på Salesforce-scenariostatus"
-    salesforce_case_status_tag_prefix: "Prefix att lägga till före Salesforce-scenarios statustaggar. Till exempel, om prefixet är 'scenario' kommer taggarna att läggas till som scenario-öppen, scenario-stängd, etc.,"
+    salesforce_case_status_tag_prefix: "Prefix att lägga till före Salesforce-scenarios statustaggar. Till exempel, om prefixet är 'scenario' kommer taggarna att läggas till som scenario-öppen, scenario-stängd, etc."
     errors:
       salesforce_client_credentials_required: "Salesforce-klient-id och klienthemliga inställningar krävs"
   salesforce:

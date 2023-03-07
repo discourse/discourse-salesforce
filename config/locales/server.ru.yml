@@ -16,7 +16,6 @@ ru:
     salesforce_max_feed_items_per_day: "Максимальное количество ответов на тему в день, которые можно публиковать в качестве элементов ленты на объектах Salesforce (обращение, интерес, контакт)"
     salesforce_case_tag_name: "Название тега для добавления в темы с обращением Salesforce"
     salesforce_case_status_tag_enabled: "Добавлять теги по статусу обращения Salesforce"
-    salesforce_case_status_tag_prefix: "Префикс для тегов статуса обращения Salesforce. Например, если префикс «case», то теги будут добавляться как «case-open», «case-closed» и т. д."
     errors:
       salesforce_client_credentials_required: "Необходимо указать идентификатор и секретный код клиента Salesforce"
   salesforce:

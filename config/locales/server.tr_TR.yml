@@ -16,7 +16,6 @@ tr_TR:
     salesforce_max_feed_items_per_day: "Günlük olarak Salesforce nesnelerinde (Vaka/Potansiyel Müşteri/Kişi) besleme ögeleri olarak gönderilebilecek maksimum konu yanıtı sayısı"
     salesforce_case_tag_name: "Salesforce vakası olan konulara eklenecek etiket adı"
     salesforce_case_status_tag_enabled: "Salesforce vaka durumuna göre etiket eklemeyi etkinleştirin"
-    salesforce_case_status_tag_prefix: "Salesforce vaka durumu etiketlerinden önce eklenecek ön ek. Örneğin, ön ek \"case\" ise, etiketler case-open, case-closed vb. şeklinde eklenir"
     errors:
       salesforce_client_credentials_required: "Salesforce istemci kimliği ve istemci sırrı ayarları gerekli"
   salesforce:

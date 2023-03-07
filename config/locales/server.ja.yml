@@ -16,7 +16,6 @@ ja:
     salesforce_max_feed_items_per_day: "Salesforce オブジェクト (ケース/リード/取引先責任者) のフィード項目として 1 日に投稿できるトピック返信の最大数"
     salesforce_case_tag_name: "Salesforce ケースのトピックに追加するタグ名"
     salesforce_case_status_tag_enabled: "Salesforce ケースのステータスに応じてタグを追加できるようにする"
-    salesforce_case_status_tag_prefix: "Salesforce ケースのステータスタグの前に追加するプレフィックス。たとえば、プレフィックスを「case」とすると、タグは case-open や case-closed などとして追加されます。"
     errors:
       salesforce_client_credentials_required: "Salesforce クライアント ID とクライアントシークレットの設定が必要です"
   salesforce:

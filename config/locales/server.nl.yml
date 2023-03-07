@@ -16,7 +16,7 @@ nl:
     salesforce_max_feed_items_per_day: "Maximaal aantal topicantwoorden dat per dag kan worden geplaatst als feeditems in Salesforce-objecten (Case/Lead/Contact)."
     salesforce_case_tag_name: "Tagnaam om toe te voegen aan topics met een Salesforce-case"
     salesforce_case_status_tag_enabled: "Schakel dit in om tags toe te voegen op basis van de status van de Salesforce-case"
-    salesforce_case_status_tag_prefix: "Voorvoegsel dat moet worden toegevoegd vóór statustags van Salesforce-cases. Als het voorvoegsel bijvoorbeeld 'case' is, worden de tags toegevoegd als case-open, case-closed, etc.,"
+    salesforce_case_status_tag_prefix: "Voorvoegsel dat moet worden toegevoegd vóór statustags van Salesforce-cases. Als het voorvoegsel bijvoorbeeld 'case' is, worden de tags toegevoegd als case-open, case-closed, etc."
     errors:
       salesforce_client_credentials_required: "De instellingen Salesforce-client-ID en -clientgeheim zijn vereist"
   salesforce:

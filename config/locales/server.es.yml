@@ -16,7 +16,6 @@ es:
     salesforce_max_feed_items_per_day: "Número máximo de respuestas a temas que pueden publicarse como elementos de feed en los objetos de Salesforce (Caso/Cliente potencial/Contacto) por día"
     salesforce_case_tag_name: "Nombre de la etiqueta para añadir en los temas con un caso de Salesforce"
     salesforce_case_status_tag_enabled: "Habilitar la adición de etiquetas basadas en el estado del caso de Salesforce"
-    salesforce_case_status_tag_prefix: "Prefijo a añadir antes de las etiquetas de estado de los casos de Salesforce. Por ejemplo, si el prefijo es «caso», se añadirán las etiquetas como caso-abierto, caso-cerrado, etc,"
     errors:
       salesforce_client_credentials_required: "Se requiere la configuración del ID de cliente y el secreto de cliente de Salesforce"
   salesforce:

@@ -16,7 +16,6 @@ de:
     salesforce_max_feed_items_per_day: "Maximale Anzahl von Themenantworten, die pro Tag als Feed-Elemente zu Salesforce-Objekten (Kundenvorgang/Lead/Kontakt) gepostet werden können"
     salesforce_case_tag_name: "Schlagwort-Name zum Hinzufügen in Themen mit einem Salesforce-Kundenvorgang"
     salesforce_case_status_tag_enabled: "Aktivieren, um Schlagwörter basierend auf dem Salesforce-Kundenvorgangsstatus hinzuzufügen"
-    salesforce_case_status_tag_prefix: "Präfix, das vor Salesforce-Kundenvorgangsstatus-Schlagwörtern hinzugefügt werden soll. Wenn das Präfix beispielsweise „kundenvorgang“ ist, werden die Schlagwörter kundenvorgang-offen, kundenvorgang-geschlossen usw. hinzugefügt."
     errors:
       salesforce_client_credentials_required: "Salesforce-Client-ID- und Salesforce-Client-Geheimnis-Einstellungen sind erforderlich"
   salesforce:

@@ -57,7 +57,12 @@ module ::Salesforce
         if c.new_record?
           post = topic.first_post
           description = "#{post.full_url}\n\n#{post.raw}"
-          c.contact_id = user.salesforce_contact_id || user.create_salesforce_contact
+          c.contact_id = user.salesforce_contact_id
+
+          if c.contact_id.blank? && !SiteSetting.salesforce_skip_contact_creation_on_case_sync
+            c.contact_id = user.create_salesforce_contact
+          end
+
           c.subject = topic.title
           c.description = description
           c.generate!

@@ -43,3 +43,5 @@ plugins:
     default: ""
   salesforce_case_origin:
     default: 'Web'
+  salesforce_skip_contact_creation_on_case_sync:
+    default: false

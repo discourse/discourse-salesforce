@@ -17,6 +17,7 @@ he:
     salesforce_case_tag_name: "שם תגית להוספה לנושאים עם מקרים של Salesforce"
     salesforce_case_status_tag_enabled: "יש להפעיל כדי להוסיף תגיות שמבוססות על מצב המקרה ב־Salesforce"
     salesforce_case_status_tag_prefix: "תוספת לפני תגיות מצב המקרה ב־Salesforce. למשל, אם הקידומת היא ‚case’ (מקרה) אז התגיות תתווספנה בצורה case-open,‏ case-closed וכו׳."
+    salesforce_skip_contact_creation_on_case_sync: "דילוג על יצירת איש קשר של Salesforce במהלך סנכרון Case"
     errors:
       salesforce_client_credentials_required: "מזהה לקוח וסוד לקוח של Salesforce נחוצים"
   salesforce:

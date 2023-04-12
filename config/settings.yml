@@ -45,3 +45,5 @@ plugins:
     default: 'Web'
   salesforce_skip_contact_creation_on_case_sync:
     default: false
+  salesforce_default_contact_id_for_case_sync:
+    default: ""

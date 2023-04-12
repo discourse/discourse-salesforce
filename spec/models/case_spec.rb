@@ -49,6 +49,17 @@ RSpec.describe Salesforce::Case do
         expect(topic.user.salesforce_contact_id).to be_nil
       end
 
+      it "uses salesforce_default_contact_id_for_case_sync for ContactId if present" do
+        SiteSetting.salesforce_default_contact_id_for_case_sync = "4546566"
+
+        stub_request(:post, "#{api_path}/Case").with(
+          body:
+            %({"ContactId":"4546566","Subject":"#{topic.title}","Description":"#{post.full_url}\\n\\n#{post.raw}","Origin":"Web"}),
+        ).to_return(status: 200, body: %({"id":"234567"}), headers: {})
+
+        expect do ::Salesforce::Case.sync!(topic) end.to change { ::Salesforce::Case.count }.by(1)
+      end
+
       include_examples "existing contact"
     end
 

@@ -12,6 +12,7 @@ en:
     salesforce_case_status_tag_enabled: "Enable to add tags based on Salesforce case status"
     salesforce_case_status_tag_prefix: "Prefix to add before Salesforce case status tags. For example, if prefix is 'case' then the tags will be added like case-open, case-closed, etc."
     salesforce_skip_contact_creation_on_case_sync: "Skip creation of Salesforce Contact during Case sync"
+    salesforce_default_contact_id_for_case_sync: "Default Salesforce Contact ID to use during Case sync. Useful when 'salesforce_skip_contact_creation_on_case_sync' is enabled."
     errors:
       salesforce_client_credentials_required: "Salesforce client id and client secret settings are required"
   salesforce:

@@ -19,6 +19,21 @@ RSpec.describe Salesforce::Case do
       )
     end
 
+    def stub_new_case_request(expected_req_body = {}, expected_resp_body = {})
+      default_req_body = {
+        ContactId: nil,
+        Subject: "#{topic.title}",
+        Description: "#{post.full_url}\n\n#{post.raw}",
+        Origin: "Web",
+      }
+
+      default_resp_body = { id: "234567" }
+
+      stub_request(:post, "#{api_path}/Case").with(
+        body: default_req_body.merge(expected_req_body).to_json,
+      ).to_return(status: 200, body: default_resp_body.merge(expected_resp_body).to_json)
+    end
+
     shared_examples "existing contact" do
       it "uses the existing contact" do
         topic.user.salesforce_contact_id = "123456"
@@ -86,6 +101,26 @@ RSpec.describe Salesforce::Case do
       end
 
       include_examples "existing contact"
+    end
+
+    context "with custom field" do
+      before do
+        SiteSetting.salesforce_skip_contact_creation_on_case_sync = true
+
+        Plugin::Instance
+          .new
+          .register_modifier(:salesforce_case_payload) do |default_payload, _|
+            default_payload.merge(CustomField__c: "Custom Value")
+          end
+
+        stub_new_case_request({ CustomField__c: "Custom Value" })
+      end
+
+      after { DiscoursePluginRegistry.clear_modifiers! }
+
+      it "syncs with modified payload" do
+        expect do ::Salesforce::Case.sync!(topic) end.to change { ::Salesforce::Case.count }.by(1)
+      end
     end
   end
 end

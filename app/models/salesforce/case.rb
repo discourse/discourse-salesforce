@@ -7,13 +7,6 @@ module ::Salesforce
     belongs_to :topic
 
     def generate!
-      payload = {
-        ContactId: self.contact_id,
-        Subject: self.subject,
-        Description: self.description,
-        Origin: SiteSetting.salesforce_case_origin,
-      }
-
       data = Salesforce::Api.new.post("sobjects/Case", payload)
 
       self.uid = data["id"]
@@ -82,6 +75,19 @@ module ::Salesforce
       else
         user.create_salesforce_contact
       end
+    end
+
+    private
+
+    def payload
+      default = {
+        ContactId: self.contact_id,
+        Subject: self.subject,
+        Description: self.description,
+        Origin: SiteSetting.salesforce_case_origin,
+      }
+
+      DiscoursePluginRegistry.apply_modifier(:salesforce_case_payload, default, topic)
     end
   end
 end

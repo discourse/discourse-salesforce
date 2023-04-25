@@ -5,3 +5,11 @@
 # https://translate.discourse.org/
 
 id:
+  site_settings:
+    salesforce_enabled: 'Aktifkan plugin discourse-salesforce'
+    salesforce_login_enabled: 'Aktifkan Login Sosial Salesforce'
+    salesforce_client_id: "ID klien aplikasi yang terhubung dengan Salesforce"
+    salesforce_username: "Nama pengguna akun Salesforce"
+  salesforce:
+    error:
+      invalid_response: "Tanggapan tidak valid dari API Salesforce"

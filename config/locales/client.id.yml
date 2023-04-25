@@ -5,3 +5,25 @@
 # https://translate.discourse.org/
 
 id:
+  js:
+    login:
+      salesforce:
+        name: "Salesforce"
+        title: "Masuk dengan Salesforce"
+    salesforce:
+      title: Salesforce
+      lead:
+        create: "Buat Prospek"
+      contact:
+        create: "Buat Kontak"
+      poster_icon:
+        lead:
+          title: "Prospek Salesforce"
+          text: "Prospek"
+        contact:
+          title: "Kontak Salesforce"
+          text: "Kontak"
+    topic:
+      actions:
+        create_salesforce_case: "Buat Kasus"
+        sync_salesforce_case: "Sinkronkan Kasus"

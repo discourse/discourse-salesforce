@@ -104,19 +104,26 @@ RSpec.describe Salesforce::Case do
     end
 
     context "with custom field" do
+      let(:plugin_instance) { Plugin::Instance.new }
+      let(:modifier_block) do
+        Proc.new { |default_payload, _| default_payload.merge(CustomField__c: "Custom Value") }
+      end
+
       before do
         SiteSetting.salesforce_skip_contact_creation_on_case_sync = true
 
-        Plugin::Instance
-          .new
-          .register_modifier(:salesforce_case_payload) do |default_payload, _|
-            default_payload.merge(CustomField__c: "Custom Value")
-          end
+        plugin_instance.register_modifier(:salesforce_case_payload, &modifier_block)
 
         stub_new_case_request({ CustomField__c: "Custom Value" })
       end
 
-      after { DiscoursePluginRegistry.clear_modifiers! }
+      after do
+        DiscoursePluginRegistry.unregister_modifier(
+          plugin_instance,
+          :salesforce_case_payload,
+          &modifier_block
+        )
+      end
 
       it "syncs with modified payload" do
         expect do ::Salesforce::Case.sync!(topic) end.to change { ::Salesforce::Case.count }.by(1)

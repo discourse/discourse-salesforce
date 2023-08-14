@@ -18,7 +18,7 @@ en:
   salesforce:
     error:
       invalid_response: "Invalid response from Salesforce API"
-      invalid_client_credentials: "Invalid Salesforce credentials. Please inform your site admin to confirm the validity of the Salesforce client id and client secret settings"
+      invalid_client_credentials: "There was an issue with the Salesforce credentials. Please confirm the validity of the Salesforce client id and client secret settings"
   dashboard:
     salesforce:
       app_not_approved: "The Discourse connected app is not yet authorized in Salesforce by the user mentioned in site setting `salesforce_username`. Please follow <a href='%{base_url}/salesforce/admin/authorize'>this link</a> to authorize it."

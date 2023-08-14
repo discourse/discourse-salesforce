@@ -80,6 +80,9 @@ module ::Salesforce
       if status == 400 && body.include?("user hasn't approved this consumer")
         AdminDashboardData.add_problem_message(APP_NOT_APPROVED)
       end
+      if status >= 300 && SiteSetting.salesforce_api_error_logs
+        Rails.logger.error("Salesforce API error: #{status} #{body}")
+      end
       raise Salesforce::InvalidCredentials if status != 200
 
       data = JSON.parse(body)

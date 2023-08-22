@@ -16,11 +16,15 @@ de:
     salesforce_max_feed_items_per_day: "Maximale Anzahl von Themenantworten, die pro Tag als Feed-Elemente zu Salesforce-Objekten (Kundenvorgang/Lead/Kontakt) gepostet werden können"
     salesforce_case_tag_name: "Schlagwort-Name zum Hinzufügen in Themen mit einem Salesforce-Kundenvorgang"
     salesforce_case_status_tag_enabled: "Aktivieren, um Schlagwörter basierend auf dem Salesforce-Kundenvorgangsstatus hinzuzufügen"
+    salesforce_case_status_tag_prefix: "Präfix, das vor Salesforce-Kundenvorgangsstatus-Schlagwörtern hinzugefügt werden soll. Wenn das Präfix beispielsweise „kundenvorgang“ ist, werden die Schlagwörter kundenvorgang-offen, kundenvorgang-geschlossen usw. hinzugefügt."
+    salesforce_skip_contact_creation_on_case_sync: "Erstellung eines Salesforce-Kontakts während der Kundenvorgangssynchronisierung überspringen"
+    salesforce_default_contact_id_for_case_sync: "Standardmäßige Salesforce-Kontakt-ID zur Verwendung während der Kundenvorgangssynchronisierung. Nützlich, wenn „salesforce_skip_contact_creation_on_case_sync“ aktiviert ist."
     errors:
       salesforce_client_credentials_required: "Salesforce-Client-ID- und Salesforce-Client-Geheimnis-Einstellungen sind erforderlich"
   salesforce:
     error:
       invalid_response: "Ungültige Antwort von Salesforce-API"
+      invalid_client_credentials: "Es gab ein Problem mit den Salesforce-Anmeldedaten. Bitte bestätige die Gültigkeit der Einstellungen für die Salesforce-Client-ID und das entsprechende Client-Geheimnis"
   dashboard:
     salesforce:
       app_not_approved: "Die mit Discourse verbundene App ist noch nicht in Salesforce vom Benutzer autorisiert, der unter der Website-Einstellung `salesforce_username` erwähnt wird. Bitte folge <a href='%{base_url}/salesforce/admin/authorize'>diesem Link</a>, um ihn zu autorisieren."

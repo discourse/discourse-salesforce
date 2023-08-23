@@ -17,11 +17,14 @@ nl:
     salesforce_case_tag_name: "Tagnaam om toe te voegen aan topics met een Salesforce-case"
     salesforce_case_status_tag_enabled: "Schakel dit in om tags toe te voegen op basis van de status van de Salesforce-case"
     salesforce_case_status_tag_prefix: "Voorvoegsel dat moet worden toegevoegd vóór statustags van Salesforce-cases. Als het voorvoegsel bijvoorbeeld 'case' is, worden de tags toegevoegd als case-open, case-closed, etc."
+    salesforce_skip_contact_creation_on_case_sync: "Salesforce-contact maken overslaan tijdens casesynchronisatie"
+    salesforce_default_contact_id_for_case_sync: "Standaard Salesforce-contact-ID voor gebruik tijdens casesynchronisatie. Nuttig wanneer 'salesforce_skip_contact_creation_on_case_sync' is ingeschakeld."
     errors:
       salesforce_client_credentials_required: "De instellingen Salesforce-client-ID en -clientgeheim zijn vereist"
   salesforce:
     error:
       invalid_response: "Ongeldig antwoord van Salesforce-API"
+      invalid_client_credentials: "Er was een probleem met de Salesforce-aanmeldgegevens. Bevestig de geldigheid van de instellingen voor de Salesforce-client-ID en het clientgeheim"
   dashboard:
     salesforce:
       app_not_approved: "De met Discourse verbonden app is nog niet geautoriseerd in Salesforce door de gebruiker vermeld in de site-instelling 'salesforce_username'. Volg <a href='%{base_url}/salesforce/admin/authorize'>deze link</a> om de gebruiker te autoriseren."

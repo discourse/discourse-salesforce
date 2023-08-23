@@ -16,11 +16,15 @@ ja:
     salesforce_max_feed_items_per_day: "Salesforce オブジェクト (ケース/リード/取引先責任者) のフィード項目として 1 日に投稿できるトピック返信の最大数"
     salesforce_case_tag_name: "Salesforce ケースのトピックに追加するタグ名"
     salesforce_case_status_tag_enabled: "Salesforce ケースのステータスに応じてタグを追加できるようにする"
+    salesforce_case_status_tag_prefix: "Salesforce ケースのステータスタグの前に追加するプレフィックス。たとえば、プレフィックスを「case」とすると、タグは case-open や case-closed などとして追加されます。"
+    salesforce_skip_contact_creation_on_case_sync: "ケースの同期中に Salesforce 連絡先の作成をスキップする"
+    salesforce_default_contact_id_for_case_sync: "ケースの同期中に使用するデフォルトの Salesforce 連絡先 ID。'salesforce_skip_contact_creation_on_case_sync' が有効な場合に役立ちます。"
     errors:
       salesforce_client_credentials_required: "Salesforce クライアント ID とクライアントシークレットの設定が必要です"
   salesforce:
     error:
       invalid_response: "Salesforce API からの応答が無効です"
+      invalid_client_credentials: "Salesforce の資格情報に問題がありました。Salesforce クライアント ID とクライアントシークレットの設定が有効であることを確認してください。"
   dashboard:
     salesforce:
       app_not_approved: "Discourse 接続アプリはまだ、`salesforce_username` サイト設定でメンションされたユーザーによって Salesforce 内で承認されていません。<a href='%{base_url}/salesforce/admin/authorize'>こちらのリンク</a>に従って承認してください。"

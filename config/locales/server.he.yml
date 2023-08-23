@@ -23,6 +23,7 @@ he:
   salesforce:
     error:
       invalid_response: "תגובה שגויה מה־API של Salesforce"
+      invalid_client_credentials: "הייתה בעיה עם האישורים של Salesforce. נא לאשר את תוקף מזהה הלקוח של Salesforce והגדרות סוד הלקוח"
   dashboard:
     salesforce:
       app_not_approved: "היישום המקושר של Discourse עדיין לא עבר אישור ב־Salesforce על ידי המשתמש שהוזכר בהגדרת האתר `salesforce_username` (שם משתמש בסיילספורס). יש לפנות ל<a href='%{base_url}/salesforce/admin/authorize'>קישור הזה</a> כדי לאמת אותו."

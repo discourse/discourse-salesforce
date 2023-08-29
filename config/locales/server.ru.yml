@@ -16,11 +16,15 @@ ru:
     salesforce_max_feed_items_per_day: "Максимальное количество ответов на тему в день, которые можно публиковать в качестве элементов ленты на объектах Salesforce (обращение, интерес, контакт)"
     salesforce_case_tag_name: "Название тега для добавления в темы с обращением Salesforce"
     salesforce_case_status_tag_enabled: "Добавлять теги по статусу обращения Salesforce"
+    salesforce_case_status_tag_prefix: "Префикс для тегов статуса обращения Salesforce. Например, если префикс «case», то теги будут добавляться как «case-open», «case-closed» и т. д."
+    salesforce_skip_contact_creation_on_case_sync: "Пропустить создание контакта Salesforce при синхронизации обращений"
+    salesforce_default_contact_id_for_case_sync: "Идентификатор контакта Salesforce по умолчанию для синхронизации обращений. Полезно, если включен параметр `salesforce_skip_contact_creation_on_case_sync`."
     errors:
       salesforce_client_credentials_required: "Необходимо указать идентификатор и секретный код клиента Salesforce"
   salesforce:
     error:
       invalid_response: "Неверный ответ от API Salesforce"
+      invalid_client_credentials: "Проблема с учетными данными Salesforce. Проверьте настройки идентификатора клиента и секрета клиента Salesforce."
   dashboard:
     salesforce:
       app_not_approved: "Подключенное приложение Discourse ещё не авторизовано в Salesforce от имени пользователя, указанного в настройке `salesforce_username` сайта. Перейдите <a href='%{base_url}/salesforce/admin/authorize'>по этой ссылке</a> и авторизуйтесь."

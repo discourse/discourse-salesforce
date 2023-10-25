@@ -8,7 +8,12 @@ module ::Jobs
     def execute(args)
       return unless SiteSetting.salesforce_enabled
 
-      api_client = Salesforce::Api.new
+      begin
+        api_client = Salesforce::Api.new
+      rescue Salesforce::InvalidCredentials
+        return
+      end
+
       lead_fields = UserCustomField.where(name: ::Salesforce::Lead::ID_FIELD)
       lead_fields.find_in_batches(batch_size: 100) do |fields|
         ids = fields.pluck(:value)

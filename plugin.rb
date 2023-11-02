@@ -1,7 +1,7 @@
 # frozen_string_literal: true
 
 # name: discourse-salesforce
-# about: Allows synchronization between Discourse Users and Salesforce leads/contacts, and enables Salesforce Social Login. 
+# about: Allows synchronization between Discourse Users and Salesforce leads/contacts, and enables Salesforce Social Login.
 # meta_topic_id: 218267
 # version: 0.1.0
 # author: Vinoth Kannan

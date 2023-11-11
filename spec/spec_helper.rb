@@ -7,6 +7,9 @@ RSpec.shared_context "with salesforce spec helper" do
   before do
     SiteSetting.salesforce_enabled = true
     SiteSetting.salesforce_client_id = "SALESFORCE_CLIENT_ID"
+    SiteSetting.salesforce_username = "SALESFORCE_API_USERNAME"
+    SiteSetting.salesforce_rsa_private_key = "SALESFORCE_PRIVATE_KEY"
+
     Salesforce::Api.any_instance.stubs(:jwt_assertion).returns("SALESFORCE_PRIVATE_KEY")
     stub_request(:post, "https://login.salesforce.com/services/oauth2/token").with(
       body: {

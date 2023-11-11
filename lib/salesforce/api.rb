@@ -57,6 +57,8 @@ module ::Salesforce
     end
 
     def set_access_token
+      raise Salesforce::InvalidCredentials unless self.class.has_credentials?
+
       if AdminDashboardData.problem_message_check(APP_NOT_APPROVED)
         AdminDashboardData.clear_problem_message(APP_NOT_APPROVED)
       end
@@ -110,6 +112,12 @@ module ::Salesforce
 
     def jwt_assertion
       JWT.encode(claims, private_key, "RS256")
+    end
+
+    def self.has_credentials?
+      SiteSetting.salesforce_client_id.present? && SiteSetting.salesforce_username.present? &&
+        SiteSetting.salesforce_rsa_private_key.present? &&
+        SiteSetting.salesforce_authorization_server_url.present?
     end
   end
 end

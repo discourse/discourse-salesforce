@@ -1,4 +1,4 @@
-plugins:
+discourse_salesforce:
   salesforce_enabled:
     default: false
   salesforce_login_enabled:

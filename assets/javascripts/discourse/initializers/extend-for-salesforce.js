@@ -10,26 +10,18 @@ import discourseComputed from "discourse-common/utils/decorators";
 
 const PLUGIN_ID = "discourse-salesforce";
 
-function createPerson(type, context) {
-  const post = context.model;
+async function createPerson(type, post) {
   post.set("flair_url", "loading spinner");
-  ajax(`/salesforce/persons/create`, {
-    type: "POST",
-    data: { type, user_id: post.user_id },
-  })
-    .catch(popupAjaxError)
-    .then(() => {
-      post.set("flair_url", "fab-salesforce");
-      context.appEvents.trigger("post-stream:refresh", { id: post.id });
+
+  try {
+    await ajax(`/salesforce/persons/create`, {
+      type: "POST",
+      data: { type, user_id: post.user_id },
     });
-}
-
-function createLead() {
-  createPerson("lead", this);
-}
-
-function createContact() {
-  createPerson("contact", this);
+    post.set("flair_url", "fab-salesforce");
+  } catch (error) {
+    popupAjaxError(error);
+  }
 }
 
 function syncCaseForTopic(context) {
@@ -59,6 +51,7 @@ function syncCaseForTopic(context) {
 function initializeWithApi(api, container) {
   const currentUser = api.getCurrentUser();
   const isStaff = currentUser?.staff;
+  const appEvents = container.lookup("service:app-events");
 
   if (isStaff) {
     api.modifyClass("raw-view:topic-status", {
@@ -85,34 +78,29 @@ function initializeWithApi(api, container) {
     const siteSettings = container.lookup("site-settings:main");
     const salesforceUrl = siteSettings.salesforce_instance_url;
 
-    api.decorateWidget("post-admin-menu:after", (dec) => {
-      return dec.h(
-        "ul",
-        dec.attach("post-admin-menu-button", {
-          icon: "user-plus",
-          label: "salesforce.lead.create",
-          action: "createLead",
-          secondaryAction: "closeAdminMenu",
-          className: "create-lead",
-        })
-      );
+    api.addPostAdminMenuButton(() => {
+      return {
+        icon: "user-plus",
+        label: "salesforce.lead.create",
+        action: async (post) => {
+          await createPerson("lead", post);
+          appEvents.trigger("post-stream:refresh", { id: post.id });
+        },
+        className: "create-lead",
+      };
     });
 
-    api.decorateWidget("post-admin-menu:after", (dec) => {
-      return dec.h(
-        "ul",
-        dec.attach("post-admin-menu-button", {
-          icon: "address-card",
-          label: "salesforce.contact.create",
-          action: "createContact",
-          secondaryAction: "closeAdminMenu",
-          className: "create-contact",
-        })
-      );
+    api.addPostAdminMenuButton(() => {
+      return {
+        icon: "address-card",
+        label: "salesforce.contact.create",
+        action: async (post) => {
+          await createPerson("contact", post);
+          appEvents.trigger("post-stream:refresh", { id: post.id });
+        },
+        className: "create-contact",
+      };
     });
-
-    api.attachWidgetAction("post", "createLead", createLead);
-    api.attachWidgetAction("post", "createContact", createContact);
 
     api.addPosterIcon((cfs) => {
       if (cfs.salesforce_lead_id) {

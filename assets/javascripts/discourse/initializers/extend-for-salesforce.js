@@ -78,7 +78,7 @@ function initializeWithApi(api, container) {
     const siteSettings = container.lookup("site-settings:main");
     const salesforceUrl = siteSettings.salesforce_instance_url;
 
-    api.addPostAdminMenuButton((attrs) => {
+    api.addPostAdminMenuButton(() => {
       return {
         icon: "user-plus",
         label: "salesforce.lead.create",
@@ -90,7 +90,7 @@ function initializeWithApi(api, container) {
       };
     });
 
-    api.addPostAdminMenuButton((attrs) => {
+    api.addPostAdminMenuButton(() => {
       return {
         icon: "address-card",
         label: "salesforce.contact.create",

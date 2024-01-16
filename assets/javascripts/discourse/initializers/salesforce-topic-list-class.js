@@ -1,5 +1,5 @@
-import discourseComputed from "discourse-common/utils/decorators";
 import { withPluginApi } from "discourse/lib/plugin-api";
+import discourseComputed from "discourse-common/utils/decorators";
 
 function initializeWithApi(api) {
   api.modifyClass("component:topic-list-item", {

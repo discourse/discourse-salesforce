@@ -7,7 +7,6 @@
 # author: Vinoth Kannan
 # url: https://github.com/discourse/discourse-salesforce
 # required_version: 2.7.0
-# transpile_js: true
 
 require "auth/managed_authenticator"
 require "omniauth-oauth2"

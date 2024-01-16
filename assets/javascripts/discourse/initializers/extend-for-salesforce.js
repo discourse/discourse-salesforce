@@ -1,12 +1,12 @@
-import { withPluginApi } from "discourse/lib/plugin-api";
+import { spinnerHTML } from "discourse/helpers/loading-spinner";
+import TopicStatusIcons from "discourse/helpers/topic-status-icons";
 import { ajax } from "discourse/lib/ajax";
 import { popupAjaxError } from "discourse/lib/ajax-error";
-import I18n from "I18n";
-import TopicStatusIcons from "discourse/helpers/topic-status-icons";
+import { withPluginApi } from "discourse/lib/plugin-api";
 import PostCooked from "discourse/widgets/post-cooked";
-import { spinnerHTML } from "discourse/helpers/loading-spinner";
 import { iconHTML } from "discourse-common/lib/icon-library";
 import discourseComputed from "discourse-common/utils/decorators";
+import I18n from "I18n";
 
 const PLUGIN_ID = "discourse-salesforce";
 
@@ -75,7 +75,7 @@ function initializeWithApi(api, container) {
     });
 
     TopicStatusIcons.addObject(["has_salesforce_case", "briefcase", "case"]);
-    const siteSettings = container.lookup("site-settings:main");
+    const siteSettings = container.lookup("service:site-settings");
     const salesforceUrl = siteSettings.salesforce_instance_url;
 
     api.addPostAdminMenuButton(() => {

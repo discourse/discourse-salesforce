@@ -162,29 +162,40 @@ function initializeWithApi(api, container) {
       }
     });
 
-    api.decorateWidget("topic-admin-menu:adminMenuButtons", (dec) => {
-      const topic = dec.attrs.topic;
-      const { canManageTopic } = dec.widget.currentUser || {};
-      if (!canManageTopic) {
-        return;
+    api.addTopicAdminMenuButton((topic) => {
+      const canManageTopic = api.getCurrentUser()?.canManageTopic;
+      if (canManageTopic) {
+        return {
+          className: "topic-admin-salesforce-case",
+          icon: "briefcase",
+          label: topic.get("salesforce_case")
+            ? "topic.actions.sync_salesforce_case"
+            : "topic.actions.create_salesforce_case",
+          action: () => {
+            const op = topic
+              .get("postStream.posts")
+              .find((p) => p.post_number === 1);
+            const _appEvents = container.lookup("service:app-events");
+
+            topic.set("salesforce_case", spinnerHTML);
+            _appEvents.trigger("post-stream:refresh", {
+              id: op.id,
+            });
+
+            ajax(`/salesforce/cases/sync`, {
+              type: "POST",
+              data: { topic_id: topic.id },
+            })
+              .catch(popupAjaxError)
+              .then((data) => {
+                topic.set("salesforce_case", data["case"]);
+                _appEvents.trigger("post-stream:refresh", {
+                  id: op.id,
+                });
+              });
+          },
+        };
       }
-
-      dec.widget.addActionButton({
-        className: "topic-admin-salesforce-case",
-        buttonClass: "popup-menu-btn",
-        action: "syncCase",
-        icon: "briefcase",
-        label: topic.salesforce_case
-          ? "actions.sync_salesforce_case"
-          : "actions.create_salesforce_case",
-      });
-    });
-
-    api.modifyClass("component:topic-admin-menu-button", {
-      pluginId: PLUGIN_ID,
-      syncCase() {
-        return syncCaseForTopic(this);
-      },
     });
 
     api.modifyClass("component:topic-timeline", {

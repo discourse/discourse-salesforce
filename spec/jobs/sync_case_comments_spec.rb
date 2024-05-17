@@ -6,7 +6,7 @@ require_relative "../spec_helper"
 RSpec.describe Jobs::SyncCaseComments do
   include_context "with salesforce spec helper"
 
-  fab!(:topic) { Fabricate(:topic) }
+  fab!(:topic)
   fab!(:salesforce_case) { Fabricate(:salesforce_case, topic: topic) }
   fab!(:post) { Fabricate(:post, topic: topic) }
   fab!(:post2) { Fabricate(:post, topic: topic, post_number: 2) }

@@ -6,8 +6,8 @@ require_relative "../spec_helper"
 RSpec.describe ::Salesforce::PersonsController do
   include_context "with salesforce spec helper"
 
-  fab!(:user) { Fabricate(:user) }
-  fab!(:admin) { Fabricate(:admin) }
+  fab!(:user)
+  fab!(:admin)
 
   describe "#create" do
     before do

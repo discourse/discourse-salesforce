@@ -6,7 +6,7 @@ require_relative "../spec_helper"
 RSpec.describe Salesforce::FeedItem do
   include_context "with salesforce spec helper"
 
-  fab!(:user) { Fabricate(:user) }
+  fab!(:user)
   fab!(:post) { Fabricate(:post, user: user) }
 
   describe "#create!" do

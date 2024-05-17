@@ -2,6 +2,8 @@
 
 module Salesforce
   class AdminController < ::Admin::AdminController
+    requires_plugin PLUGIN_NAME
+
     skip_before_action :check_xhr, :preload_json
 
     def authorize

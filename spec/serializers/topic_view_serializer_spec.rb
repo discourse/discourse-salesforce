@@ -6,10 +6,10 @@ require_relative "../spec_helper"
 describe TopicViewSerializer do
   include_context "with salesforce spec helper"
 
-  fab!(:topic) { Fabricate(:topic) }
+  fab!(:topic)
   fab!(:salesforce_case) { Fabricate(:salesforce_case, topic: topic) }
   fab!(:post) { Fabricate(:post, topic: topic) }
-  fab!(:admin) { Fabricate(:admin) }
+  fab!(:admin)
 
   it "includes Salesforce case details" do
     topic_view = TopicView.new(topic.id, admin)

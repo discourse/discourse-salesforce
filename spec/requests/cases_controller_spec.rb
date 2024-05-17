@@ -6,9 +6,9 @@ require_relative "../spec_helper"
 RSpec.describe ::Salesforce::CasesController do
   include_context "with salesforce spec helper"
 
-  fab!(:topic) { Fabricate(:topic) }
+  fab!(:topic)
   fab!(:first_post) { Fabricate(:post, topic: topic) }
-  fab!(:admin) { Fabricate(:admin) }
+  fab!(:admin)
 
   describe "#sync" do
     it "creates a new case object in Salesforce" do

@@ -2,6 +2,8 @@
 
 module Salesforce
   class PersonsController < ::Admin::AdminController
+    requires_plugin PLUGIN_NAME
+
     before_action :find_user
     attr_accessor :user
 

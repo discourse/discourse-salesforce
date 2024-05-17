@@ -6,7 +6,7 @@ require_relative "../spec_helper"
 RSpec.describe Jobs::CreateFeedItem do
   include_context "with salesforce spec helper"
 
-  fab!(:user) { Fabricate(:user) }
+  fab!(:user)
   fab!(:post) { Fabricate(:post, user: user) }
 
   it "will not create feed item if user not linked to Salesforce lead" do

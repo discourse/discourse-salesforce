@@ -2,6 +2,8 @@
 
 module Salesforce
   class CasesController < ::Admin::AdminController
+    requires_plugin PLUGIN_NAME
+
     def sync
       params.require(:topic_id)
       topic = Topic.find(params[:topic_id])

@@ -78,25 +78,25 @@ after_initialize do
     end
   end
 
-  %w[
-    ../app/controllers/salesforce/admin_controller.rb
-    ../app/controllers/salesforce/cases_controller.rb
-    ../app/controllers/salesforce/persons_controller.rb
-    ../app/jobs/regular/create_case_comment.rb
-    ../app/jobs/regular/create_feed_item.rb
-    ../app/jobs/regular/sync_case_comments.rb
-    ../app/jobs/regular/sync_case.rb
-    ../app/jobs/scheduled/sync_salesforce_users.rb
-    ../app/models/salesforce/case.rb
-    ../app/models/salesforce/feed_item.rb
-    ../app/models/salesforce/case_comment.rb
-    ../app/models/salesforce/person.rb
-    ../app/models/salesforce/lead.rb
-    ../app/models/salesforce/contact.rb
-    ../app/serializers/concerns/case_mixin.rb
-    ../app/serializers/case_serializer.rb
-    ../lib/salesforce/api.rb
-  ].each { |path| load File.expand_path(path, __FILE__) }
+  require_relative "app/controllers/salesforce/admin_controller"
+  require_relative "app/controllers/salesforce/cases_controller"
+  require_relative "app/controllers/salesforce/persons_controller"
+  require_relative "app/jobs/regular/create_case_comment"
+  require_relative "app/jobs/regular/create_feed_item"
+  require_relative "app/jobs/regular/sync_case_comments"
+  require_relative "app/jobs/regular/sync_case"
+  require_relative "app/jobs/scheduled/sync_salesforce_users"
+  require_relative "app/models/salesforce/case"
+  require_relative "app/models/salesforce/feed_item"
+  require_relative "app/models/salesforce/case_comment"
+  require_relative "app/models/salesforce/person"
+  require_relative "app/models/salesforce/lead"
+  require_relative "app/models/salesforce/contact"
+  require_relative "app/serializers/concerns/case_mixin"
+  require_relative "app/serializers/case_serializer"
+  require_relative "lib/salesforce/api"
+  require_relative "lib/salesforce/user_extension"
+  require_relative "lib/salesforce/topic_extension"
 
   Salesforce::Engine.routes.draw do
     post "/persons/create" => "persons#create"
@@ -147,101 +147,22 @@ after_initialize do
   on(:post_edited) { |post| automatic_case_sync.call(post.topic) }
 
   reloadable_patch do |plugin|
-    class ::User
-      def salesforce_contact_id
-        custom_fields[::Salesforce::Contact::ID_FIELD]
-      end
-
-      def salesforce_lead_id
-        custom_fields[::Salesforce::Lead::ID_FIELD]
-      end
-
-      def salesforce_contact_id=(value)
-        custom_fields[::Salesforce::Contact::ID_FIELD] = value
-      end
-
-      def salesforce_lead_id=(value)
-        custom_fields[::Salesforce::Lead::ID_FIELD] = value
-      end
-
-      def create_salesforce_contact
-        ::Salesforce::Contact.create!(self)
-      end
-
-      def salesforce_contact_payload
-        name = self.name || self.username
-
-        if name.include?(" ")
-          first_name, last_name = name.split(" ", 2)
-        else
-          last_name = name
-        end
-
-        payload = {
-          Email: self.email,
-          LastName: last_name,
-          LeadSource: ::Salesforce::Contact::SOURCE,
-          Description: "#{Discourse.base_url}/u/#{UrlHelper.encode_component(self.username)}",
-        }
-
-        payload.merge!(FirstName: first_name) if first_name.present?
-
-        payload
-      end
-
-      def salesforce_lead_payload
-        salesforce_contact_payload.merge(
-          {
-            Company: ::Salesforce::Lead::DEFAULT_COMPANY_NAME,
-            Website: self.user_profile&.website,
-          },
-        )
-      end
-    end
-
-    class ::Topic
-      def has_salesforce_case
-        custom_fields["has_salesforce_case"] ? true : false
-      end
-
-      def salesforce_case
-        return unless has_salesforce_case
-        ::Salesforce::Case.find_by(topic_id: id)
-      end
-    end
-
-    class ::TopicListItemSerializer
-      include CaseMixin
-    end
-
-    class ::SearchTopicListItemSerializer
-      include CaseMixin
-    end
-
-    class ::SuggestedTopicSerializer
-      include CaseMixin
-    end
-
-    class ::UserSummarySerializer::TopicSerializer
-      include CaseMixin
-    end
-
-    class ::ListableTopicSerializer
-      include CaseMixin
-    end
-
-    class ::TopicViewSerializer
-      attributes :salesforce_case
-
-      def include_salesforce_case?
-        SiteSetting.salesforce_enabled && scope.is_staff? && object.topic.has_salesforce_case
-      end
-
-      def salesforce_case
-        ::Salesforce::CaseSerializer.new(object.topic.salesforce_case, root: false).as_json
-      end
-    end
+    User.prepend(Salesforce::UserExtension)
+    Topic.prepend(Salesforce::TopicExtension)
+    TopicListItemSerializer.include(CaseMixin)
+    SearchTopicListItemSerializer.include(CaseMixin)
+    SuggestedTopicSerializer.include(CaseMixin)
+    UserSummarySerializer::TopicSerializer.include(CaseMixin)
+    ListableTopicSerializer.include(CaseMixin)
   end
+
+  add_to_serializer(
+    :topic_view,
+    :salesforce_case,
+    include_condition: -> do
+      SiteSetting.salesforce_enabled && scope.is_staff? && object.topic.has_salesforce_case
+    end,
+  ) { ::Salesforce::CaseSerializer.new(object.topic.salesforce_case, root: false).as_json }
 
   TopicList.preloaded_custom_fields << "has_salesforce_case"
 

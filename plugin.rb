@@ -85,6 +85,7 @@ after_initialize do
   require_relative "app/jobs/regular/create_feed_item"
   require_relative "app/jobs/regular/sync_case_comments"
   require_relative "app/jobs/regular/sync_case"
+  require_relative "app/jobs/regular/sync_salesforce_user"
   require_relative "app/jobs/scheduled/sync_salesforce_users"
   require_relative "app/models/salesforce/case"
   require_relative "app/models/salesforce/feed_item"
@@ -115,13 +116,7 @@ after_initialize do
   Search.preloaded_topic_custom_fields << ::CaseMixin::HAS_SALESFORCE_CASE
 
   on(:user_created) do |user, opts|
-    if ::Salesforce::Api.has_credentials?
-      if user.salesforce_contact_id = ::Salesforce::Contact.find_id_by_email(user.email)
-        user.save_custom_fields
-      elsif user.salesforce_lead_id = ::Salesforce::Lead.find_id_by_email(user.email)
-        user.save_custom_fields
-      end
-    end
+    Jobs.enqueue(:sync_salesforce_user, user_id: user.id) if ::Salesforce::Api.has_credentials?
   end
 
   on(:post_created) do |post, opts|

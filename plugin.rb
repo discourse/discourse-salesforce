@@ -15,6 +15,12 @@ require "base64"
 
 enabled_site_setting :salesforce_enabled
 
+module ::Salesforce
+  PLUGIN_NAME = "discourse-salesforce"
+end
+
+require_relative "lib/salesforce/engine"
+
 register_asset "stylesheets/salesforce.scss"
 
 register_svg_icon "fab-salesforce"
@@ -24,88 +30,6 @@ require_relative "lib/validators/salesforce_login_enabled_validator"
 
 after_initialize do
   SeedFu.fixture_paths << Rails.root.join("plugins", "discourse-salesforce", "db", "fixtures").to_s
-
-  module ::Salesforce
-    PLUGIN_NAME = "discourse-salesforce"
-
-    class Engine < ::Rails::Engine
-      engine_name PLUGIN_NAME
-      isolate_namespace Salesforce
-    end
-
-    def self.api
-      @api ||= Api.new
-    end
-
-    def self.leads_group
-      group_id = SiteSetting.salesforce_leads_group_id
-      return if group_id.blank?
-
-      Group.find_by(id: group_id)
-    end
-
-    def self.contacts_group
-      group_id = SiteSetting.salesforce_contacts_group_id
-      return if group_id.blank?
-
-      Group.find_by(id: group_id)
-    end
-
-    def self.seed_groups!
-      if leads_group.blank?
-        group =
-          Group.where(name: "salesforce-leads").first_or_create!(
-            name: "salesforce-leads",
-            visibility_level: Group.visibility_levels[:staff],
-            primary_group: true,
-            bio_raw: "Members are automatically synced from Salesforce via API",
-            full_name: "Salesforce Leads",
-          )
-        SiteSetting.salesforce_leads_group_id = group.id
-      end
-
-      if contacts_group.blank?
-        group =
-          Group.where(name: "salesforce-contacts").first_or_create!(
-            name: "salesforce-contacts",
-            visibility_level: Group.visibility_levels[:staff],
-            primary_group: true,
-            bio_raw: "Members are automatically synced from Salesforce via API",
-            full_name: "Salesforce Contacts",
-          )
-        SiteSetting.salesforce_contacts_group_id = group.id
-      end
-    end
-  end
-
-  require_relative "app/controllers/salesforce/admin_controller"
-  require_relative "app/controllers/salesforce/cases_controller"
-  require_relative "app/controllers/salesforce/persons_controller"
-  require_relative "app/jobs/regular/create_case_comment"
-  require_relative "app/jobs/regular/create_feed_item"
-  require_relative "app/jobs/regular/sync_case_comments"
-  require_relative "app/jobs/regular/sync_case"
-  require_relative "app/jobs/regular/sync_salesforce_user"
-  require_relative "app/jobs/scheduled/sync_salesforce_users"
-  require_relative "app/models/salesforce/case"
-  require_relative "app/models/salesforce/feed_item"
-  require_relative "app/models/salesforce/case_comment"
-  require_relative "app/models/salesforce/person"
-  require_relative "app/models/salesforce/lead"
-  require_relative "app/models/salesforce/contact"
-  require_relative "app/serializers/concerns/case_mixin"
-  require_relative "app/serializers/case_serializer"
-  require_relative "lib/salesforce/api"
-  require_relative "lib/salesforce/user_extension"
-  require_relative "lib/salesforce/topic_extension"
-
-  Salesforce::Engine.routes.draw do
-    post "/persons/create" => "persons#create"
-    post "/cases/sync" => "cases#sync"
-    get "/admin/authorize" => "admin#authorize"
-  end
-
-  Discourse::Application.routes.append { mount ::Salesforce::Engine, at: "salesforce" }
 
   AdminDashboardData.problem_messages << ::Salesforce::Api::APP_NOT_APPROVED
 

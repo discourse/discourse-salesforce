@@ -13,10 +13,9 @@ RSpec.describe ::Salesforce::Api do
   end
 
   it "returns invalid credentials error when Salesforce client ID is blank" do
-    freeze_time
     SiteSetting.salesforce_client_id = ""
 
-    described_class.new
+    expect { described_class.new }.to raise_error(::Salesforce::InvalidCredentials)
 
     problem = AdminNotice.find_by(identifier: "salesforce_invalid_credentials")
     expect(problem.message).to eq(

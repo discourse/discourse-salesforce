@@ -15,8 +15,7 @@ module ::Salesforce
 
     attr_reader :faraday, :prefix
 
-    def initialize(raise_errors: false)
-      @raise_errors = raise_errors
+    def initialize
       set_access_token
 
       @faraday =
@@ -60,8 +59,7 @@ module ::Salesforce
     def set_access_token
       if !self.class.has_credentials?
         ProblemCheckTracker[:salesforce_invalid_credentials].problem!
-        raise Salesforce::InvalidCredentials if @raise_errors
-        return
+        raise Salesforce::InvalidCredentials
       end
 
       if AdminDashboardData.problem_message_check(APP_NOT_APPROVED)
@@ -92,9 +90,8 @@ module ::Salesforce
       end
 
       if status != 200
-        raise Salesforce::InvalidCredentials if @raise_errors
         ProblemCheckTracker[:salesforce_invalid_credentials].problem!
-        return
+        raise Salesforce::InvalidCredentials
       end
 
       ProblemCheckTracker[:salesforce_invalid_credentials].no_problem!

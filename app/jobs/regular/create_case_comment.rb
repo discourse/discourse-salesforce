@@ -14,7 +14,10 @@ module ::Jobs
       topic = post.topic
       return unless topic.present? && topic.has_salesforce_case
 
-      ::Salesforce::CaseComment.new(topic.salesforce_case.uid, post).create!
+      begin
+        ::Salesforce::CaseComment.new(topic.salesforce_case.uid, post).create!
+      rescue Salesforce::InvalidCredentials
+      end
     end
   end
 end

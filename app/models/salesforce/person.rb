@@ -8,8 +8,7 @@ module ::Salesforce
     def self.create!(user)
       return if user.custom_fields[self::ID_FIELD].present?
 
-      data =
-        Salesforce::Api.new(raise_errors: true).post("sobjects/#{self::OBJECT_NAME}", payload(user))
+      data = Salesforce::Api.new.post("sobjects/#{self::OBJECT_NAME}", payload(user))
       id = data["id"]
 
       user.custom_fields[self::ID_FIELD] = id

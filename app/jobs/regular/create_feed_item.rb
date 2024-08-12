@@ -15,7 +15,10 @@ module ::Jobs
       uid = user.salesforce_contact_id || user.salesforce_lead_id
       return if uid.blank?
 
-      ::Salesforce::FeedItem.new(uid, post).create!
+      begin
+        ::Salesforce::FeedItem.new(uid, post).create!
+      rescue Salesforce::InvalidCredentials
+      end
     end
   end
 end

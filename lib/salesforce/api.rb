@@ -57,7 +57,10 @@ module ::Salesforce
     end
 
     def set_access_token
-      raise Salesforce::InvalidCredentials unless self.class.has_credentials?
+      if !self.class.has_credentials?
+        ProblemCheckTracker[:salesforce_invalid_credentials].problem!
+        raise Salesforce::InvalidCredentials
+      end
 
       if AdminDashboardData.problem_message_check(APP_NOT_APPROVED)
         AdminDashboardData.clear_problem_message(APP_NOT_APPROVED)
@@ -85,8 +88,13 @@ module ::Salesforce
       if status >= 300 && SiteSetting.salesforce_api_error_logs
         Rails.logger.error("Salesforce API error: #{status} #{body}")
       end
-      raise Salesforce::InvalidCredentials if status != 200
 
+      if status != 200
+        ProblemCheckTracker[:salesforce_invalid_credentials].problem!
+        raise Salesforce::InvalidCredentials
+      end
+
+      ProblemCheckTracker[:salesforce_invalid_credentials].no_problem!
       data = JSON.parse(body)
       Discourse.redis.setex("salesforce_access_token", 10.minutes, data["access_token"])
       SiteSetting.salesforce_instance_url = data["instance_url"]

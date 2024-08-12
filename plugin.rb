@@ -30,6 +30,7 @@ require_relative "lib/validators/salesforce_login_enabled_validator"
 
 after_initialize do
   SeedFu.fixture_paths << Rails.root.join("plugins", "discourse-salesforce", "db", "fixtures").to_s
+  register_problem_check Salesforce::ProblemCheck::SalesforceInvalidCredentials
 
   AdminDashboardData.problem_messages << ::Salesforce::Api::APP_NOT_APPROVED
 

@@ -6,7 +6,10 @@ module ::Jobs
       return unless SiteSetting.salesforce_enabled
 
       topic = Topic.find(args[:topic_id])
-      ::Salesforce::Case.sync!(topic)
+      begin
+        ::Salesforce::Case.sync!(topic)
+      rescue Salesforce::InvalidCredentials
+      end
     end
   end
 end

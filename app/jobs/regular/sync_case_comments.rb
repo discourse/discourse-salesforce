@@ -9,8 +9,12 @@ module ::Jobs
       post_id = args[:post_id]
       return if topic_id.blank?
 
-      salesforce_case = ::Salesforce::Case.find_by(topic_id: topic_id)
-      return if salesforce_case.blank?
+      begin
+        salesforce_case = ::Salesforce::Case.find_by(topic_id: topic_id)
+        return if salesforce_case.blank?
+      rescue Salesforce::InvalidCredentials
+        return
+      end
 
       posts =
         Post

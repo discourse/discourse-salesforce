@@ -28,3 +28,5 @@ tr_TR:
   dashboard:
     salesforce:
       app_not_approved: "Discourse bağlantılı uygulama, \"salesforce_username\" site ayarında belirtilen kullanıcı tarafından Salesforce'ta henüz yetkilendirilmemiş. Lütfen yetkilendirmek için <a href='%{base_url}/salesforce/admin/authorize'>bu bağlantıyı</a> ziyaret edin."
+    problem:
+      salesforce_invalid_credentials: "Salesforce kimlik bilgileriyle ilgili bir sorun oluştu. Lütfen Salesforce istemci kimliği ve istemci gizli ayarlarının geçerliliğini onaylayın"

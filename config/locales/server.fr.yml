@@ -28,3 +28,5 @@ fr:
   dashboard:
     salesforce:
       app_not_approved: "L'application connectée Discourse n'est pas encore autorisée dans Salesforce par l'utilisateur mentionné dans le paramètre de site salesforce_username. Veuillez suivre <a href='%{base_url}/salesforce/admin/authorize'>ce lien</a> pour l'autoriser."
+    problem:
+      salesforce_invalid_credentials: "Un problème s'est produit avec les informations d'identification Salesforce. Veuillez confirmer la validité de l'identifiant client Salesforce et des paramètres secrets du client"

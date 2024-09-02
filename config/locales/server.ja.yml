@@ -28,3 +28,5 @@ ja:
   dashboard:
     salesforce:
       app_not_approved: "Discourse 接続アプリはまだ、`salesforce_username` サイト設定でメンションされたユーザーによって Salesforce 内で承認されていません。<a href='%{base_url}/salesforce/admin/authorize'>こちらのリンク</a>に従って承認してください。"
+    problem:
+      salesforce_invalid_credentials: "Salesforce の資格情報に問題がありました。Salesforce クライアント ID とクライアントシークレットの設定が有効であることを確認してください。"

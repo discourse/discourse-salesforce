@@ -28,3 +28,5 @@ zh_CN:
   dashboard:
     salesforce:
       app_not_approved: "站点设置 `salesforce_username` 中提到的用户在 Salesforce 中尚未获得 Discourse 关联应用的授权。请按照<a href='%{base_url}/salesforce/admin/authorize'>此链接</a>进行授权。"
+    problem:
+      salesforce_invalid_credentials: "Salesforce 凭据存在问题。请确认 Salesforce 客户端 ID 和客户端密钥设置的有效性"

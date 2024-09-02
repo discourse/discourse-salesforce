@@ -28,3 +28,5 @@ ru:
   dashboard:
     salesforce:
       app_not_approved: "Подключенное приложение Discourse ещё не авторизовано в Salesforce от имени пользователя, указанного в настройке `salesforce_username` сайта. Перейдите <a href='%{base_url}/salesforce/admin/authorize'>по этой ссылке</a> и авторизуйтесь."
+    problem:
+      salesforce_invalid_credentials: "Проблема с учетными данными Salesforce. Проверьте настройки идентификатора клиента и секрета клиента Salesforce."

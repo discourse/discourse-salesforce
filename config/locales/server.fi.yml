@@ -28,3 +28,5 @@ fi:
   dashboard:
     salesforce:
       app_not_approved: "Käyttäjä, joka on mainittu \"salesforce_username\"-sivustoasetuksessa, ei ole vielä valtuuttanut Discourseen yhdistettyä sovellusta Salesforcessa. Valtuuta se <a href='%{base_url}/salesforce/admin/authorize'>tämän linkin</a> kautta."
+    problem:
+      salesforce_invalid_credentials: "Salesforcen tunnistetiedoissa oli ongelma. Varmista, että Salesforcen asiakastunnuksen ja asiakkaan salatunnuksen asetukset ovat oikein."

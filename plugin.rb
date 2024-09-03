@@ -32,8 +32,6 @@ after_initialize do
   SeedFu.fixture_paths << Rails.root.join("plugins", "discourse-salesforce", "db", "fixtures").to_s
   register_problem_check Salesforce::ProblemCheck::SalesforceInvalidCredentials
 
-  AdminDashboardData.problem_messages << ::Salesforce::Api::APP_NOT_APPROVED
-
   allow_staff_user_custom_field(::Salesforce::Contact::ID_FIELD)
   allow_staff_user_custom_field(::Salesforce::Lead::ID_FIELD)
   register_topic_custom_field_type(::CaseMixin::HAS_SALESFORCE_CASE, :boolean)

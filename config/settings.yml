@@ -50,3 +50,5 @@ discourse_salesforce:
   salesforce_api_error_logs:
     default: false
     hidden: true
+  salesforce_auth_verbose_logging:
+    default: false

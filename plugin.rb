@@ -170,15 +170,25 @@ class Auth::SalesforceAuthenticator < Auth::ManagedAuthenticator
     omniauth.provider :salesforce,
                       setup:
                         lambda { |env|
-                          strategy = env["omniauth.strategy"]
-                          strategy.options[:client_id] = SiteSetting.salesforce_client_id
-                          strategy.options[:client_secret] = SiteSetting.salesforce_client_secret
-                          strategy.options[
-                            :redirect_uri
-                          ] = "#{Discourse.base_url}/auth/salesforce/callback"
-                          strategy.options[:client_options][
+                          opts = strategy = env["omniauth.strategy"].options
+                          opts[:client_id] = SiteSetting.salesforce_client_id
+                          opts[:client_secret] = SiteSetting.salesforce_client_secret
+                          opts[:redirect_uri] = "#{Discourse.base_url}/auth/salesforce/callback"
+                          opts[:client_options][
                             :site
                           ] = SiteSetting.salesforce_authorization_server_url
+                          opts[:client_options][:connection_build] = lambda do |builder|
+                            if SiteSetting.salesforce_auth_verbose_logging
+                              builder.response :logger,
+                                               Rails.logger,
+                                               {
+                                                 bodies: true,
+                                                 formatter: Auth::OauthFaradayFormatter,
+                                               }
+                            end
+                            builder.request :url_encoded
+                            builder.adapter FinalDestination::FaradayAdapter
+                          end
                         }
   end
 

@@ -170,7 +170,7 @@ class Auth::SalesforceAuthenticator < Auth::ManagedAuthenticator
     omniauth.provider :salesforce,
                       setup:
                         lambda { |env|
-                          opts = strategy = env["omniauth.strategy"].options
+                          opts = env["omniauth.strategy"].options
                           opts[:client_id] = SiteSetting.salesforce_client_id
                           opts[:client_secret] = SiteSetting.salesforce_client_secret
                           opts[:redirect_uri] = "#{Discourse.base_url}/auth/salesforce/callback"

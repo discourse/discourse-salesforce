@@ -19,6 +19,7 @@ he:
     salesforce_case_status_tag_prefix: "תוספת לפני תגיות מצב המקרה ב־Salesforce. למשל, אם הקידומת היא ‚case’ (מקרה) אז התגיות תתווספנה בצורה case-open,‏ case-closed וכו׳."
     salesforce_skip_contact_creation_on_case_sync: "דילוג על יצירת איש קשר של Salesforce במהלך סנכרון Case"
     salesforce_default_contact_id_for_case_sync: "מזהה קשר של Salesforce לשימוש כברירת מחדל במהלך סנכרון Case/מקרה. שימושי כאשר ‚salesforce_skip_contact_creation_on_case_sync’ מופעל."
+    salesforce_auth_verbose_logging: "הצגת פירוט כניסה / יומני אימות מפורטים לאימות מול Salesforce לטיפול בתקלות"
     errors:
       salesforce_client_credentials_required: "מזהה לקוח וסוד לקוח של Salesforce נחוצים"
   salesforce:

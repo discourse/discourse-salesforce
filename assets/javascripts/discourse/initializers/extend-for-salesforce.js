@@ -24,30 +24,6 @@ async function createPerson(type, post) {
   }
 }
 
-function syncCaseForTopic(context) {
-  const topic = context.topic;
-  const op = context.topic
-    .get("postStream.posts")
-    .find((p) => p.post_number === 1);
-
-  topic.set("salesforce_case", spinnerHTML);
-  context.appEvents.trigger("post-stream:refresh", {
-    id: op.id,
-  });
-
-  ajax(`/salesforce/cases/sync`, {
-    type: "POST",
-    data: { topic_id: topic.id },
-  })
-    .catch(popupAjaxError)
-    .then((data) => {
-      topic.set("salesforce_case", data["case"]);
-      context.appEvents.trigger("post-stream:refresh", {
-        id: op.id,
-      });
-    });
-}
-
 function initializeWithApi(api, container) {
   const currentUser = api.getCurrentUser();
   const isStaff = currentUser?.staff;
@@ -196,13 +172,6 @@ function initializeWithApi(api, container) {
           },
         };
       }
-    });
-
-    api.modifyClass("component:topic-timeline", {
-      pluginId: PLUGIN_ID,
-      syncCase() {
-        return syncCaseForTopic(this);
-      },
     });
   }
 }

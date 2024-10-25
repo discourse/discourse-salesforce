@@ -91,3 +91,24 @@ module ::Salesforce
     end
   end
 end
+
+# == Schema Information
+#
+# Table name: salesforce_cases
+#
+#  id             :bigint           not null, primary key
+#  uid            :string
+#  topic_id       :integer          not null
+#  contact_id     :string
+#  number         :string
+#  subject        :string
+#  description    :string
+#  status         :string
+#  last_synced_at :datetime
+#  created_at     :datetime         not null
+#  updated_at     :datetime         not null
+#
+# Indexes
+#
+#  index_salesforce_cases_on_uid  (uid)
+#

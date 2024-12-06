@@ -19,6 +19,7 @@ fi:
     salesforce_case_status_tag_prefix: "Etuliite, joka lisätään ennen Salesforce-tapauksen tilatunnisteita. Jos esimerkiksi etuliite on \"tapaus\", tunnisteet lisätään seuraavasti: tapaus-avoin, tapaus-suljettu jne."
     salesforce_skip_contact_creation_on_case_sync: "Ohita Salesforce-yhteystiedon luominen tapauksen synkronoinnin aikana"
     salesforce_default_contact_id_for_case_sync: "Oletusarvoinen Salesforcen yhteystiedon tunnus käytettäväksi tapauksen synkronoinnin aikana. Hyödyllinen, kun \"salesforce_skip_contact_creation_on_case_sync\" on käytössä."
+    salesforce_auth_verbose_logging: "Näytä monisanaiset Salesforce-todennuslokit /logs-sivulla vianmääritystä varten"
     errors:
       salesforce_client_credentials_required: "Salesforcen asiakastunnuksen ja asiakkaan salatunnuksen asetukset ovat pakollisia"
   salesforce:

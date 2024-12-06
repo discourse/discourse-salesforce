@@ -19,6 +19,7 @@ zh_CN:
     salesforce_case_status_tag_prefix: "要在 Salesforce 案例状态标签之前添加的前缀。例如，如果前缀是“case”，则添加诸如 case-open、case-closed 等标签"
     salesforce_skip_contact_creation_on_case_sync: "在案例同步期间跳过 Salesforce 联系人的创建"
     salesforce_default_contact_id_for_case_sync: "在案例同步期间使用的默认 Salesforce 联系人 ID。启用 'salesforce_skip_contact_creation_on_case_sync' 时很有用。"
+    salesforce_auth_verbose_logging: "在 /logs 中显示详细的 Salesforce 身份验证日志以进行排查"
     errors:
       salesforce_client_credentials_required: "需要 Salesforce 客户端 ID 和客户端密钥设置"
   salesforce:

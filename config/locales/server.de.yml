@@ -19,6 +19,7 @@ de:
     salesforce_case_status_tag_prefix: "Präfix, das vor Salesforce-Kundenvorgangsstatus-Schlagwörtern hinzugefügt werden soll. Wenn das Präfix beispielsweise „kundenvorgang“ ist, werden die Schlagwörter kundenvorgang-offen, kundenvorgang-geschlossen usw. hinzugefügt."
     salesforce_skip_contact_creation_on_case_sync: "Erstellung eines Salesforce-Kontakts während der Kundenvorgangssynchronisierung überspringen"
     salesforce_default_contact_id_for_case_sync: "Standardmäßige Salesforce-Kontakt-ID zur Verwendung während der Kundenvorgangssynchronisierung. Nützlich, wenn „salesforce_skip_contact_creation_on_case_sync“ aktiviert ist."
+    salesforce_auth_verbose_logging: "Ausführliche Salesforce-Authentifizierungsprotokolle in /logs zur Fehlerbehebung anzeigen"
     errors:
       salesforce_client_credentials_required: "Salesforce-Client-ID- und Salesforce-Client-Geheimnis-Einstellungen sind erforderlich"
   salesforce:

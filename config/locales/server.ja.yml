@@ -19,6 +19,7 @@ ja:
     salesforce_case_status_tag_prefix: "Salesforce ケースのステータスタグの前に追加するプレフィックス。たとえば、プレフィックスを「case」とすると、タグは case-open や case-closed などとして追加されます。"
     salesforce_skip_contact_creation_on_case_sync: "ケースの同期中に Salesforce 連絡先の作成をスキップする"
     salesforce_default_contact_id_for_case_sync: "ケースの同期中に使用するデフォルトの Salesforce 連絡先 ID。'salesforce_skip_contact_creation_on_case_sync' が有効な場合に役立ちます。"
+    salesforce_auth_verbose_logging: "トラブルシューティングを行うために、/logs に詳細な Salesforce 認証ログを表示する"
     errors:
       salesforce_client_credentials_required: "Salesforce クライアント ID とクライアントシークレットの設定が必要です"
   salesforce:

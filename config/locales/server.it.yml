@@ -19,6 +19,7 @@ it:
     salesforce_case_status_tag_prefix: "Prefisso da aggiungere prima delle etichette di stato del caso Salesforce. Ad esempio, se il prefisso è \"case\", le etichette che verranno aggiunte saranno case-open, case-closed, ecc."
     salesforce_skip_contact_creation_on_case_sync: "Salta la creazione del contatto Salesforce durante la sincronizzazione dei casi"
     salesforce_default_contact_id_for_case_sync: "ID contatto Salesforce predefinito da utilizzare durante la sincronizzazione dei casi. Utile quando \"salesforce_skip_contact_creation_on_case_sync\" è abilitato."
+    salesforce_auth_verbose_logging: "Mostra i registri di autenticazione Salesforce dettagliati in /logs per la risoluzione dei problemi"
     errors:
       salesforce_client_credentials_required: "Le impostazioni dell'ID client e del segreto client di Salesforce sono richieste"
   salesforce:

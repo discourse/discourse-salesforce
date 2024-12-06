@@ -19,6 +19,7 @@ pt_BR:
     salesforce_case_status_tag_prefix: "Prefixo a ser adicionado antes das tags de status do caso do Salesforce. Por exemplo, se o prefixo for 'case', as tags serão adicionadas como case-open, case-closed, etc."
     salesforce_skip_contact_creation_on_case_sync: "Pular criação do contato do Salesforce durante sincronização de casos"
     salesforce_default_contact_id_for_case_sync: "ID de Contato do Salesforce padrão para usar durante sincronização de casos. Útil quando \"salesforce_skip_contact_creation_on_case_sync\" estiver ativado."
+    salesforce_auth_verbose_logging: "Mostrar logs de autenticação detalhados do Salesforce em /logs para solucionar problemas"
     errors:
       salesforce_client_credentials_required: "As configurações de ID do cliente e segredo do cliente do Salesforce são obrigatórias"
   salesforce:

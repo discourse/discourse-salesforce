@@ -19,6 +19,7 @@ tr_TR:
     salesforce_case_status_tag_prefix: "Salesforce vaka durumu etiketlerinden önce eklenecek ön ek. Örneğin, ön ek \"case\" ise etiketler case-open, case-closed vb. şeklinde eklenir"
     salesforce_skip_contact_creation_on_case_sync: "Vaka senkronizasyonu sırasında Salesforce Kişisinin oluşturulmasını atlayın"
     salesforce_default_contact_id_for_case_sync: "Vaka senkronizasyonu sırasında kullanılacak varsayılan Salesforce Kişi Kimliği. \"salesforce_skip_contact_creation_on_case_sync\" etkin olduğunda kullanışlıdır."
+    salesforce_auth_verbose_logging: "Sorun giderme için /logs içinde ayrıntılı Salesforce kimlik doğrulama günlüklerini gösterin"
     errors:
       salesforce_client_credentials_required: "Salesforce istemci kimliği ve istemci sırrı ayarları gerekli"
   salesforce:
@@ -29,4 +30,4 @@ tr_TR:
     salesforce:
       app_not_approved: "Discourse bağlantılı uygulama, \"salesforce_username\" site ayarında belirtilen kullanıcı tarafından Salesforce'ta henüz yetkilendirilmemiş. Lütfen yetkilendirmek için <a href='%{base_url}/salesforce/admin/authorize'>bu bağlantıyı</a> ziyaret edin."
     problem:
-      salesforce_invalid_credentials: "Salesforce kimlik bilgileriyle ilgili bir sorun oluştu. Lütfen Salesforce istemci kimliği ve istemci gizli ayarlarının geçerliliğini onaylayın"
+      salesforce_invalid_credentials: "Salesforce giriş bilgileriyle ilgili bir sorun oluştu. Lütfen Salesforce istemci kimliği ve istemci gizli ayarlarının geçerliliğini onaylayın"

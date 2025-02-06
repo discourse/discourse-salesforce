@@ -1,12 +1,12 @@
 import { spinnerHTML } from "discourse/helpers/loading-spinner";
 import { ajax } from "discourse/lib/ajax";
 import { popupAjaxError } from "discourse/lib/ajax-error";
+import discourseComputed from "discourse/lib/decorators";
+import { withSilencedDeprecations } from "discourse/lib/deprecated";
+import { iconHTML } from "discourse/lib/icon-library";
 import { withPluginApi } from "discourse/lib/plugin-api";
 import PostCooked from "discourse/widgets/post-cooked";
-import { withSilencedDeprecations } from "discourse-common/lib/deprecated";
-import { iconHTML } from "discourse-common/lib/icon-library";
-import discourseComputed from "discourse-common/utils/decorators";
-import I18n from "I18n";
+import { i18n } from "discourse-i18n";
 
 async function createPerson(type, post) {
   post.set("flair_url", "loading spinner");
@@ -49,7 +49,7 @@ function initializeWithApi(api, container) {
                 results.push({
                   openTag: "span",
                   closeTag: "span",
-                  title: I18n.t("topic_statuses.case.help"),
+                  title: i18n("topic_statuses.case.help"),
                   icon: "briefcase",
                   key: "case",
                 });
@@ -93,7 +93,7 @@ function initializeWithApi(api, container) {
         return {
           icon: "user-plus",
           className: "salesforce-lead",
-          title: I18n.t("salesforce.poster_icon.lead.title"),
+          title: i18n("salesforce.poster_icon.lead.title"),
           url: `${salesforceUrl}/${cfs.salesforce_lead_id}`,
         };
       }
@@ -104,7 +104,7 @@ function initializeWithApi(api, container) {
         return {
           icon: "address-card",
           className: "salesforce-contact",
-          title: I18n.t("salesforce.poster_icon.contact.title"),
+          title: i18n("salesforce.poster_icon.contact.title"),
           url: `${salesforceUrl}/${cfs.salesforce_contact_id}`,
         };
       }

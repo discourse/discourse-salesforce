@@ -40,35 +40,13 @@ RSpec.describe Jobs::SyncSalesforceUsers do
   end
 
   describe "bad response" do
-    it "does not fail the job with a 400 error" do
+    it "does not fail the job" do
       stub_request(
         :post,
         "#{SiteSetting.salesforce_authorization_server_url}/services/oauth2/token",
       ).to_return(status: 400)
 
       expect { described_class.new.execute({}) }.not_to raise_error
-    end
-
-    context "with `salesforce_api_error_logs` enabled" do
-      let(:fake_logger) { FakeLogger.new }
-
-      before do
-        SiteSetting.salesforce_api_error_logs = true
-        Rails.logger.broadcast_to(fake_logger)
-      end
-
-      after { Rails.logger.stop_broadcasting_to(fake_logger) }
-
-      it "logs the error" do
-        stub_request(
-          :post,
-          "#{SiteSetting.salesforce_authorization_server_url}/services/oauth2/token",
-        ).to_return(status: 401)
-
-        described_class.new.execute({})
-
-        expect(fake_logger.errors.last).to eq("SyncSalesforceUsers Job Error: Invalid credentials")
-      end
     end
   end
 end

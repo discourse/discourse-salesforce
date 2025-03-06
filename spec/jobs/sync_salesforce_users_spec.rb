@@ -59,7 +59,7 @@ RSpec.describe Jobs::SyncSalesforceUsers do
 
       after { Rails.logger.stop_broadcasting_to(fake_logger) }
 
-      it "logs an invalid credentials error job fails with 401" do
+      it "logs the error" do
         stub_request(
           :post,
           "#{SiteSetting.salesforce_authorization_server_url}/services/oauth2/token",

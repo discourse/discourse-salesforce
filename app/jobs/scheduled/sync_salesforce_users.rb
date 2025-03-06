@@ -11,6 +11,9 @@ module ::Jobs
       begin
         api_client = Salesforce::Api.new
       rescue Salesforce::InvalidCredentials
+        if SiteSetting.salesforce_api_error_logs
+          Rails.logger.error("SyncSalesforceUsers Job Error: Invalid credentials")
+        end
         return
       end
 

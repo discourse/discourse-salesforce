@@ -130,10 +130,10 @@ function initializeWithApi(api, container) {
                   <div class='title'>
                   ${iconHTML("briefcase", { class: "case" })}
                     Salesforce Case <a href="${salesforceUrl}/${
-                salesforceCase.uid
-              }">#${
-                salesforceCase.number
-              }</a> <div class="quote-controls"><\/div>
+                      salesforceCase.uid
+                    }">#${
+                      salesforceCase.number
+                    }</a> <div class="quote-controls"><\/div>
                   </div>
                   <blockquote>
                     Status: <strong>${salesforceCase.status}</strong>

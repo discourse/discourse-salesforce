@@ -1,8 +1,6 @@
 import { spinnerHTML } from "discourse/helpers/loading-spinner";
 import { ajax } from "discourse/lib/ajax";
 import { popupAjaxError } from "discourse/lib/ajax-error";
-import discourseComputed from "discourse/lib/decorators";
-import { withSilencedDeprecations } from "discourse/lib/deprecated";
 import { iconHTML } from "discourse/lib/icon-library";
 import { withPluginApi } from "discourse/lib/plugin-api";
 import PostCooked from "discourse/widgets/post-cooked";
@@ -28,39 +26,6 @@ function initializeWithApi(api, container) {
   const appEvents = container.lookup("service:app-events");
 
   if (isStaff) {
-    withSilencedDeprecations("discourse.hbr-topic-list-overrides", () => {
-      let topicStatusIcons;
-      try {
-        topicStatusIcons =
-          require("discourse/helpers/topic-status-icons").default;
-      } catch {}
-
-      topicStatusIcons?.addObject(["has_salesforce_case", "briefcase", "case"]);
-
-      api.modifyClass(
-        "raw-view:topic-status",
-        (Superclass) =>
-          class extends Superclass {
-            @discourseComputed("topic.{has_salesforce_case}")
-            statuses() {
-              const results = super.statuses;
-
-              if (this.topic.has_salesforce_case) {
-                results.push({
-                  openTag: "span",
-                  closeTag: "span",
-                  title: i18n("topic_statuses.case.help"),
-                  icon: "briefcase",
-                  key: "case",
-                });
-              }
-
-              return results;
-            }
-          }
-      );
-    });
-
     const siteSettings = container.lookup("service:site-settings");
     const salesforceUrl = siteSettings.salesforce_instance_url;
 

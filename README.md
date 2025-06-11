@@ -1,3 +1,3 @@
 ## Discourse Salesforce Plugin
 
-Integration features between Salesforce and Discourse
+For more information, please see: https://meta.discourse.org/t/discourse-salesforce/218267

@@ -11,7 +11,6 @@ module ::Salesforce
   class Api
     VERSION = "49.0"
     INVALID_RESPONSE = "salesforce.error.invalid_response"
-    APP_NOT_APPROVED = "dashboard.salesforce.app_not_approved"
 
     attr_reader :faraday, :prefix
 
@@ -62,9 +61,8 @@ module ::Salesforce
         raise Salesforce::InvalidCredentials
       end
 
-      if AdminDashboardData.problem_message_check(APP_NOT_APPROVED)
-        AdminDashboardData.clear_problem_message(APP_NOT_APPROVED)
-      end
+      ProblemCheckTracker[:salesforce_app_not_approved].no_problem!
+
       return if access_token.present? && SiteSetting.salesforce_instance_url.present?
 
       connection = Faraday.new(url: SiteSetting.salesforce_authorization_server_url)
@@ -83,7 +81,7 @@ module ::Salesforce
       body = response.body
 
       if status == 400 && body.include?("user hasn't approved this consumer")
-        AdminDashboardData.add_problem_message(APP_NOT_APPROVED)
+        ProblemCheckTracker[:salesforce_app_not_approved].problem!
       end
       if status >= 300 && SiteSetting.salesforce_api_error_logs
         Rails.logger.error("Salesforce API error: #{status} #{body}")

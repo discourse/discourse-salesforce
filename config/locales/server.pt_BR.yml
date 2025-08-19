@@ -27,7 +27,5 @@ pt_BR:
       invalid_response: "Resposta inválida da API do Salesforce"
       invalid_client_credentials: "Ocorreu um problema com as credenciais do Salesforce. Confirme a validade do id do cliente do Salesforce e as configurações secretas do cliente"
   dashboard:
-    salesforce:
-      app_not_approved: "O aplicativo conectado ao Discourse ainda não foi autorizado no Salesforce pelo usuário mencionado na configuração do site `salesforce_username`. Para autorizá-lo, siga <a href='%{base_url}/salesforce/admin/authorize'>este link</a>."
     problem:
       salesforce_invalid_credentials: "Ocorreu um problema com as credenciais do Salesforce. Confirme a validade da identidade do cliente do Salesforce e as configurações secretas do cliente"

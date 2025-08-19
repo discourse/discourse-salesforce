@@ -21,6 +21,3 @@ sv:
   salesforce:
     error:
       invalid_response: "Ogiltigt svar från Salesforce API"
-  dashboard:
-    salesforce:
-      app_not_approved: "Den Discourse anslutna appen är ännu inte auktoriserad i Salesforce av användaren som nämns i webbplatsinställningen `salesforce_username`. Följ <a href='%{base_url}/salesforce/admin/authorize'>denna länk</a> för att godkänna den."

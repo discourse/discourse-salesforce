@@ -29,3 +29,4 @@ de:
   dashboard:
     problem:
       salesforce_invalid_credentials: "Es gab ein Problem mit den Salesforce-Anmeldedaten. Bitte bestätige die Gültigkeit der Einstellungen für die Salesforce-Client-ID und das entsprechende Client-Geheimnis"
+      salesforce_app_not_approved: "Die mit Discourse verbundene App ist noch nicht in Salesforce vom Benutzer autorisiert, der unter der Website-Einstellung `salesforce_username` erwähnt wird. Bitte folge <a href='%{base_path}/salesforce/admin/authorize'>diesem Link</a>, um ihn zu autorisieren."

@@ -38,8 +38,6 @@ function initializeWithApi(api, container) {
         label: "salesforce.lead.create",
         action: async (post) => {
           await createPerson("lead", post);
-          // TODO (glimmer-post-stream) the Glimmer Post Stream does not listen to this event
-          appEvents.trigger("post-stream:refresh", { id: post.id });
         },
         className: "create-lead",
       };
@@ -51,8 +49,6 @@ function initializeWithApi(api, container) {
         label: "salesforce.contact.create",
         action: async (post) => {
           await createPerson("contact", post);
-          // TODO (glimmer-post-stream) the Glimmer Post Stream does not listen to this event
-          appEvents.trigger("post-stream:refresh", { id: post.id });
         },
         className: "create-contact",
       };
@@ -99,11 +95,6 @@ function initializeWithApi(api, container) {
 
             topic.salesforce_case_loading = true;
 
-            // TODO (glimmer-post-stream) the Glimmer Post Stream does not listen to this event
-            _appEvents.trigger("post-stream:refresh", {
-              id: op.id,
-            });
-
             try {
               const data = await ajax(`/salesforce/cases/sync`, {
                 type: "POST",
@@ -114,11 +105,6 @@ function initializeWithApi(api, container) {
               popupAjaxError(error);
             } finally {
               topic.salesforce_case_loading = false;
-
-              // TODO (glimmer-post-stream) the Glimmer Post Stream does not listen to this event
-              _appEvents.trigger("post-stream:refresh", {
-                id: op.id,
-              });
             }
           },
         };

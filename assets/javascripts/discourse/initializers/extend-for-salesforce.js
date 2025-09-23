@@ -22,7 +22,6 @@ async function createPerson(type, post) {
 function initializeWithApi(api, container) {
   const currentUser = api.getCurrentUser();
   const isStaff = currentUser?.staff;
-  const appEvents = container.lookup("service:app-events");
 
   if (isStaff) {
     const siteSettings = container.lookup("service:site-settings");

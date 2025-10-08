@@ -6,8 +6,8 @@ require_relative "../spec_helper"
 RSpec.describe Jobs::SyncSalesforceUsers do
   include_context "with salesforce spec helper"
 
-  fab!(:user1) { Fabricate(:user) }
-  fab!(:user2) { Fabricate(:user) }
+  fab!(:user1, :user)
+  fab!(:user2, :user)
   let!(:path) { api_path.sub("sobjects", "composite/sobjects") }
 
   describe "proper leads and contacts in response" do

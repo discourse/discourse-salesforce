@@ -15,7 +15,7 @@ module Salesforce
         "::Salesforce::#{type}".constantize.create!(user)
         render json: success_json
       rescue => e
-        render json: { errors: [e.message] }, status: 422
+        render json: { errors: [e.message] }, status: :unprocessable_content
       end
     end
 
@@ -24,7 +24,7 @@ module Salesforce
         Contact.create!(user)
         render json: success_json
       rescue => e
-        render json: { errors: [e.message] }, status: 422
+        render json: { errors: [e.message] }, status: :unprocessable_content
       end
     end
 

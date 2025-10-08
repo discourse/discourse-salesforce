@@ -18,9 +18,7 @@ RSpec.describe ::Salesforce::Api do
     expect { described_class.new }.to raise_error(::Salesforce::InvalidCredentials)
 
     problem = AdminNotice.find_by(identifier: "salesforce_invalid_credentials")
-    expect(problem.message).to eq(
-      I18n.t("dashboard.problem.salesforce_invalid_credentials"),
-    )
+    expect(problem.message).to eq(I18n.t("dashboard.problem.salesforce_invalid_credentials"))
     expect(ProblemCheckTracker["salesforce_invalid_credentials"].failing?).to eq(true)
   end
 

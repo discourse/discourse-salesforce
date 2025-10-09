@@ -18,12 +18,7 @@ RSpec.shared_context "with salesforce spec helper" do
         "assertion" => "SALESFORCE_PRIVATE_KEY",
         "grant_type" => "urn:ietf:params:oauth:grant-type:jwt-bearer",
       },
-    ).to_return(
-      status: api_response_status,
-      body: api_response_body,
-      headers: {
-      },
-    )
+    ).to_return(status: api_response_status, body: api_response_body, headers: {})
   end
 
   def api_path

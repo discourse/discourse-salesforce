@@ -5,8 +5,30 @@
 # https://translate.discourse.org/
 
 pt:
+  admin_js:
+    admin:
+      site_settings:
+        categories:
+          discourse_salesforce: "Discourse Salesforce"
   js:
+    login:
+      salesforce:
+        name: "Salesforce"
+        title: "Iniciar sessão com Salesforce"
     salesforce:
+      title: Salesforce
+      lead:
+        create: "Criar Lead"
+      contact:
+        create: "Criar Contacto"
       poster_icon:
+        lead:
+          title: "Salesforce Lead"
+          text: "Lead"
         contact:
+          title: "Contactar Salesforce"
           text: "Contacte-nos"
+    topic:
+      actions:
+        create_salesforce_case: "Criar Caso"
+        sync_salesforce_case: "Sincronizar Caso"

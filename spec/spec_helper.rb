@@ -3,6 +3,8 @@
 RSpec.shared_context "with salesforce spec helper" do
   let(:access_token) { "SALESFORCE_ACCESS_TOKEN" }
   let(:instance_url) { "https://test.my.salesforce.com/" }
+  let(:api_response_status) { 200 }
+  let(:api_response_body) { %({"access_token":"#{access_token}","instance_url":"#{instance_url}"}) }
 
   before do
     SiteSetting.salesforce_enabled = true
@@ -16,12 +18,7 @@ RSpec.shared_context "with salesforce spec helper" do
         "assertion" => "SALESFORCE_PRIVATE_KEY",
         "grant_type" => "urn:ietf:params:oauth:grant-type:jwt-bearer",
       },
-    ).to_return(
-      status: 200,
-      body: %({"access_token":"#{access_token}","instance_url":"#{instance_url}"}),
-      headers: {
-      },
-    )
+    ).to_return(status: api_response_status, body: api_response_body, headers: {})
   end
 
   def api_path

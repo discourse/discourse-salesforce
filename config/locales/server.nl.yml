@@ -27,7 +27,5 @@ nl:
       invalid_response: "Ongeldig antwoord van Salesforce-API"
       invalid_client_credentials: "Er was een probleem met de Salesforce-aanmeldgegevens. Bevestig de geldigheid van de instellingen voor de Salesforce-client-ID en het clientgeheim"
   dashboard:
-    salesforce:
-      app_not_approved: "De met Discourse verbonden app is nog niet geautoriseerd in Salesforce door de gebruiker vermeld in de site-instelling 'salesforce_username'. Volg <a href='%{base_url}/salesforce/admin/authorize'>deze link</a> om de gebruiker te autoriseren."
     problem:
       salesforce_invalid_credentials: "Er was een probleem met de Salesforce-aanmeldgegevens. Bevestig de geldigheid van de instellingen voor de Salesforce-client-ID en het clientgeheim"

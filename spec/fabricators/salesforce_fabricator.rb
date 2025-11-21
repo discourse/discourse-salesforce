@@ -8,5 +8,5 @@ Fabricator(:salesforce_case, class_name: ::Salesforce::Case) do
   description "This is the description of the Salesforce case."
   number "345678"
   status "New"
-  last_synced_at 1.minutes.ago
+  last_synced_at 1.minute.ago
 end

@@ -31,6 +31,7 @@ require_relative "lib/validators/salesforce_login_enabled_validator"
 after_initialize do
   SeedFu.fixture_paths << Rails.root.join("plugins", "discourse-salesforce", "db", "fixtures").to_s
   register_problem_check Salesforce::ProblemCheck::SalesforceInvalidCredentials
+  register_problem_check Salesforce::ProblemCheck::SalesforceAppNotApproved
 
   allow_staff_user_custom_field(::Salesforce::Contact::ID_FIELD)
   allow_staff_user_custom_field(::Salesforce::Lead::ID_FIELD)

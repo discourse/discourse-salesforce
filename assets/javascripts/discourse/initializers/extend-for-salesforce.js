@@ -1,11 +1,7 @@
 import { tracked } from "@glimmer/tracking";
-import { spinnerHTML } from "discourse/helpers/loading-spinner";
 import { ajax } from "discourse/lib/ajax";
 import { popupAjaxError } from "discourse/lib/ajax-error";
-import { withSilencedDeprecations } from "discourse/lib/deprecated";
-import { iconHTML } from "discourse/lib/icon-library";
 import { withPluginApi } from "discourse/lib/plugin-api";
-import PostCooked from "discourse/widgets/post-cooked";
 import { i18n } from "discourse-i18n";
 import PostSalesforceCase from "../components/post-salesforce-case";
 
@@ -26,7 +22,6 @@ async function createPerson(type, post) {
 function initializeWithApi(api, container) {
   const currentUser = api.getCurrentUser();
   const isStaff = currentUser?.staff;
-  const appEvents = container.lookup("service:app-events");
 
   if (isStaff) {
     const siteSettings = container.lookup("service:site-settings");
@@ -38,8 +33,6 @@ function initializeWithApi(api, container) {
         label: "salesforce.lead.create",
         action: async (post) => {
           await createPerson("lead", post);
-          // TODO (glimmer-post-stream) the Glimmer Post Stream does not listen to this event
-          appEvents.trigger("post-stream:refresh", { id: post.id });
         },
         className: "create-lead",
       };
@@ -51,8 +44,6 @@ function initializeWithApi(api, container) {
         label: "salesforce.contact.create",
         action: async (post) => {
           await createPerson("contact", post);
-          // TODO (glimmer-post-stream) the Glimmer Post Stream does not listen to this event
-          appEvents.trigger("post-stream:refresh", { id: post.id });
         },
         className: "create-contact",
       };
@@ -92,17 +83,9 @@ function initializeWithApi(api, container) {
             ? "topic.actions.sync_salesforce_case"
             : "topic.actions.create_salesforce_case",
           action: async () => {
-            const op = topic
-              .get("postStream.posts")
-              .find((p) => p.post_number === 1);
-            const _appEvents = container.lookup("service:app-events");
+            topic.get("postStream.posts").find((p) => p.post_number === 1);
 
             topic.salesforce_case_loading = true;
-
-            // TODO (glimmer-post-stream) the Glimmer Post Stream does not listen to this event
-            _appEvents.trigger("post-stream:refresh", {
-              id: op.id,
-            });
 
             try {
               const data = await ajax(`/salesforce/cases/sync`, {
@@ -114,11 +97,6 @@ function initializeWithApi(api, container) {
               popupAjaxError(error);
             } finally {
               topic.salesforce_case_loading = false;
-
-              // TODO (glimmer-post-stream) the Glimmer Post Stream does not listen to this event
-              _appEvents.trigger("post-stream:refresh", {
-                id: op.id,
-              });
             }
           },
         };
@@ -127,7 +105,7 @@ function initializeWithApi(api, container) {
   }
 }
 
-function customizePost(api, container) {
+function customizePost(api) {
   api.modifyClass(
     "model:topic",
     (Superclass) =>
@@ -138,51 +116,6 @@ function customizePost(api, container) {
   );
 
   api.renderAfterWrapperOutlet("post-content-cooked-html", PostSalesforceCase);
-
-  withSilencedDeprecations("discourse.post-stream-widget-overrides", () =>
-    customizeWidgetPost(api, container)
-  );
-}
-
-function customizeWidgetPost(api, container) {
-  const siteSettings = container.lookup("service:site-settings");
-  const salesforceUrl = siteSettings.salesforce_instance_url;
-
-  api.decorateWidget("post-contents:after-cooked", (dec) => {
-    if (dec.attrs.post_number === 1) {
-      const postModel = dec.getModel();
-      if (postModel) {
-        const topic = postModel.topic;
-        const salesforceCase = topic.salesforce_case;
-
-        let rawHtml = "";
-
-        if (topic.salesforce_case_loading) {
-          rawHtml = spinnerHTML;
-        } else if (salesforceCase) {
-          rawHtml = `
-                <aside class='quote salesforce-case' data-id="${
-                  salesforceCase?.id
-                }" data-topic="${topic.id}">
-                  <div class='title'>
-                  ${iconHTML("briefcase", { class: "case" })}
-                    Salesforce Case <a href="${salesforceUrl}/${
-                      salesforceCase?.uid
-                    }">#${
-                      salesforceCase?.number
-                    }</a> <div class="quote-controls"><\/div>
-                  </div>
-                  <blockquote>
-                    Status: <strong>${salesforceCase?.status}</strong>
-                  </blockquote>
-                </aside>`;
-        }
-
-        const cooked = new PostCooked({ cooked: rawHtml }, dec);
-        return dec.rawHtml(cooked.init());
-      }
-    }
-  });
 }
 
 export default {

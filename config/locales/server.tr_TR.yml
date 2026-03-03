@@ -29,3 +29,4 @@ tr_TR:
   dashboard:
     problem:
       salesforce_invalid_credentials: "Salesforce giriş bilgileriyle ilgili bir sorun oluştu. Lütfen Salesforce istemci kimliği ve istemci gizli ayarlarının geçerliliğini onaylayın"
+      salesforce_app_not_approved: "Discourse connected uygulaması, site ayarlarında `salesforce_username` olarak belirtilen kullanıcı tarafından Salesforce'ta henüz yetkilendirilmemiştir. Yetkilendirmek için lütfen <a href='%{base_path}/salesforce/admin/authorize'>bu bağlantıyı</a> takip edin."

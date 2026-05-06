@@ -31,7 +31,7 @@ RSpec.describe ::Salesforce::Api do
       expect { described_class.new }.to raise_error(::Salesforce::InvalidCredentials)
 
       problem = AdminNotice.find_by(identifier: "salesforce_app_not_approved")
-      expect(problem.message).to eq(
+      expect(problem.message).to match_html(
         I18n.t("dashboard.problem.salesforce_app_not_approved", base_path: Discourse.base_path),
       )
       expect(ProblemCheckTracker["salesforce_app_not_approved"].failing?).to eq(true)

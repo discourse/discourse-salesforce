@@ -16,6 +16,11 @@ module Salesforce
                  error: I18n.t("salesforce.error.invalid_client_credentials"),
                },
                status: :bad_gateway
+      rescue Salesforce::InvalidApiResponse => e
+        render json: {
+                 errors: [e.message.presence || I18n.t("salesforce.error.invalid_response")],
+               },
+               status: :unprocessable_content
       end
     end
   end

@@ -81,6 +81,8 @@ RSpec.describe Salesforce::Case do
       before do
         SiteSetting.salesforce_skip_contact_creation_on_case_sync = false
 
+        stub_salesforce_person_lookup("Contact", topic.user.email)
+
         stub_request(:post, "#{api_path}/Contact").with(
           body: topic.user.salesforce_contact_payload.to_json,
         ).to_return(status: 200, body: %({"id":"123456"}), headers: {})

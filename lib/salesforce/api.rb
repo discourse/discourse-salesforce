@@ -1,6 +1,7 @@
 # frozen_string_literal: true
 
 require "json"
+require "cgi"
 
 module ::Salesforce
   class InvalidApiResponse < ::StandardError
@@ -28,8 +29,7 @@ module ::Salesforce
     end
 
     def query(soql)
-      soql = URI::Parser.new.escape(soql.gsub(" ", "+"))
-      get("query/?q=#{soql}")
+      get("query/?q=#{CGI.escape(soql)}")
     end
 
     def get(path)

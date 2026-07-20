@@ -11,9 +11,9 @@ describe TopicViewSerializer do
   fab!(:admin)
 
   it "includes Salesforce case details" do
-    topic_view = TopicView.new(topic.id, admin)
     topic.custom_fields["has_salesforce_case"] = true
     topic.save!
+    topic_view = TopicView.new(topic.id, admin)
 
     json = described_class.new(topic_view, scope: Guardian.new(admin), root: false).as_json
 

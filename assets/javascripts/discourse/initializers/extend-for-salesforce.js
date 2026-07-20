@@ -5,15 +5,31 @@ import { withPluginApi } from "discourse/lib/plugin-api";
 import { i18n } from "discourse-i18n";
 import PostSalesforceCase from "../components/post-salesforce-case";
 
-async function createPerson(type, post) {
+export function updateSalesforcePersonFields(topic, message) {
+  topic.postStream.posts.forEach((post) => {
+    if (post.user_id === message.user_id) {
+      post.user_custom_fields = {
+        ...(post.user_custom_fields || {}),
+        [message.field]: message.value,
+      };
+    }
+  });
+}
+
+async function createPerson(type, post, toasts) {
   post.set("flair_url", "loading spinner");
 
   try {
     await ajax(`/salesforce/persons/create`, {
       type: "POST",
-      data: { type, user_id: post.user_id },
+      data: { type, user_id: post.user_id, post_id: post.id },
     });
     post.set("flair_url", "fab-salesforce");
+    toasts.success({
+      data: {
+        message: i18n(`salesforce.${type}.create_success`),
+      },
+    });
   } catch (error) {
     popupAjaxError(error);
   }
@@ -25,6 +41,7 @@ function initializeWithApi(api, container) {
 
   if (isStaff) {
     const siteSettings = container.lookup("service:site-settings");
+    const toasts = container.lookup("service:toasts");
     const salesforceUrl = siteSettings.salesforce_instance_url;
 
     api.addPostAdminMenuButton(() => {
@@ -32,7 +49,7 @@ function initializeWithApi(api, container) {
         icon: "user-plus",
         label: "salesforce.lead.create",
         action: async (post) => {
-          await createPerson("lead", post);
+          await createPerson("lead", post, toasts);
         },
         className: "create-lead",
       };
@@ -43,7 +60,7 @@ function initializeWithApi(api, container) {
         icon: "address-card",
         label: "salesforce.contact.create",
         action: async (post) => {
-          await createPerson("contact", post);
+          await createPerson("contact", post, toasts);
         },
         className: "create-contact",
       };
@@ -70,6 +87,13 @@ function initializeWithApi(api, container) {
         };
       }
     });
+
+    api.registerCustomPostMessageCallback(
+      "salesforce_person_synced",
+      (controller, message) => {
+        updateSalesforcePersonFields(controller.model, message);
+      }
+    );
 
     customizePost(api, container);
 

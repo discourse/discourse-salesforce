@@ -13,8 +13,10 @@ en:
       title: Salesforce
       lead:
         create: "Create Lead"
+        create_success: "Salesforce lead synced"
       contact:
         create: "Create Contact"
+        create_success: "Salesforce contact synced"
       poster_icon:
         lead:
           title: "Salesforce Lead"

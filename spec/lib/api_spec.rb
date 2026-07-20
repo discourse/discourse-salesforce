@@ -11,6 +11,21 @@ RSpec.describe ::Salesforce::Api do
     expect(api.access_token).to eq(access_token)
   end
 
+  it "escapes plus signs in SOQL query parameters" do
+    soql = "SELECT Id FROM Contact WHERE Email = 'team+salesforce-discourse-dev-ed@example.com'"
+
+    stub_request(:get, query_path).with(query: { q: soql }).to_return(
+      status: 200,
+      body: { totalSize: 0, records: [] }.to_json,
+      headers: {
+      },
+    )
+
+    described_class.new.query(soql)
+
+    expect(a_request(:get, query_path).with(query: { q: soql })).to have_been_made
+  end
+
   it "returns invalid credentials error when Salesforce client ID is blank" do
     SiteSetting.salesforce_client_id = ""
 

@@ -16,5 +16,17 @@ describe Topic do
 
       expect(topic.has_salesforce_case).to eq(true)
     end
+
+    it "reflects changes to the case marker on the same topic instance" do
+      topic.custom_fields.delete(CaseMixin::HAS_SALESFORCE_CASE)
+      topic.save_custom_fields
+
+      expect(topic.has_salesforce_case).to eq(false)
+
+      topic.custom_fields[CaseMixin::HAS_SALESFORCE_CASE] = true
+      topic.save_custom_fields
+
+      expect(topic.has_salesforce_case).to eq(true)
+    end
   end
 end

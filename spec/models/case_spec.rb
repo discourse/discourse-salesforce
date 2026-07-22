@@ -101,6 +101,21 @@ RSpec.describe Salesforce::Case do
         expect(topic.user.salesforce_contact_id).to eq("123456")
       end
 
+      it "uses an existing salesforce contact when one matches the topic user email" do
+        stub_salesforce_person_lookup("Contact", topic.user.email, id: "existing_contact_id")
+
+        stub_request(:post, "#{api_path}/Case").with(
+          body:
+            %({"ContactId":"existing_contact_id","Subject":"#{topic.title}","Description":"#{post.full_url}\\n\\n#{post.raw}","Origin":"Web"}),
+        ).to_return(status: 200, body: %({"id":"234567"}), headers: {})
+
+        expect do ::Salesforce::Case.sync!(topic) end.to change { ::Salesforce::Case.count }.by(1)
+
+        expect(topic.user.salesforce_contact_id).to eq("existing_contact_id")
+        expect(Salesforce.contacts_group.users.exists?(topic.user.id)).to eq(true)
+        expect(a_request(:post, "#{api_path}/Contact")).not_to have_been_made
+      end
+
       include_examples "existing contact"
     end
 

@@ -5,8 +5,6 @@ module Salesforce
     extend ActiveSupport::Concern
 
     def has_salesforce_case
-      return @has_salesforce_case if defined?(@has_salesforce_case)
-
       field = CaseMixin::HAS_SALESFORCE_CASE
       value =
         if custom_field_preloaded?(field)
@@ -17,7 +15,7 @@ module Salesforce
           custom_fields[field]
         end
 
-      @has_salesforce_case = ActiveModel::Type::Boolean.new.cast(value)
+      ActiveModel::Type::Boolean.new.cast(value) ? true : false
     end
 
     def salesforce_case

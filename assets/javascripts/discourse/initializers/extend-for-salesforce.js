@@ -1,4 +1,3 @@
-import { tracked } from "@glimmer/tracking";
 import { ajax } from "discourse/lib/ajax";
 import { popupAjaxError } from "discourse/lib/ajax-error";
 import { withPluginApi } from "discourse/lib/plugin-api";
@@ -130,14 +129,8 @@ function initializeWithApi(api, container) {
 }
 
 function customizePost(api) {
-  api.modifyClass(
-    "model:topic",
-    (Superclass) =>
-      class extends Superclass {
-        @tracked salesforce_case_loading;
-        @tracked salesforce_case;
-      }
-  );
+  api.addModelField("topic", "salesforce_case_loading");
+  api.addModelField("topic", "salesforce_case");
 
   api.renderAfterWrapperOutlet("post-content-cooked-html", PostSalesforceCase);
 }

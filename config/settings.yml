@@ -18,8 +18,13 @@ discourse_salesforce:
     default: 'https://login.salesforce.com'
   salesforce_username:
     default: ''
-  salesforce_fill_blank_fields_on_user_sync:
-    default: false
+  salesforce_existing_record_sync_mode:
+    type: enum
+    default: disabled
+    choices:
+      - disabled
+      - fill_blank
+      - overwrite
   salesforce_case_tag_name:
     default: 'salesforce-case'
   salesforce_case_status_tag_enabled:

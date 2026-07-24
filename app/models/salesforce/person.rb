@@ -1,6 +1,15 @@
 # frozen_string_literal: true
 
 module ::Salesforce
+  class AmbiguousEmailMatch < StandardError
+    attr_reader :object_name
+
+    def initialize(object_name)
+      @object_name = object_name
+      super("Multiple Salesforce #{object_name} records have the same email")
+    end
+  end
+
   class Person
     OBJECT_NAME = ""
     ID_FIELD = ""
@@ -20,7 +29,7 @@ module ::Salesforce
       id
     end
 
-    def self.find_by_email(email, fields: [])
+    def self.find_by_email(email, fields: [], require_unique: false)
       # Keep the default lookup ID-only because create/link callers do not need record data.
       fields = ["Id", *fields.map(&:to_s)].uniq
       invalid_field = fields.find { |field| !FIELD_NAME_PATTERN.match?(field) }
@@ -32,6 +41,7 @@ module ::Salesforce
           "SELECT #{fields.join(",")} FROM #{self::OBJECT_NAME} WHERE Email = '#{escaped_email}'",
         )
       return if result["totalSize"] == 0
+      raise AmbiguousEmailMatch.new(self::OBJECT_NAME) if require_unique && result["totalSize"] > 1
 
       result["records"][0]
     end

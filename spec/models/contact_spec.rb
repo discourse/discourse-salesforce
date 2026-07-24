@@ -46,5 +46,15 @@ RSpec.describe Salesforce::Contact do
         described_class.find_by_email("person@example.com", fields: ["Id FROM Lead"])
       end.to raise_error(ArgumentError, "Invalid Salesforce field name: Id FROM Lead")
     end
+
+    it "rejects ambiguous email matches when uniqueness is required" do
+      email = "duplicate@example.com"
+      stub_salesforce_person_lookup("Contact", email, records: [{ Id: "123456" }, { Id: "654321" }])
+
+      expect do described_class.find_by_email(email, require_unique: true) end.to raise_error(
+        Salesforce::AmbiguousEmailMatch,
+        "Multiple Salesforce Contact records have the same email",
+      )
+    end
   end
 end

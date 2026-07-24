@@ -10,6 +10,10 @@ module ::Jobs
       user = User.find(args[:user_id])
       begin
         sync(user, ::Salesforce::Contact) || sync(user, ::Salesforce::Lead)
+      rescue Salesforce::AmbiguousEmailMatch => error
+        Rails.logger.warn(
+          "Skipping Salesforce sync for Discourse user #{user.id}: multiple #{error.object_name} records have the same email",
+        )
       rescue Salesforce::InvalidCredentials
       end
     end
@@ -17,8 +21,9 @@ module ::Jobs
     private
 
     def sync(user, person_type)
+      mode = SiteSetting.salesforce_existing_record_sync_mode
       payload = {}
-      if SiteSetting.salesforce_fill_blank_fields_on_user_sync
+      if mode != "disabled"
         payload =
           DiscoursePluginRegistry.apply_modifier(
             :salesforce_existing_user_sync_payload,
@@ -28,7 +33,12 @@ module ::Jobs
           )
       end
 
-      record = person_type.find_by_email(user.email, fields: payload.keys)
+      record =
+        person_type.find_by_email(
+          user.email,
+          fields: payload.keys,
+          require_unique: mode != "disabled",
+        )
       return false if record.blank?
 
       user.custom_fields[person_type::ID_FIELD] = record["Id"]
@@ -40,7 +50,9 @@ module ::Jobs
         payload.each_with_object({}) do |(field, value), result|
           existing_value = record[field.to_s]
           next if value.nil? || (value.respond_to?(:empty?) && value.empty?)
-          next if existing_value.present? || existing_value == false
+          if mode == "fill_blank"
+            next if existing_value.present? || existing_value == false
+          end
 
           result[field] = value
         end

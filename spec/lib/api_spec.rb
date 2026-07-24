@@ -26,6 +26,16 @@ RSpec.describe ::Salesforce::Api do
     expect(a_request(:get, query_path).with(query: { q: soql })).to have_been_made
   end
 
+  it "accepts no-content responses when updating Salesforce records" do
+    request =
+      stub_request(:patch, "#{api_path}/Contact/123456").with(
+        body: { LeadSource: "Web" }.to_json,
+      ).to_return(status: 204)
+
+    expect(described_class.new.patch("sobjects/Contact/123456", LeadSource: "Web")).to be_nil
+    expect(request).to have_been_requested
+  end
+
   it "returns invalid credentials error when Salesforce client ID is blank" do
     SiteSetting.salesforce_client_id = ""
 

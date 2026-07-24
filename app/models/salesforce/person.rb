@@ -4,6 +4,7 @@ module ::Salesforce
   class Person
     OBJECT_NAME = ""
     ID_FIELD = ""
+    FIELD_NAME_PATTERN = /\A[A-Za-z][A-Za-z0-9_]*\z/
 
     def self.create!(user)
       return if user.custom_fields[self::ID_FIELD].present?
@@ -19,12 +20,28 @@ module ::Salesforce
       id
     end
 
-    def self.find_id_by_email(email)
+    def self.find_by_email(email, fields: [])
+      # Keep the default lookup ID-only because create/link callers do not need record data.
+      fields = ["Id", *fields.map(&:to_s)].uniq
+      invalid_field = fields.find { |field| !FIELD_NAME_PATTERN.match?(field) }
+      raise ArgumentError, "Invalid Salesforce field name: #{invalid_field}" if invalid_field
+
       escaped_email = escape_soql_string(email)
       result =
-        Salesforce.api.query("SELECT Id FROM #{self::OBJECT_NAME} WHERE Email = '#{escaped_email}'")
+        Salesforce.api.query(
+          "SELECT #{fields.join(",")} FROM #{self::OBJECT_NAME} WHERE Email = '#{escaped_email}'",
+        )
       return if result["totalSize"] == 0
-      result["records"][0]["Id"]
+
+      result["records"][0]
+    end
+
+    def self.find_id_by_email(email)
+      find_by_email(email)&.dig("Id")
+    end
+
+    def self.update!(id, fields)
+      Salesforce.api.patch("sobjects/#{self::OBJECT_NAME}/#{id}", fields)
     end
 
     def self.group

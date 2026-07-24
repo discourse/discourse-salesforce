@@ -32,12 +32,14 @@ RSpec.shared_context "with salesforce spec helper" do
     "#{instance_url}services/data/v49.0/query/"
   end
 
-  def stub_salesforce_person_lookup(object_name, email, id: nil)
-    records = id.present? ? [{ Id: id }] : []
+  def stub_salesforce_person_lookup(object_name, email, id: nil, fields: [], record: nil)
+    record ||= { Id: id } if id.present?
+    records = record.present? ? [record] : []
+    query_fields = ["Id", *fields.map(&:to_s)].uniq.join(",")
 
     stub_request(:get, query_path).with(
       query: {
-        q: "SELECT Id FROM #{object_name} WHERE Email = '#{email}'",
+        q: "SELECT #{query_fields} FROM #{object_name} WHERE Email = '#{email}'",
       },
     ).to_return(
       status: 200,

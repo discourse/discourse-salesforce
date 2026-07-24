@@ -40,6 +40,10 @@ module ::Salesforce
       call(path) { |uri| faraday.post(uri, fields.to_json, "Content-Type": "application/json") }
     end
 
+    def patch(path, fields)
+      call(path) { |uri| faraday.patch(uri, fields.to_json, "Content-Type": "application/json") }
+    end
+
     def call(path)
       uri = File.join(prefix, path)
       response = yield(uri)
@@ -47,6 +51,8 @@ module ::Salesforce
       case response.status
       when 200, 201
         JSON.parse response.body
+      when 204
+        nil
       else
         e = ::Salesforce::InvalidApiResponse.new(response.body.presence || "")
         e.set_backtrace(caller)

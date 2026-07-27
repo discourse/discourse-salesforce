@@ -8,7 +8,7 @@ When a Discourse user is created, the plugin links them to an existing Salesforc
 with the same email address. By default, it does not update the Salesforce record. Enable the
 `salesforce_existing_record_sync_mode` site setting to choose how fields are synchronized:
 
-- `disabled` only links the matching record and does not update it.
+- `link_only` only links the matching record and does not update it.
 - `fill_blank` sets a blank `LeadSource` to `Web` and a blank `Description` to the Discourse user
   profile URL. Existing non-empty Salesforce values are preserved.
 - `overwrite` replaces `LeadSource` and `Description` with those values.
@@ -30,7 +30,7 @@ end
 
 The modifier receives the default two-field payload, the Discourse user, and the Salesforce object
 name. Modifier-added fields follow the selected update mode, but `nil` and empty values are never
-sent to Salesforce. The modifier is not called when the mode is `disabled`.
+sent to Salesforce. The modifier is not called when the mode is `link_only`.
 
 If multiple Contacts or multiple Leads have the same email, the plugin skips linking and updating
 the ambiguous records when `fill_blank` or `overwrite` is selected.

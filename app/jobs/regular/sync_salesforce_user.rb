@@ -23,7 +23,7 @@ module ::Jobs
     def sync(user, person_type)
       mode = SiteSetting.salesforce_existing_record_sync_mode
       payload = {}
-      if mode != "disabled"
+      if mode != "link_only"
         payload =
           DiscoursePluginRegistry.apply_modifier(
             :salesforce_existing_user_sync_payload,
@@ -37,7 +37,7 @@ module ::Jobs
         person_type.find_by_email(
           user.email,
           fields: payload.keys,
-          require_unique: mode != "disabled",
+          require_unique: mode != "link_only",
         )
       return false if record.blank?
 

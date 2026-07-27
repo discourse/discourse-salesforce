@@ -20,9 +20,9 @@ discourse_salesforce:
     default: ''
   salesforce_existing_record_sync_mode:
     type: enum
-    default: disabled
+    default: link_only
     choices:
-      - disabled
+      - link_only
       - fill_blank
       - overwrite
   salesforce_case_tag_name:

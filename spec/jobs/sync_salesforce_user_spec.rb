@@ -39,7 +39,7 @@ RSpec.describe Jobs::SyncSalesforceUser do
     expect(a_request(:patch, %r{/sobjects/})).not_to have_been_made
   end
 
-  it "keeps first-match linking for duplicate records when synchronization is disabled" do
+  it "keeps first-match linking for duplicate records in link-only mode" do
     stub_salesforce_person_lookup(
       "Contact",
       user.email,

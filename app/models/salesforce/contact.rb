@@ -5,6 +5,7 @@ module ::Salesforce
     ID_FIELD = "salesforce_contact_id"
     SOURCE = "Web"
     OBJECT_NAME = "Contact"
+    FIELDS_TO_FILL = %i[Description]
 
     def self.group
       Salesforce.contacts_group

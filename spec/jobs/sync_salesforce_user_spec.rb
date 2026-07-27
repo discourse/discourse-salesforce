@@ -36,28 +36,15 @@ RSpec.describe Jobs::SyncSalesforceUser do
     expect(a_request(:patch, %r{/sobjects/})).not_to have_been_made
   end
 
-  it "falls back to a lead and fills its blank description" do
+  it "falls back to a lead without updating it" do
     SiteSetting.salesforce_existing_record_sync_mode = "fill_blank"
-    fields = %i[Description]
-    stub_salesforce_person_lookup("Contact", user.email, fields: fields)
-    stub_salesforce_person_lookup(
-      "Lead",
-      user.email,
-      fields: fields,
-      record: {
-        Id: "lead_123",
-        Description: nil,
-      },
-    )
-    patch_request =
-      stub_request(:patch, "#{api_path}/Lead/lead_123").with(
-        body: { Description: "http://test.localhost/u/example_person" }.to_json,
-      ).to_return(status: 204)
+    stub_salesforce_person_lookup("Contact", user.email, fields: %i[Description])
+    stub_salesforce_person_lookup("Lead", user.email, id: "lead_123")
 
     described_class.new.execute(user_id: user.id)
 
     expect(user.reload.salesforce_lead_id).to eq("lead_123")
-    expect(patch_request).to have_been_requested
+    expect(a_request(:patch, %r{/sobjects/Lead/})).not_to have_been_made
   end
 
   it "fills a blank description when updating existing users is enabled" do

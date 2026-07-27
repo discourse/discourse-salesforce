@@ -7,7 +7,7 @@ en:
     salesforce_rsa_private_key: "Salesforce connected app's RSA private key"
     salesforce_authorization_server_url: "Salesforce authorization server's URL"
     salesforce_username: "Salesforce account username"
-    salesforce_existing_record_sync_mode: "Choose how Salesforce fields are updated when a newly created Discourse user matches an existing Contact or Lead. Disabled only links the record. Fill blank sets an empty LeadSource to “Web” and an empty Description to the Discourse profile URL. Overwrite replaces those fields. Default updates do not include Email."
+    salesforce_existing_record_sync_mode: "Choose how Salesforce Contacts or Leads are updated when a Discourse user matches an existing Contact or Lead."
     salesforce_max_feed_items_per_day: "Maximum number topic replies which can be posted as feed items on Salesforce objects (Case/Lead/Contact) per day"
     salesforce_case_tag_name: "Tag name to add in topics with a Salesforce case"
     salesforce_case_status_tag_enabled: "Enable to add tags based on Salesforce case status"

@@ -36,12 +36,7 @@ module ::Salesforce
         if mode == "link_only"
           {}
         else
-          DiscoursePluginRegistry.apply_modifier(
-            :salesforce_existing_user_sync_payload,
-            payload(user).slice(*FIELDS_TO_FILL),
-            user,
-            self::OBJECT_NAME,
-          )
+          payload(user).slice(*FIELDS_TO_FILL)
         end
 
       record =

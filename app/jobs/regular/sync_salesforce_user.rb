@@ -22,16 +22,17 @@ module ::Jobs
 
     def sync(user, person_type)
       mode = SiteSetting.salesforce_existing_record_sync_mode
-      payload = {}
-      if mode != "link_only"
-        payload =
+      payload =
+        if mode == "link_only"
+          {}
+        else
           DiscoursePluginRegistry.apply_modifier(
             :salesforce_existing_user_sync_payload,
             person_type.payload(user).slice(*FIELDS_TO_FILL),
             user,
             person_type::OBJECT_NAME,
           )
-      end
+        end
 
       record =
         person_type.find_by_email(

@@ -9,9 +9,9 @@ with the same email address. By default, it does not update the Salesforce recor
 `salesforce_existing_record_sync_mode` site setting to choose how fields are synchronized:
 
 - `link_only` only links the matching record and does not update it.
-- `fill_blank` sets a blank `LeadSource` to `Web` and a blank `Description` to the Discourse user
-  profile URL. Existing non-empty Salesforce values are preserved.
-- `overwrite` replaces `LeadSource` and `Description` with those values.
+- `fill_blank` sets a blank `Description` to the Discourse user profile URL. An existing non-empty
+  description is preserved.
+- `overwrite` replaces `Description` with the Discourse user profile URL.
 - `Email` is only used to find the record and is not included in the default update payload.
 
 If multiple Contacts or multiple Leads have the same email, the plugin skips linking and updating

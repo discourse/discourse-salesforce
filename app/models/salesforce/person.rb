@@ -13,7 +13,7 @@ module ::Salesforce
   class Person
     OBJECT_NAME = ""
     ID_FIELD = ""
-    FIELDS_TO_FILL = %i[LeadSource Description]
+    FIELDS_TO_FILL = %i[Description]
     FIELD_NAME_PATTERN = /\A[A-Za-z][A-Za-z0-9_]*\z/
 
     def self.create!(user)

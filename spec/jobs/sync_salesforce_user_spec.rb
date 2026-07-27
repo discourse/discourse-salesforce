@@ -36,9 +36,9 @@ RSpec.describe Jobs::SyncSalesforceUser do
     expect(a_request(:patch, %r{/sobjects/})).not_to have_been_made
   end
 
-  it "falls back to a lead and fills its blank selected fields" do
+  it "falls back to a lead and fills its blank description" do
     SiteSetting.salesforce_existing_record_sync_mode = "fill_blank"
-    fields = %i[LeadSource Description]
+    fields = %i[Description]
     stub_salesforce_person_lookup("Contact", user.email, fields: fields)
     stub_salesforce_person_lookup(
       "Lead",
@@ -46,13 +46,12 @@ RSpec.describe Jobs::SyncSalesforceUser do
       fields: fields,
       record: {
         Id: "lead_123",
-        LeadSource: nil,
-        Description: "Existing notes",
+        Description: nil,
       },
     )
     patch_request =
       stub_request(:patch, "#{api_path}/Lead/lead_123").with(
-        body: { LeadSource: "Web" }.to_json,
+        body: { Description: "http://test.localhost/u/example_person" }.to_json,
       ).to_return(status: 204)
 
     described_class.new.execute(user_id: user.id)
@@ -61,15 +60,14 @@ RSpec.describe Jobs::SyncSalesforceUser do
     expect(patch_request).to have_been_requested
   end
 
-  it "fills only blank fields when updating existing users is enabled" do
+  it "fills a blank description when updating existing users is enabled" do
     SiteSetting.salesforce_existing_record_sync_mode = "fill_blank"
     stub_salesforce_person_lookup(
       "Contact",
       user.email,
-      fields: %i[LeadSource Description],
+      fields: %i[Description],
       record: {
         Id: "contact_123",
-        LeadSource: "Referral",
         Description: nil,
       },
     )
@@ -83,15 +81,14 @@ RSpec.describe Jobs::SyncSalesforceUser do
     expect(patch_request).to have_been_requested
   end
 
-  it "does not update Salesforce when every selected field is populated" do
+  it "does not update Salesforce when the description is populated" do
     SiteSetting.salesforce_existing_record_sync_mode = "fill_blank"
     stub_salesforce_person_lookup(
       "Contact",
       user.email,
-      fields: %i[LeadSource Description],
+      fields: %i[Description],
       record: {
         Id: "contact_123",
-        LeadSource: "Referral",
         Description: "Existing notes",
       },
     )
@@ -101,21 +98,20 @@ RSpec.describe Jobs::SyncSalesforceUser do
     expect(a_request(:patch, %r{/sobjects/})).not_to have_been_made
   end
 
-  it "overwrites selected fields when overwrite mode is enabled" do
+  it "overwrites the description when overwrite mode is enabled" do
     SiteSetting.salesforce_existing_record_sync_mode = "overwrite"
     stub_salesforce_person_lookup(
       "Contact",
       user.email,
-      fields: %i[LeadSource Description],
+      fields: %i[Description],
       record: {
         Id: "contact_123",
-        LeadSource: "Referral",
         Description: "Existing notes",
       },
     )
     patch_request =
       stub_request(:patch, "#{api_path}/Contact/contact_123").with(
-        body: { LeadSource: "Web", Description: "http://test.localhost/u/example_person" }.to_json,
+        body: { Description: "http://test.localhost/u/example_person" }.to_json,
       ).to_return(status: 204)
 
     described_class.new.execute(user_id: user.id)
@@ -129,11 +125,8 @@ RSpec.describe Jobs::SyncSalesforceUser do
     stub_salesforce_person_lookup(
       "Contact",
       user.email,
-      fields: %i[LeadSource Description],
-      records: [
-        { Id: "contact_123", LeadSource: nil, Description: nil },
-        { Id: "contact_456", LeadSource: nil, Description: nil },
-      ],
+      fields: %i[Description],
+      records: [{ Id: "contact_123", Description: nil }, { Id: "contact_456", Description: nil }],
     )
 
     described_class.new.execute(user_id: user.id)

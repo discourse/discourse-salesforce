@@ -13,6 +13,7 @@ module ::Salesforce
   class Person
     OBJECT_NAME = ""
     ID_FIELD = ""
+    FIELDS_TO_FILL = %i[LeadSource Description]
     FIELD_NAME_PATTERN = /\A[A-Za-z][A-Za-z0-9_]*\z/
 
     def self.create!(user)
@@ -27,6 +28,45 @@ module ::Salesforce
       group.add(user)
 
       id
+    end
+
+    def self.sync(user)
+      mode = SiteSetting.salesforce_existing_record_sync_mode
+      sync_payload =
+        if mode == "link_only"
+          {}
+        else
+          DiscoursePluginRegistry.apply_modifier(
+            :salesforce_existing_user_sync_payload,
+            payload(user).slice(*FIELDS_TO_FILL),
+            user,
+            self::OBJECT_NAME,
+          )
+        end
+
+      record =
+        find_by_email(user.email, fields: sync_payload.keys, require_unique: mode != "link_only")
+      return false if record.blank?
+
+      user.custom_fields[self::ID_FIELD] = record["Id"]
+      user.save_custom_fields
+
+      return true if sync_payload.empty?
+
+      fields =
+        sync_payload.each_with_object({}) do |(field, value), result|
+          existing_value = record[field.to_s]
+          next if value.nil? || (value.respond_to?(:empty?) && value.empty?)
+          if mode == "fill_blank"
+            next if existing_value.present? || existing_value == false
+          end
+
+          result[field] = value
+        end
+      return true if fields.empty?
+
+      update!(record["Id"], fields)
+      true
     end
 
     def self.find_by_email(email, fields: [], require_unique: false)

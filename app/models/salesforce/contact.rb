@@ -5,7 +5,7 @@ module ::Salesforce
     ID_FIELD = "salesforce_contact_id"
     SOURCE = "Web"
     OBJECT_NAME = "Contact"
-    FIELDS_TO_FILL = %i[Description]
+    FIELDS_TO_SYNC = %i[Description].freeze
 
     def self.group
       Salesforce.contacts_group

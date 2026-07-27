@@ -13,7 +13,6 @@ module ::Salesforce
   class Person
     OBJECT_NAME = ""
     ID_FIELD = ""
-    FIELDS_TO_FILL = []
     FIELD_NAME_PATTERN = /\A[A-Za-z][A-Za-z0-9_]*\z/
 
     def self.create!(user)
@@ -36,7 +35,7 @@ module ::Salesforce
         if mode == "link_only"
           {}
         else
-          payload(user).slice(*self::FIELDS_TO_FILL)
+          payload(user).slice(*self::FIELDS_TO_SYNC)
         end
 
       record =

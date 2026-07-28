@@ -19,8 +19,10 @@ tr_TR:
       title: Salesforce
       lead:
         create: "Potansiyel Müşteri Oluştur"
+        create_success: "Salesforce potansiyel müşterisi senkronize edildi"
       contact:
         create: "Kişi Oluştur"
+        create_success: "Salesforce kişisi senkronize edildi"
       poster_icon:
         lead:
           title: "Salesforce Potansiyel Müşterisi"

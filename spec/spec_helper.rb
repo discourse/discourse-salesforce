@@ -7,6 +7,9 @@ RSpec.shared_context "with salesforce spec helper" do
   let(:api_response_body) { %({"access_token":"#{access_token}","instance_url":"#{instance_url}"}) }
 
   before do
+    Salesforce.instance_variable_set(:@api, nil)
+    Discourse.redis.del("salesforce_access_token")
+
     SiteSetting.salesforce_enabled = true
     SiteSetting.salesforce_client_id = "SALESFORCE_CLIENT_ID"
     SiteSetting.salesforce_username = "SALESFORCE_API_USERNAME"
@@ -23,5 +26,24 @@ RSpec.shared_context "with salesforce spec helper" do
 
   def api_path
     "#{instance_url}services/data/v49.0/sobjects"
+  end
+
+  def query_path
+    "#{instance_url}services/data/v49.0/query/"
+  end
+
+  def stub_salesforce_person_lookup(object_name, email, id: nil)
+    records = id.present? ? [{ Id: id }] : []
+
+    stub_request(:get, query_path).with(
+      query: {
+        q: "SELECT Id FROM #{object_name} WHERE Email = '#{email}'",
+      },
+    ).to_return(
+      status: 200,
+      body: { totalSize: records.size, records: records }.to_json,
+      headers: {
+      },
+    )
   end
 end

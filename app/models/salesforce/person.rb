@@ -8,8 +8,8 @@ module ::Salesforce
     def self.create!(user)
       return if user.custom_fields[self::ID_FIELD].present?
 
-      data = Salesforce::Api.new.post("sobjects/#{self::OBJECT_NAME}", payload(user))
-      id = data["id"]
+      id = find_id_by_email(user.email)
+      id ||= Salesforce::Api.new.post("sobjects/#{self::OBJECT_NAME}", payload(user))["id"]
 
       user.custom_fields[self::ID_FIELD] = id
       user.save_custom_fields
@@ -20,7 +20,9 @@ module ::Salesforce
     end
 
     def self.find_id_by_email(email)
-      result = Salesforce.api.query("SELECT Id FROM #{self::OBJECT_NAME} WHERE Email = '#{email}'")
+      escaped_email = escape_soql_string(email)
+      result =
+        Salesforce.api.query("SELECT Id FROM #{self::OBJECT_NAME} WHERE Email = '#{escaped_email}'")
       return if result["totalSize"] == 0
       result["records"][0]["Id"]
     end
@@ -34,6 +36,10 @@ module ::Salesforce
     end
 
     private
+
+    def self.escape_soql_string(value)
+      value.to_s.gsub(/['\\]/) { |character| "\\#{character}" }
+    end
 
     def self.not_implemented
       raise "Not implemented."

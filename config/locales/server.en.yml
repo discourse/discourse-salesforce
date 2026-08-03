@@ -20,6 +20,7 @@ en:
       salesforce_client_credentials_required: "Salesforce client id and client secret settings are required"
   salesforce:
     error:
+      ambiguous_email_match: "Multiple Salesforce %{object_name} records have the same email"
       invalid_response: "Invalid response from Salesforce API"
       invalid_client_credentials: "There was an issue with the Salesforce credentials. Please confirm the validity of the Salesforce client id and client secret settings"
   dashboard:

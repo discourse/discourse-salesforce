@@ -6,7 +6,7 @@ module ::Salesforce
 
     def initialize(object_name)
       @object_name = object_name
-      super("Multiple Salesforce #{object_name} records have the same email")
+      super(I18n.t("salesforce.error.ambiguous_email_match", object_name: object_name))
     end
   end
 

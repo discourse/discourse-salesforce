@@ -19,10 +19,6 @@ en:
     errors:
       salesforce_client_credentials_required: "Salesforce client id and client secret settings are required"
   salesforce:
-    contact_sync_mode:
-      link_only: "Link only — link the Discourse user to the Salesforce Contact without updating Salesforce fields"
-      fill_blank: "Fill blank Salesforce fields — update selected fields only when they are empty in Salesforce"
-      overwrite: "Overwrite Salesforce fields — replace selected Salesforce field values with values from Discourse"
     error:
       invalid_response: "Invalid response from Salesforce API"
       invalid_client_credentials: "There was an issue with the Salesforce credentials. Please confirm the validity of the Salesforce client id and client secret settings"

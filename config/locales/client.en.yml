@@ -11,6 +11,10 @@ en:
         title: "Login with Salesforce"
     salesforce:
       title: Salesforce
+      contact_sync_mode:
+        link_only: "Link only — link the Discourse user to the Salesforce Contact without updating Salesforce fields"
+        fill_blank: "Fill blank Salesforce fields — update selected fields only when they are empty in Salesforce"
+        overwrite: "Overwrite Salesforce fields — replace selected Salesforce field values with values from Discourse"
       lead:
         create: "Create Lead"
         create_success: "Salesforce lead synced"

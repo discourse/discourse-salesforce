@@ -1,15 +1,29 @@
 # frozen_string_literal: true
 
 module ::Salesforce
+  class AmbiguousEmailMatch < StandardError
+    attr_reader :object_name
+
+    def initialize(object_name)
+      @object_name = object_name
+      super(I18n.t("salesforce.error.ambiguous_email_match", object_name: object_name))
+    end
+  end
+
   class Person
     OBJECT_NAME = ""
     ID_FIELD = ""
+    FIELD_NAME_PATTERN = /\A[A-Za-z][A-Za-z0-9_]*\z/
 
     def self.create!(user)
       return if user.custom_fields[self::ID_FIELD].present?
 
-      id = find_id_by_email(user.email)
-      id ||= Salesforce::Api.new.post("sobjects/#{self::OBJECT_NAME}", payload(user))["id"]
+      if sync(user)
+        group.add(user)
+        return user.custom_fields[self::ID_FIELD]
+      end
+
+      id = Salesforce::Api.new.post("sobjects/#{self::OBJECT_NAME}", payload(user))["id"]
 
       user.custom_fields[self::ID_FIELD] = id
       user.save_custom_fields
@@ -19,12 +33,71 @@ module ::Salesforce
       id
     end
 
-    def self.find_id_by_email(email)
+    def self.sync(user)
+      mode = sync_mode
+      sync_payload =
+        if mode == "link_only"
+          {}
+        else
+          payload(user).slice(*fields_to_sync)
+        end
+
+      record =
+        find_by_email(user.email, fields: sync_payload.keys, require_unique: sync_payload.present?)
+      return false if record.blank?
+
+      user.custom_fields[self::ID_FIELD] = record["Id"]
+      user.save_custom_fields
+
+      return true if sync_payload.empty?
+
+      fields =
+        sync_payload.each_with_object({}) do |(field, value), result|
+          existing_value = record[field.to_s]
+          next if value.nil? || (value.respond_to?(:empty?) && value.empty?)
+          if mode == "fill_blank"
+            next if existing_value.present? || existing_value == false
+          end
+
+          result[field] = value
+        end
+      return true if fields.empty?
+
+      update!(record["Id"], fields)
+      true
+    end
+
+    def self.sync_mode
+      "link_only"
+    end
+
+    def self.fields_to_sync
+      []
+    end
+
+    def self.find_by_email(email, fields: [], require_unique: false)
+      # Keep the default lookup ID-only because create/link callers do not need record data.
+      fields = ["Id", *fields.map(&:to_s)].uniq
+      invalid_field = fields.find { |field| !FIELD_NAME_PATTERN.match?(field) }
+      raise ArgumentError, "Invalid Salesforce field name: #{invalid_field}" if invalid_field
+
       escaped_email = escape_soql_string(email)
       result =
-        Salesforce.api.query("SELECT Id FROM #{self::OBJECT_NAME} WHERE Email = '#{escaped_email}'")
+        Salesforce.api.query(
+          "SELECT #{fields.join(",")} FROM #{self::OBJECT_NAME} WHERE Email = '#{escaped_email}'",
+        )
       return if result["totalSize"] == 0
-      result["records"][0]["Id"]
+      raise AmbiguousEmailMatch.new(self::OBJECT_NAME) if require_unique && result["totalSize"] > 1
+
+      result["records"][0]
+    end
+
+    def self.find_id_by_email(email)
+      find_by_email(email)&.dig("Id")
+    end
+
+    def self.update!(id, fields)
+      Salesforce.api.patch("sobjects/#{self::OBJECT_NAME}/#{id}", fields)
     end
 
     def self.group

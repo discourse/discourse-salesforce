@@ -13,5 +13,13 @@ module ::Salesforce
     def self.payload(user)
       user.salesforce_contact_payload
     end
+
+    def self.sync_mode
+      SiteSetting.salesforce_contact_sync_mode
+    end
+
+    def self.fields_to_sync
+      SiteSetting.salesforce_contact_sync_fields.split("|").map(&:to_sym)
+    end
   end
 end

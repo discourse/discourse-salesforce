@@ -18,6 +18,29 @@ discourse_salesforce:
     default: 'https://login.salesforce.com'
   salesforce_username:
     default: ''
+  salesforce_contact_sync_mode:
+    type: enum
+    enum: "Salesforce::ContactSyncModeSiteSetting"
+    default: link_only
+  salesforce_contact_sync_fields:
+    type: list
+    list_type: compact
+    default: "Description"
+    allow_any: false
+    choices:
+      - Description
+      - FirstName
+      - LastName
+      - Email
+      - LeadSource
+    depends_on:
+      - salesforce_contact_sync_mode
+    depends_on_values:
+      salesforce_contact_sync_mode:
+        - fill_blank
+        - overwrite
+    depends_behavior: hidden
+    dependent_setting_display: inline
   salesforce_case_tag_name:
     default: 'salesforce-case'
   salesforce_case_status_tag_enabled:

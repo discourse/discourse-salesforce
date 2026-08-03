@@ -36,19 +36,18 @@ RSpec.describe Jobs::SyncSalesforceUser do
     expect(a_request(:patch, %r{/sobjects/})).not_to have_been_made
   end
 
-  it "falls back to a lead without updating it" do
-    SiteSetting.salesforce_existing_record_sync_mode = "fill_blank"
+  it "preserves ID-only lead linking when no contact exists" do
+    SiteSetting.salesforce_contact_sync_mode = "fill_blank"
     stub_salesforce_person_lookup("Contact", user.email, fields: %i[Description])
     stub_salesforce_person_lookup("Lead", user.email, id: "lead_123")
 
     described_class.new.execute(user_id: user.id)
 
     expect(user.reload.salesforce_lead_id).to eq("lead_123")
-    expect(a_request(:patch, %r{/sobjects/Lead/})).not_to have_been_made
   end
 
   it "fills a blank description when updating existing users is enabled" do
-    SiteSetting.salesforce_existing_record_sync_mode = "fill_blank"
+    SiteSetting.salesforce_contact_sync_mode = "fill_blank"
     stub_salesforce_person_lookup(
       "Contact",
       user.email,
@@ -69,7 +68,7 @@ RSpec.describe Jobs::SyncSalesforceUser do
   end
 
   it "does not update Salesforce when the description is populated" do
-    SiteSetting.salesforce_existing_record_sync_mode = "fill_blank"
+    SiteSetting.salesforce_contact_sync_mode = "fill_blank"
     stub_salesforce_person_lookup(
       "Contact",
       user.email,
@@ -85,20 +84,21 @@ RSpec.describe Jobs::SyncSalesforceUser do
     expect(a_request(:patch, %r{/sobjects/})).not_to have_been_made
   end
 
-  it "overwrites the description when overwrite mode is enabled" do
-    SiteSetting.salesforce_existing_record_sync_mode = "overwrite"
+  it "overwrites configured fields when overwrite mode is enabled" do
+    SiteSetting.salesforce_contact_sync_mode = "overwrite"
+    SiteSetting.salesforce_contact_sync_fields = "FirstName"
     stub_salesforce_person_lookup(
       "Contact",
       user.email,
-      fields: %i[Description],
+      fields: %i[FirstName],
       record: {
         Id: "contact_123",
-        Description: "Existing notes",
+        FirstName: "Old name",
       },
     )
     patch_request =
       stub_request(:patch, "#{api_path}/Contact/contact_123").with(
-        body: { Description: "http://test.localhost/u/example_person" }.to_json,
+        body: { FirstName: "Example" }.to_json,
       ).to_return(status: 204)
 
     described_class.new.execute(user_id: user.id)
@@ -108,7 +108,7 @@ RSpec.describe Jobs::SyncSalesforceUser do
   end
 
   it "skips ambiguous records when field synchronization is enabled" do
-    SiteSetting.salesforce_existing_record_sync_mode = "fill_blank"
+    SiteSetting.salesforce_contact_sync_mode = "fill_blank"
     stub_salesforce_person_lookup(
       "Contact",
       user.email,

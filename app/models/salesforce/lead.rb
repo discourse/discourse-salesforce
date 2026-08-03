@@ -5,7 +5,6 @@ module ::Salesforce
     ID_FIELD = "salesforce_lead_id"
     DEFAULT_COMPANY_NAME = "None"
     OBJECT_NAME = "Lead"
-    FIELDS_TO_SYNC = [].freeze
 
     def self.group
       Salesforce.leads_group

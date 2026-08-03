@@ -45,11 +45,24 @@ RSpec.describe ::Salesforce::PersonsController do
       expect(messages.first.group_ids).to eq([Group::AUTO_GROUPS[:admins]])
     end
 
-    it "links an existing contact in Salesforce by email" do
+    it "links an existing contact by email and syncs its configured fields" do
       existing_user = Fabricate(:user, email: "team+salesforce-discourse-dev-ed@example.com")
       existing_contact_id = "123456"
+      SiteSetting.salesforce_contact_sync_mode = "fill_blank"
 
-      stub_salesforce_person_lookup("Contact", existing_user.email, id: existing_contact_id)
+      stub_salesforce_person_lookup(
+        "Contact",
+        existing_user.email,
+        fields: %i[Description],
+        record: {
+          Id: existing_contact_id,
+          Description: nil,
+        },
+      )
+      patch_request =
+        stub_request(:patch, "#{api_path}/Contact/#{existing_contact_id}").with(
+          body: { Description: "http://test.localhost/u/#{existing_user.username}" }.to_json,
+        ).to_return(status: 204)
 
       post "/salesforce/persons/create.json", params: { type: "contact", user_id: existing_user.id }
 
@@ -57,6 +70,7 @@ RSpec.describe ::Salesforce::PersonsController do
       expect(existing_user.reload.salesforce_contact_id).to eq(existing_contact_id)
       expect(Salesforce.contacts_group.users.exists?(existing_user.id)).to eq(true)
       expect(a_request(:post, "#{api_path}/Contact")).not_to have_been_made
+      expect(patch_request).to have_been_requested
     end
 
     it "does not publish a topic update without a post" do

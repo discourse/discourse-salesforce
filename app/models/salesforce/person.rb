@@ -18,8 +18,12 @@ module ::Salesforce
     def self.create!(user)
       return if user.custom_fields[self::ID_FIELD].present?
 
-      id = find_id_by_email(user.email)
-      id ||= Salesforce::Api.new.post("sobjects/#{self::OBJECT_NAME}", payload(user))["id"]
+      if sync(user)
+        group.add(user)
+        return user.custom_fields[self::ID_FIELD]
+      end
+
+      id = Salesforce::Api.new.post("sobjects/#{self::OBJECT_NAME}", payload(user))["id"]
 
       user.custom_fields[self::ID_FIELD] = id
       user.save_custom_fields
@@ -30,12 +34,12 @@ module ::Salesforce
     end
 
     def self.sync(user)
-      mode = SiteSetting.salesforce_existing_record_sync_mode
+      mode = sync_mode
       sync_payload =
         if mode == "link_only"
           {}
         else
-          payload(user).slice(*self::FIELDS_TO_SYNC)
+          payload(user).slice(*fields_to_sync)
         end
 
       record =
@@ -61,6 +65,14 @@ module ::Salesforce
 
       update!(record["Id"], fields)
       true
+    end
+
+    def self.sync_mode
+      "link_only"
+    end
+
+    def self.fields_to_sync
+      []
     end
 
     def self.find_by_email(email, fields: [], require_unique: false)

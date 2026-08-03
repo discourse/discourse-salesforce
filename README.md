@@ -6,13 +6,13 @@ For more information, please see: https://meta.discourse.org/t/discourse-salesfo
 
 When a Discourse user is created, the plugin links them to an existing Salesforce Contact or Lead
 with the same email address. By default, it does not update the Salesforce record. Enable the
-`salesforce_existing_record_sync_mode` site setting to choose how an existing Contact's
-`Description` is synchronized:
+`salesforce_contact_sync_mode` site setting to choose how existing Contact fields selected in
+`salesforce_contact_sync_fields` are synchronized. `Description` is selected by default and is set
+to the Discourse profile URL:
 
 - `link_only` only links the matching record and does not update it.
-- `fill_blank` sets a blank `Description` to the Discourse user profile URL. An existing non-empty
-  description is preserved.
-- `overwrite` replaces `Description` with the Discourse user profile URL.
+- `fill_blank` populates selected fields only when they are empty in Salesforce.
+- `overwrite` replaces selected Salesforce field values with values from Discourse.
 - `Email` is only used to find the record and is not included in the default update payload.
 
 Leads are linked but never updated. If multiple Contacts have the same email, the plugin skips

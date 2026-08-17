@@ -7,8 +7,7 @@ RSpec.shared_context "with salesforce spec helper" do
   let(:api_response_body) { %({"access_token":"#{access_token}","instance_url":"#{instance_url}"}) }
 
   before do
-    Salesforce.instance_variable_set(:@api, nil)
-    Discourse.redis.del("salesforce_access_token")
+    Discourse.redis.del(Salesforce::Api::ACCESS_TOKEN_KEY)
 
     SiteSetting.salesforce_enabled = true
     SiteSetting.salesforce_client_id = "SALESFORCE_CLIENT_ID"

@@ -43,28 +43,41 @@ module ::Salesforce
     CASE_ID_FIELD = "salesforce_case_id"
 
     def self.sync!(topic)
-      salesforce_case = find_or_initialize_by(topic_id: topic.id)
-      salesforce_case.tap do |c|
-        user = topic.user
+      # Serialized because concurrent calls (a double-click, or a manual sync
+      # racing the tag-triggered job) would otherwise each create a Salesforce
+      # case before either row is visible to the other.
+      DistributedMutex.synchronize("salesforce_case_sync_#{topic.id}") do
+        salesforce_case = find_or_initialize_by(topic_id: topic.id)
+        salesforce_case.tap do |c|
+          user = topic.user
 
-        if c.new_record?
-          post = topic.first_post
-          description = "#{post.full_url}\n\n#{post.raw}"
-          c.contact_id =
-            contact_id_for(user) || SiteSetting.salesforce_default_contact_id_for_case_sync.presence
-          c.subject = topic.title
-          c.description = description
-          c.generate!
+          if c.new_record?
+            post = topic.first_post
+            description = "#{post.full_url}\n\n#{post.raw}"
+            c.contact_id =
+              contact_id_for(user) ||
+                SiteSetting.salesforce_default_contact_id_for_case_sync.presence
+            c.subject = topic.title
+            c.description = description
+            c.generate!
 
-          Jobs.enqueue(:sync_case_comments, topic_id: topic.id)
+            Jobs.enqueue(:sync_case_comments, topic_id: topic.id)
 
-          topic.custom_fields["has_salesforce_case"] = true
-          topic.save_custom_fields
+            topic.custom_fields["has_salesforce_case"] = true
+            topic.save_custom_fields
+          end
+
+          c.sync!
         end
-
-        c.sync!
+        salesforce_case
       end
-      salesforce_case
+    rescue ActiveRecord::RecordNotUnique
+      # Only reachable when an insert outlives the mutex validity window; the
+      # case we created in Salesforce is left behind as an orphan there.
+      Rails.logger.warn(
+        "Concurrent Salesforce case creation for topic #{topic.id}; an orphaned case may exist in Salesforce",
+      )
+      find_by!(topic_id: topic.id).tap(&:sync!)
     end
 
     def self.contact_id_for(user)
@@ -110,5 +123,6 @@ end
 #
 # Indexes
 #
-#  index_salesforce_cases_on_uid  (uid)
+#  index_salesforce_cases_on_topic_id  (topic_id) UNIQUE
+#  index_salesforce_cases_on_uid       (uid)
 #

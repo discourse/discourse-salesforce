@@ -119,6 +119,35 @@ RSpec.describe Salesforce::Case do
       include_examples "existing contact"
     end
 
+    context "with duplicate sync attempts" do
+      before { SiteSetting.salesforce_skip_contact_creation_on_case_sync = true }
+
+      it "re-syncs the existing case instead of creating a second one" do
+        stub_new_case_request
+
+        ::Salesforce::Case.sync!(topic)
+
+        expect { ::Salesforce::Case.sync!(topic) }.not_to change { ::Salesforce::Case.count }
+        expect(a_request(:post, "#{api_path}/Case")).to have_been_made.once
+      end
+
+      it "converges on the case a concurrent sync created first" do
+        existing_case = Fabricate(:salesforce_case, topic: topic, uid: "234567")
+        # The loser of the race checked for a case before the winner's insert
+        # became visible.
+        ::Salesforce::Case.stubs(:find_or_initialize_by).returns(
+          ::Salesforce::Case.new(topic_id: topic.id),
+        )
+        stub_new_case_request
+
+        result = ::Salesforce::Case.sync!(topic)
+
+        expect(result.id).to eq(existing_case.id)
+        expect(::Salesforce::Case.where(topic_id: topic.id).count).to eq(1)
+        expect(result.reload.number).to eq("345678")
+      end
+    end
+
     context "with custom field" do
       let(:plugin_instance) { Plugin::Instance.new }
       let(:modifier_block) do

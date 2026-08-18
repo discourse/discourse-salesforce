@@ -16,21 +16,26 @@ module ::Salesforce
     FIELD_NAME_PATTERN = /\A[A-Za-z][A-Za-z0-9_]*\z/
 
     def self.create!(user)
-      return if user.custom_fields[self::ID_FIELD].present?
+      # Serialized because concurrent callers would each pass the checks below
+      # and create duplicate records in Salesforce.
+      DistributedMutex.synchronize("salesforce_person_create_#{user.id}") do
+        user.reload
+        return if user.custom_fields[self::ID_FIELD].present?
 
-      if sync(user)
+        if sync(user)
+          group.add(user)
+          return user.custom_fields[self::ID_FIELD]
+        end
+
+        id = Salesforce::Api.new.post("sobjects/#{self::OBJECT_NAME}", payload(user))["id"]
+
+        user.custom_fields[self::ID_FIELD] = id
+        user.save_custom_fields
+
         group.add(user)
-        return user.custom_fields[self::ID_FIELD]
+
+        id
       end
-
-      id = Salesforce::Api.new.post("sobjects/#{self::OBJECT_NAME}", payload(user))["id"]
-
-      user.custom_fields[self::ID_FIELD] = id
-      user.save_custom_fields
-
-      group.add(user)
-
-      id
     end
 
     def self.sync(user)

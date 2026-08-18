@@ -18,6 +18,8 @@ discourse_salesforce:
     default: 'https://login.salesforce.com'
   salesforce_username:
     default: ''
+  salesforce_auto_create_contact_on_signup:
+    default: false
   salesforce_contact_sync_mode:
     type: enum
     enum: "Salesforce::ContactSyncModeSiteSetting"

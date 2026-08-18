@@ -5,6 +5,12 @@ require "cgi"
 
 module ::Salesforce
   class InvalidApiResponse < ::StandardError
+    attr_reader :status
+
+    def initialize(message = nil, status: nil)
+      super(message)
+      @status = status
+    end
   end
   class InvalidCredentials < ::StandardError
   end
@@ -54,7 +60,11 @@ module ::Salesforce
       when 204
         nil
       else
-        e = ::Salesforce::InvalidApiResponse.new(response.body.presence || "")
+        e =
+          ::Salesforce::InvalidApiResponse.new(
+            response.body.presence || "",
+            status: response.status,
+          )
         e.set_backtrace(caller)
         Discourse.warn_exception(e, message: I18n.t(INVALID_RESPONSE), env: { api_uri: uri })
         raise e

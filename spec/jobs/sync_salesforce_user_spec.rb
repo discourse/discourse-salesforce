@@ -107,6 +107,91 @@ RSpec.describe Jobs::SyncSalesforceUser do
     expect(patch_request).to have_been_requested
   end
 
+  it "creates nothing when no contact or lead matches by default" do
+    stub_salesforce_person_lookup("Contact", user.email)
+    stub_salesforce_person_lookup("Lead", user.email)
+
+    described_class.new.execute(user_id: user.id)
+
+    expect(user.reload.salesforce_contact_id).to be_nil
+    expect(user.salesforce_lead_id).to be_nil
+    expect(a_request(:post, %r{/sobjects/})).not_to have_been_made
+  end
+
+  context "when salesforce_auto_create_contact_on_signup is enabled" do
+    before do
+      SiteSetting.salesforce_auto_create_contact_on_signup = true
+      Salesforce.seed_groups!
+      stub_salesforce_person_lookup("Contact", user.email)
+      stub_salesforce_person_lookup("Lead", user.email)
+    end
+
+    it "creates a contact when no contact or lead matches" do
+      create_request =
+        stub_request(:post, "#{api_path}/Contact").with(
+          body: user.salesforce_contact_payload.to_json,
+        ).to_return(status: 200, body: %({"id":"contact_new"}))
+
+      described_class.new.execute(user_id: user.id)
+
+      expect(create_request).to have_been_requested
+      expect(user.reload.salesforce_contact_id).to eq("contact_new")
+      expect(Salesforce.contacts_group.users.exists?(user.id)).to eq(true)
+    end
+
+    it "links a matching lead instead of creating a contact" do
+      stub_salesforce_person_lookup("Lead", user.email, id: "lead_123")
+
+      described_class.new.execute(user_id: user.id)
+
+      expect(user.reload.salesforce_lead_id).to eq("lead_123")
+      expect(a_request(:post, %r{/sobjects/})).not_to have_been_made
+    end
+
+    it "waits for the user to become active" do
+      user.update!(active: false)
+
+      described_class.new.execute(user_id: user.id)
+
+      expect(user.reload.salesforce_contact_id).to be_nil
+      expect(a_request(:post, %r{/sobjects/})).not_to have_been_made
+    end
+
+    it "does not create contacts for staged users" do
+      user.update!(staged: true)
+
+      described_class.new.execute(user_id: user.id)
+
+      expect(a_request(:post, %r{/sobjects/})).not_to have_been_made
+    end
+
+    it "does not create contacts for suspended users" do
+      user.update!(suspended_at: Time.zone.now, suspended_till: 1.year.from_now)
+
+      described_class.new.execute(user_id: user.id)
+
+      expect(a_request(:post, %r{/sobjects/})).not_to have_been_made
+    end
+
+    it "logs instead of raising when Salesforce rejects the contact" do
+      stub_request(:post, "#{api_path}/Contact").to_return(
+        status: 400,
+        body: %([{"errorCode":"DUPLICATES_DETECTED","message":"Use one of these records?"}]),
+      )
+
+      expect { described_class.new.execute(user_id: user.id) }.not_to raise_error
+      expect(user.reload.salesforce_contact_id).to be_nil
+    end
+
+    it "raises for transient Salesforce failures so the job retries" do
+      stub_request(:post, "#{api_path}/Contact").to_return(status: 503, body: "")
+
+      expect { described_class.new.execute(user_id: user.id) }.to raise_error(
+        Salesforce::InvalidApiResponse,
+      )
+    end
+  end
+
   it "skips ambiguous records when field synchronization is enabled" do
     SiteSetting.salesforce_contact_sync_mode = "fill_blank"
     stub_salesforce_person_lookup(

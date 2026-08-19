@@ -17,3 +17,22 @@ to the Discourse profile URL:
 
 Leads are linked but never updated. If multiple Contacts have the same email, the plugin skips
 linking and updating the ambiguous records when `fill_blank` or `overwrite` is selected.
+
+### Idempotent Salesforce cases
+
+To prevent a retry from creating a duplicate Salesforce Case, add this custom field to the Case
+object:
+
+- Field name: `Discourse_Topic_Key` (API name `Discourse_Topic_Key__c`)
+- Type: Text, at least 64 characters
+- Options: External ID and Unique
+- Permissions: read and write access for the Salesforce integration user
+
+The plugin checks the Case metadata and uses the field automatically; there is no Discourse site
+setting. The key combines a durable identifier stored by the plugin with the topic ID, so sites
+connected to the same Salesforce organization do not collide. A retry first adopts a Case already
+holding the key without updating it, preserving Salesforce-side edits.
+
+If the field is absent or does not have all the required properties, the plugin retains the legacy
+Case creation behavior and shows an admin dashboard warning. A transient metadata lookup failure
+stops Case creation instead of silently falling back to a non-idempotent request.

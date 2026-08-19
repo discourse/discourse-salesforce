@@ -2,16 +2,21 @@
 
 module ::Salesforce
   class Case < ::ActiveRecord::Base
+    EXTERNAL_ID_FIELD = "Discourse_Topic_Key__c"
+    EXTERNAL_ID_CACHE_PREFIX = "salesforce_case_external_id_capability"
+    SITE_IDENTIFIER_KEY = "site_identifier"
+
     self.table_name = "salesforce_cases"
 
     belongs_to :topic
 
     def generate!
+      api = Salesforce::Api.new
       data =
-        if SiteSetting.salesforce_case_external_id_field.present?
-          upsert
+        if external_id_supported?(api)
+          find_or_create_by_external_id(api)
         else
-          Salesforce::Api.new.post("sobjects/Case", payload)
+          api.post("sobjects/Case", payload)
         end
 
       self.uid = data["id"]
@@ -46,6 +51,22 @@ module ::Salesforce
     end
 
     CASE_ID_FIELD = "salesforce_case_id"
+
+    def self.external_id_capability_cache_key(instance_url = SiteSetting.salesforce_instance_url)
+      "#{EXTERNAL_ID_CACHE_PREFIX}:#{instance_url}"
+    end
+
+    def self.site_identifier
+      identifier = PluginStore.get(PLUGIN_NAME, SITE_IDENTIFIER_KEY)
+      return identifier if identifier.present?
+
+      DistributedMutex.synchronize("salesforce_site_identifier") do
+        PluginStore.get(PLUGIN_NAME, SITE_IDENTIFIER_KEY) ||
+          SecureRandom.uuid.tap do |new_identifier|
+            PluginStore.set(PLUGIN_NAME, SITE_IDENTIFIER_KEY, new_identifier)
+          end
+      end
+    end
 
     def self.sync!(topic)
       salesforce_case = find_or_initialize_by(topic_id: topic.id)
@@ -84,22 +105,37 @@ module ::Salesforce
 
     private
 
-    # Upserting on an external ID makes creation idempotent: a request that
-    # dies between the Salesforce write and the local save converges on the
-    # same case when retried instead of creating a duplicate.
-    def upsert
-      field = SiteSetting.salesforce_case_external_id_field
-      if !Person::FIELD_NAME_PATTERN.match?(field)
-        raise Discourse::InvalidParameters.new(:salesforce_case_external_id_field)
-      end
+    def external_id_supported?(api)
+      cache_key = self.class.external_id_capability_cache_key
+      cached = Discourse.redis.get(cache_key)
+      return cached == "1" if cached.present?
 
-      # The external ID travels in the URL and must not repeat in the body.
-      # Both branches return the case id: 201 on insert and, since API v46,
-      # 200 with a body on update.
-      Salesforce::Api.new.patch(
-        "sobjects/Case/#{field}/#{topic_id}",
-        payload.except(field, field.to_sym),
-      )
+      field =
+        api
+          .get("sobjects/Case/describe")
+          .fetch("fields")
+          .find { |candidate| candidate["name"] == EXTERNAL_ID_FIELD }
+      supported =
+        field.present? && field["externalId"] && field["unique"] && field["createable"] &&
+          field["updateable"] && field["type"] == "string"
+
+      tracker = ProblemCheckTracker[:salesforce_case_external_id]
+      supported ? tracker.no_problem! : tracker.problem!
+      Discourse.redis.setex(cache_key, supported ? 10.minutes : 1.minute, supported ? "1" : "0")
+
+      supported
+    end
+
+    def find_or_create_by_external_id(api)
+      path = "sobjects/Case/#{EXTERNAL_ID_FIELD}/#{external_id_value}"
+      existing_case = api.get(path, allow_not_found: true)
+      return { "id" => existing_case.fetch("Id") } if existing_case
+
+      api.patch(path, payload.except(EXTERNAL_ID_FIELD, EXTERNAL_ID_FIELD.to_sym))
+    end
+
+    def external_id_value
+      "#{self.class.site_identifier}-#{topic_id}"
     end
 
     def payload

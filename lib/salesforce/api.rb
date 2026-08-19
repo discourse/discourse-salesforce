@@ -32,8 +32,8 @@ module ::Salesforce
       get("query/?q=#{CGI.escape(soql)}")
     end
 
-    def get(path)
-      call(path) { |uri| faraday.get(uri) }
+    def get(path, allow_not_found: false)
+      call(path, allow_not_found:) { |uri| faraday.get(uri) }
     end
 
     def post(path, fields)
@@ -44,7 +44,7 @@ module ::Salesforce
       call(path) { |uri| faraday.patch(uri, fields.to_json, "Content-Type": "application/json") }
     end
 
-    def call(path)
+    def call(path, allow_not_found: false)
       uri = File.join(prefix, path)
       response = yield(uri)
 
@@ -54,6 +54,8 @@ module ::Salesforce
       when 204
         nil
       else
+        return nil if allow_not_found && response.status == 404 && not_found?(response.body)
+
         e = ::Salesforce::InvalidApiResponse.new(response.body.presence || "")
         e.set_backtrace(caller)
         Discourse.warn_exception(e, message: I18n.t(INVALID_RESPONSE), env: { api_uri: uri })
@@ -130,6 +132,15 @@ module ::Salesforce
       SiteSetting.salesforce_client_id.present? && SiteSetting.salesforce_username.present? &&
         SiteSetting.salesforce_rsa_private_key.present? &&
         SiteSetting.salesforce_authorization_server_url.present?
+    end
+
+    private
+
+    def not_found?(body)
+      errors = JSON.parse(body)
+      errors.is_a?(Array) && errors.any? { |error| error["errorCode"] == "NOT_FOUND" }
+    rescue JSON::ParserError
+      false
     end
   end
 end

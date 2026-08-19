@@ -8,32 +8,13 @@ RSpec.describe Salesforce::Case do
 
   include_context "with salesforce spec helper"
 
-  describe ".external_id_value" do
-    it "separates sites with the same topic ID" do
-      first_key = described_class.external_id_value(topic.id, hostname: "one.example.com")
-      second_key = described_class.external_id_value(topic.id, hostname: "two.example.com")
-
-      expect(first_key).not_to eq(second_key)
-      expect(first_key.length).to eq(64)
-    end
-  end
-
   describe ".sync!" do
     before do
       Salesforce.seed_groups!
 
-      stub_case_description
-
       stub_request(:get, "#{api_path}/Case/234567").to_return(
         status: 200,
         body: %({"CaseNumber":"345678","Status":"New"}),
-      )
-    end
-
-    def stub_case_description(fields = [])
-      stub_request(:get, "#{api_path}/Case/describe").to_return(
-        status: 200,
-        body: { fields: fields }.to_json,
       )
     end
 
@@ -138,27 +119,15 @@ RSpec.describe Salesforce::Case do
       include_examples "existing contact"
     end
 
-    context "when the canonical external ID field is available" do
+    context "when an external ID field is configured" do
       before do
         SiteSetting.salesforce_skip_contact_creation_on_case_sync = true
-        stub_case_description(
-          [
-            {
-              name: described_class::EXTERNAL_ID_FIELD,
-              externalId: true,
-              unique: true,
-              createable: true,
-              updateable: true,
-              type: "string",
-              length: 64,
-            },
-          ],
-        )
+        SiteSetting.salesforce_case_external_id_field = "Discourse_Topic_Case_Id__c"
       end
 
-      def external_record_url
-        external_id = described_class.external_id_value(topic.id)
-        "#{api_path}/Case/#{described_class::EXTERNAL_ID_FIELD}/#{external_id}"
+      def upsert_url
+        external_id = CGI.escape("#{Discourse.current_hostname}:#{topic.id}")
+        "#{api_path}/Case/Discourse_Topic_Case_Id__c/#{external_id}"
       end
 
       def base_payload_json
@@ -171,7 +140,7 @@ RSpec.describe Salesforce::Case do
       end
 
       it "creates the case with an idempotent upsert" do
-        stub_request(:patch, external_record_url).with(body: base_payload_json).to_return(
+        stub_request(:patch, upsert_url).with(body: base_payload_json).to_return(
           status: 201,
           body: %({"id":"234567","success":true,"errors":[],"created":true}),
         )
@@ -183,7 +152,7 @@ RSpec.describe Salesforce::Case do
       end
 
       it "links and refreshes an existing case returned by the upsert" do
-        stub_request(:patch, external_record_url).with(body: base_payload_json).to_return(
+        stub_request(:patch, upsert_url).with(body: base_payload_json).to_return(
           status: 200,
           body: %({"id":"234567","success":true,"errors":[],"created":false}),
         )
@@ -192,18 +161,15 @@ RSpec.describe Salesforce::Case do
 
         expect(::Salesforce::Case.find_by(topic_id: topic.id).uid).to eq("234567")
         expect(a_request(:post, "#{api_path}/Case")).not_to have_been_made
-        expect(a_request(:patch, external_record_url)).to have_been_made.once
+        expect(a_request(:patch, upsert_url)).to have_been_made.once
       end
 
       it "keeps the external ID out of the request body even when a modifier adds it" do
         plugin_instance = Plugin::Instance.new
-        modifier =
-          Proc.new do |fields, _|
-            fields.merge(described_class::EXTERNAL_ID_FIELD.to_sym => "hijacked")
-          end
+        modifier = Proc.new { |fields, _| fields.merge(Discourse_Topic_Case_Id__c: "hijacked") }
         plugin_instance.register_modifier(:salesforce_case_payload, &modifier)
 
-        stub_request(:patch, external_record_url).with(body: base_payload_json).to_return(
+        stub_request(:patch, upsert_url).with(body: base_payload_json).to_return(
           status: 201,
           body: %({"id":"234567","success":true,"errors":[],"created":true}),
         )
@@ -216,83 +182,11 @@ RSpec.describe Salesforce::Case do
           &modifier
         )
       end
-    end
 
-    context "when the canonical external ID field is unavailable" do
-      before { SiteSetting.salesforce_skip_contact_creation_on_case_sync = true }
-
-      it "retains legacy creation" do
-        stub_new_case_request
-
-        expect { ::Salesforce::Case.sync!(topic) }.to change { ::Salesforce::Case.count }.by(1)
-
-        expect(a_request(:post, "#{api_path}/Case")).to have_been_made.once
-      end
-    end
-
-    context "when the canonical external ID field is misconfigured" do
-      before do
-        SiteSetting.salesforce_skip_contact_creation_on_case_sync = true
-        stub_case_description(
-          [
-            {
-              name: described_class::EXTERNAL_ID_FIELD,
-              externalId: true,
-              unique: false,
-              createable: true,
-              updateable: true,
-              type: "string",
-              length: 64,
-            },
-          ],
+      it "rejects an invalid field name" do
+        expect { SiteSetting.salesforce_case_external_id_field = "bad name" }.to raise_error(
+          Discourse::InvalidParameters,
         )
-        stub_new_case_request
-      end
-
-      it "does not claim idempotency" do
-        expect { ::Salesforce::Case.sync!(topic) }.to change { ::Salesforce::Case.count }.by(1)
-
-        expect(a_request(:post, "#{api_path}/Case")).to have_been_made.once
-        expect(a_request(:patch, /Discourse_Topic_Key/)).not_to have_been_made
-      end
-    end
-
-    context "when the canonical external ID field is too short" do
-      before do
-        SiteSetting.salesforce_skip_contact_creation_on_case_sync = true
-        stub_case_description(
-          [
-            {
-              name: described_class::EXTERNAL_ID_FIELD,
-              externalId: true,
-              unique: true,
-              createable: true,
-              updateable: true,
-              type: "string",
-              length: 63,
-            },
-          ],
-        )
-        stub_new_case_request
-      end
-
-      it "does not claim idempotency" do
-        expect { ::Salesforce::Case.sync!(topic) }.to change { ::Salesforce::Case.count }.by(1)
-
-        expect(a_request(:post, "#{api_path}/Case")).to have_been_made.once
-      end
-    end
-
-    context "when the Case metadata lookup fails" do
-      before do
-        SiteSetting.salesforce_skip_contact_creation_on_case_sync = true
-        stub_request(:get, "#{api_path}/Case/describe").to_return(status: 503, body: "unavailable")
-      end
-
-      it "does not fall back to non-idempotent creation" do
-        expect { ::Salesforce::Case.sync!(topic) }.to raise_error(Salesforce::InvalidApiResponse)
-
-        expect(a_request(:post, "#{api_path}/Case")).not_to have_been_made
       end
     end
 

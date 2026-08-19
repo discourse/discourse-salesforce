@@ -20,19 +20,15 @@ linking and updating the ambiguous records when `fill_blank` or `overwrite` is s
 
 ### Idempotent Salesforce cases
 
-To prevent a retry from creating a duplicate Salesforce Case, add this custom field to the Case
-object:
+To prevent a retry from creating a duplicate Salesforce Case, add a custom field to the Case
+object. For example:
 
-- Field name: `Discourse_Topic_Key` (API name `Discourse_Topic_Key__c`)
-- Type: Text, at least 64 characters
+- Field name: `Discourse_Topic_Case_Id` (API name `Discourse_Topic_Case_Id__c`)
+- Type: Text
 - Options: External ID and Unique
 - Permissions: read and write access for the Salesforce integration user
 
-The plugin checks the Case metadata and uses the field automatically; there is no Discourse site
-setting. The key is a hash of the site's canonical hostname and topic ID, so sites connected to the
-same Salesforce organization do not collide. A retry upserts the same Case and refreshes its fields
-from the Discourse topic.
-
-If the field is absent or does not have all the required properties, the plugin retains the legacy
-Case creation behavior. A transient metadata lookup failure stops Case creation instead of silently
-falling back to a non-idempotent request.
+Set `salesforce_case_external_id_field` to the field's API name. The external value combines the
+Discourse hostname and topic ID, so sites connected to the same Salesforce organization do not
+collide. A retry upserts the same Case and refreshes its fields from the Discourse topic. Leave the
+setting blank to create Cases without external-ID upsert.

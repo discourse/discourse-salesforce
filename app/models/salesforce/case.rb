@@ -7,7 +7,12 @@ module ::Salesforce
     belongs_to :topic
 
     def generate!
-      data = Salesforce::Api.new.post("sobjects/Case", payload)
+      data =
+        if SiteSetting.salesforce_case_external_id_field.present?
+          upsert
+        else
+          Salesforce::Api.new.post("sobjects/Case", payload)
+        end
 
       self.uid = data["id"]
       save!
@@ -78,6 +83,24 @@ module ::Salesforce
     end
 
     private
+
+    # Upserting on an external ID makes creation idempotent: a request that
+    # dies between the Salesforce write and the local save converges on the
+    # same case when retried instead of creating a duplicate.
+    def upsert
+      field = SiteSetting.salesforce_case_external_id_field
+      if !Person::FIELD_NAME_PATTERN.match?(field)
+        raise Discourse::InvalidParameters.new(:salesforce_case_external_id_field)
+      end
+
+      # The external ID travels in the URL and must not repeat in the body.
+      # Both branches return the case id: 201 on insert and, since API v46,
+      # 200 with a body on update.
+      Salesforce::Api.new.patch(
+        "sobjects/Case/#{field}/#{topic_id}",
+        payload.except(field, field.to_sym),
+      )
+    end
 
     def payload
       default = {

@@ -8,6 +8,46 @@ RSpec.describe Salesforce::Case do
 
   include_context "with salesforce spec helper"
 
+  describe ".external_id_capability_cache_key" do
+    it "is scoped to the Discourse database and Salesforce connection" do
+      default_key =
+        described_class.external_id_capability_cache_key(
+          instance_url,
+          database: "site-a",
+          username: "integration@example.com",
+        )
+
+      expect(
+        described_class.external_id_capability_cache_key(
+          instance_url,
+          database: "site-b",
+          username: "integration@example.com",
+        ),
+      ).not_to eq(default_key)
+      expect(
+        described_class.external_id_capability_cache_key(
+          instance_url,
+          database: "site-a",
+          username: "other-integration@example.com",
+        ),
+      ).not_to eq(default_key)
+    end
+  end
+
+  describe ".external_id_value" do
+    before do
+      PluginStore.set(Salesforce::PLUGIN_NAME, described_class::SITE_IDENTIFIER_KEY, "test-site")
+    end
+
+    it "separates backup clones restored under different hostnames" do
+      production_key = described_class.external_id_value(topic.id, hostname: "forum.example.com")
+      staging_key = described_class.external_id_value(topic.id, hostname: "staging.example.com")
+
+      expect(production_key).not_to eq(staging_key)
+      expect(production_key.length).to eq(64)
+    end
+  end
+
   describe ".sync!" do
     before do
       Salesforce.seed_groups!
@@ -142,13 +182,15 @@ RSpec.describe Salesforce::Case do
               createable: true,
               updateable: true,
               type: "string",
+              length: 64,
             },
           ],
         )
       end
 
       def external_record_url
-        "#{api_path}/Case/#{described_class::EXTERNAL_ID_FIELD}/test-site-#{topic.id}"
+        external_id = described_class.external_id_value(topic.id)
+        "#{api_path}/Case/#{described_class::EXTERNAL_ID_FIELD}/#{external_id}"
       end
 
       def base_payload_json
@@ -177,6 +219,24 @@ RSpec.describe Salesforce::Case do
         expect(::Salesforce::Case.find_by(topic_id: topic.id).uid).to eq("234567")
         expect(a_request(:post, "#{api_path}/Case")).not_to have_been_made
         expect(a_request(:get, external_record_url)).to have_been_made.once
+      end
+
+      it "links the case when another writer creates it after the lookup" do
+        stub_request(:get, external_record_url).to_return(
+          status: 404,
+          body: [
+            { errorCode: "NOT_FOUND", message: "The requested resource does not exist" },
+          ].to_json,
+        )
+        stub_request(:patch, external_record_url).with(body: base_payload_json).to_return(
+          status: 200,
+          body: %({"id":"234567","success":true,"errors":[],"created":false}),
+        )
+
+        expect { ::Salesforce::Case.sync!(topic) }.to change { ::Salesforce::Case.count }.by(1)
+
+        expect(::Salesforce::Case.find_by(topic_id: topic.id).uid).to eq("234567")
+        expect(a_request(:post, "#{api_path}/Case")).not_to have_been_made
       end
 
       it "links a case a crashed request already created without overwriting it" do
@@ -246,6 +306,7 @@ RSpec.describe Salesforce::Case do
               createable: true,
               updateable: true,
               type: "string",
+              length: 64,
             },
           ],
         )
@@ -257,6 +318,33 @@ RSpec.describe Salesforce::Case do
 
         expect(a_request(:post, "#{api_path}/Case")).to have_been_made.once
         expect(a_request(:patch, /Discourse_Topic_Key/)).not_to have_been_made
+      end
+    end
+
+    context "when the canonical external ID field is too short" do
+      before do
+        SiteSetting.salesforce_skip_contact_creation_on_case_sync = true
+        stub_case_description(
+          [
+            {
+              name: described_class::EXTERNAL_ID_FIELD,
+              externalId: true,
+              unique: true,
+              createable: true,
+              updateable: true,
+              type: "string",
+              length: 63,
+            },
+          ],
+        )
+        stub_new_case_request
+      end
+
+      it "does not claim idempotency" do
+        expect { ::Salesforce::Case.sync!(topic) }.to change { ::Salesforce::Case.count }.by(1)
+
+        expect(a_request(:post, "#{api_path}/Case")).to have_been_made.once
+        expect(ProblemCheckTracker[:salesforce_case_external_id].failing?).to eq(true)
       end
     end
 

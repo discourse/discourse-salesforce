@@ -1,5 +1,7 @@
 # frozen_string_literal: true
 
+require "digest"
+
 module ::Salesforce
   class Case < ::ActiveRecord::Base
     EXTERNAL_ID_FIELD = "Discourse_Topic_Key__c"
@@ -52,8 +54,13 @@ module ::Salesforce
 
     CASE_ID_FIELD = "salesforce_case_id"
 
-    def self.external_id_capability_cache_key(instance_url = SiteSetting.salesforce_instance_url)
-      "#{EXTERNAL_ID_CACHE_PREFIX}:#{instance_url}"
+    def self.external_id_capability_cache_key(
+      instance_url = SiteSetting.salesforce_instance_url,
+      database: RailsMultisite::ConnectionManagement.current_db,
+      username: SiteSetting.salesforce_username
+    )
+      connection_identity = [database, instance_url, username].join("\0")
+      "#{EXTERNAL_ID_CACHE_PREFIX}:#{Digest::SHA256.hexdigest(connection_identity)}"
     end
 
     def self.site_identifier
@@ -66,6 +73,10 @@ module ::Salesforce
             PluginStore.set(PLUGIN_NAME, SITE_IDENTIFIER_KEY, new_identifier)
           end
       end
+    end
+
+    def self.external_id_value(topic_id, hostname: Discourse.current_hostname)
+      Digest::SHA256.hexdigest([hostname.downcase, site_identifier, topic_id].join("\0"))
     end
 
     def self.sync!(topic)
@@ -117,7 +128,7 @@ module ::Salesforce
           .find { |candidate| candidate["name"] == EXTERNAL_ID_FIELD }
       supported =
         field.present? && field["externalId"] && field["unique"] && field["createable"] &&
-          field["updateable"] && field["type"] == "string"
+          field["updateable"] && field["type"] == "string" && field["length"].to_i >= 64
 
       tracker = ProblemCheckTracker[:salesforce_case_external_id]
       supported ? tracker.no_problem! : tracker.problem!
@@ -135,7 +146,7 @@ module ::Salesforce
     end
 
     def external_id_value
-      "#{self.class.site_identifier}-#{topic_id}"
+      self.class.external_id_value(topic_id)
     end
 
     def payload

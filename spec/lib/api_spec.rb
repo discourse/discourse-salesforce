@@ -26,6 +26,54 @@ RSpec.describe ::Salesforce::Api do
     expect(a_request(:get, query_path).with(query: { q: soql })).to have_been_made
   end
 
+  describe "#get" do
+    let(:record_path) { "sobjects/Case/Discourse_Topic_Key__c/missing" }
+    let(:record_url) { "#{api_path}/Case/Discourse_Topic_Key__c/missing" }
+
+    it "returns nil for an allowed Salesforce NOT_FOUND response" do
+      stub_request(:get, record_url).to_return(
+        status: 404,
+        body: [
+          { errorCode: "NOT_FOUND", message: "The requested resource does not exist" },
+        ].to_json,
+      )
+
+      expect(described_class.new.get(record_path, allow_not_found: true)).to be_nil
+    end
+
+    it "raises for an empty 404 response" do
+      stub_request(:get, record_url).to_return(status: 404, body: "")
+
+      expect { described_class.new.get(record_path, allow_not_found: true) }.to raise_error(
+        Salesforce::InvalidApiResponse,
+      )
+    end
+
+    it "raises for a different Salesforce 404 error" do
+      stub_request(:get, record_url).to_return(
+        status: 404,
+        body: [{ errorCode: "INVALID_FIELD", message: "No such field" }].to_json,
+      )
+
+      expect { described_class.new.get(record_path, allow_not_found: true) }.to raise_error(
+        Salesforce::InvalidApiResponse,
+      )
+    end
+
+    it "raises when NOT_FOUND has a different HTTP status" do
+      stub_request(:get, record_url).to_return(
+        status: 400,
+        body: [
+          { errorCode: "NOT_FOUND", message: "The requested resource does not exist" },
+        ].to_json,
+      )
+
+      expect { described_class.new.get(record_path, allow_not_found: true) }.to raise_error(
+        Salesforce::InvalidApiResponse,
+      )
+    end
+  end
+
   it "returns invalid credentials error when Salesforce client ID is blank" do
     SiteSetting.salesforce_client_id = ""
 

@@ -137,7 +137,7 @@ module ::Salesforce
     private
 
     def not_found?(body)
-      errors = JSON.parse(body)
+      errors = JSON.parse(body.to_s)
       errors.is_a?(Array) && errors.any? { |error| error["errorCode"] == "NOT_FOUND" }
     rescue JSON::ParserError
       false

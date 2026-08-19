@@ -5,8 +5,6 @@ require "digest"
 module ::Salesforce
   class Case < ::ActiveRecord::Base
     EXTERNAL_ID_FIELD = "Discourse_Topic_Key__c"
-    EXTERNAL_ID_CACHE_PREFIX = "salesforce_case_external_id_capability"
-    SITE_IDENTIFIER_KEY = "site_identifier"
 
     self.table_name = "salesforce_cases"
 
@@ -14,12 +12,7 @@ module ::Salesforce
 
     def generate!
       api = Salesforce::Api.new
-      data =
-        if external_id_supported?(api)
-          find_or_create_by_external_id(api)
-        else
-          api.post("sobjects/Case", payload)
-        end
+      data = (external_id_supported?(api) ? upsert(api) : api.post("sobjects/Case", payload))
 
       self.uid = data["id"]
       save!
@@ -54,29 +47,8 @@ module ::Salesforce
 
     CASE_ID_FIELD = "salesforce_case_id"
 
-    def self.external_id_capability_cache_key(
-      instance_url = SiteSetting.salesforce_instance_url,
-      database: RailsMultisite::ConnectionManagement.current_db,
-      username: SiteSetting.salesforce_username
-    )
-      connection_identity = [database, instance_url, username].join("\0")
-      "#{EXTERNAL_ID_CACHE_PREFIX}:#{Digest::SHA256.hexdigest(connection_identity)}"
-    end
-
-    def self.site_identifier
-      identifier = PluginStore.get(PLUGIN_NAME, SITE_IDENTIFIER_KEY)
-      return identifier if identifier.present?
-
-      DistributedMutex.synchronize("salesforce_site_identifier") do
-        PluginStore.get(PLUGIN_NAME, SITE_IDENTIFIER_KEY) ||
-          SecureRandom.uuid.tap do |new_identifier|
-            PluginStore.set(PLUGIN_NAME, SITE_IDENTIFIER_KEY, new_identifier)
-          end
-      end
-    end
-
     def self.external_id_value(topic_id, hostname: Discourse.current_hostname)
-      Digest::SHA256.hexdigest([hostname.downcase, site_identifier, topic_id].join("\0"))
+      Digest::SHA256.hexdigest([hostname.downcase, topic_id].join("\0"))
     end
 
     def self.sync!(topic)
@@ -117,31 +89,17 @@ module ::Salesforce
     private
 
     def external_id_supported?(api)
-      cache_key = self.class.external_id_capability_cache_key
-      cached = Discourse.redis.get(cache_key)
-      return cached == "1" if cached.present?
-
       field =
         api
           .get("sobjects/Case/describe")
           .fetch("fields")
           .find { |candidate| candidate["name"] == EXTERNAL_ID_FIELD }
-      supported =
-        field.present? && field["externalId"] && field["unique"] && field["createable"] &&
-          field["updateable"] && field["type"] == "string" && field["length"].to_i >= 64
-
-      tracker = ProblemCheckTracker[:salesforce_case_external_id]
-      supported ? tracker.no_problem! : tracker.problem!
-      Discourse.redis.setex(cache_key, supported ? 10.minutes : 1.minute, supported ? "1" : "0")
-
-      supported
+      field.present? && field["externalId"] && field["unique"] && field["createable"] &&
+        field["updateable"] && field["type"] == "string" && field["length"].to_i >= 64
     end
 
-    def find_or_create_by_external_id(api)
+    def upsert(api)
       path = "sobjects/Case/#{EXTERNAL_ID_FIELD}/#{external_id_value}"
-      existing_case = api.get(path, allow_not_found: true)
-      return { "id" => existing_case.fetch("Id") } if existing_case
-
       api.patch(path, payload.except(EXTERNAL_ID_FIELD, EXTERNAL_ID_FIELD.to_sym))
     end
 

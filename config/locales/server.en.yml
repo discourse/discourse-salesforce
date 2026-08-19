@@ -27,4 +27,3 @@ en:
     problem:
       salesforce_invalid_credentials: "There was an issue with the Salesforce credentials. Please confirm the validity of the Salesforce client id and client secret settings"
       salesforce_app_not_approved: "The Discourse connected app is not yet authorized in Salesforce by the user mentioned in site setting `salesforce_username`. Please follow <a href='%{base_path}/salesforce/admin/authorize'>this link</a> to authorize it."
-      salesforce_case_external_id: "Salesforce Case creation is not idempotent. Create a unique Text External ID field named `Discourse_Topic_Key__c` on the Case object and grant the integration user read and write access."

@@ -11,7 +11,6 @@ RSpec.describe ::Salesforce::CasesController do
 
   describe "#sync" do
     before do
-      Discourse.redis.del(Salesforce::Case.external_id_capability_cache_key(instance_url))
       stub_request(:get, "#{api_path}/Case/describe").to_return(
         status: 200,
         body: { fields: [] }.to_json,

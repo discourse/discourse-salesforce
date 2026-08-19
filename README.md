@@ -29,11 +29,10 @@ object:
 - Permissions: read and write access for the Salesforce integration user
 
 The plugin checks the Case metadata and uses the field automatically; there is no Discourse site
-setting. The key is a hash of the site's canonical hostname, a durable identifier stored by the
-plugin, and the topic ID. This prevents sites connected to the same Salesforce organization—and
-backup clones restored under a different hostname—from colliding. A retry first adopts a Case
-already holding the key without updating it, preserving Salesforce-side edits.
+setting. The key is a hash of the site's canonical hostname and topic ID, so sites connected to the
+same Salesforce organization do not collide. A retry upserts the same Case and refreshes its fields
+from the Discourse topic.
 
 If the field is absent or does not have all the required properties, the plugin retains the legacy
-Case creation behavior and shows an admin dashboard warning. A transient metadata lookup failure
-stops Case creation instead of silently falling back to a non-idempotent request.
+Case creation behavior. A transient metadata lookup failure stops Case creation instead of silently
+falling back to a non-idempotent request.

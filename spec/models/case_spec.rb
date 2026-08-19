@@ -8,51 +8,19 @@ RSpec.describe Salesforce::Case do
 
   include_context "with salesforce spec helper"
 
-  describe ".external_id_capability_cache_key" do
-    it "is scoped to the Discourse database and Salesforce connection" do
-      default_key =
-        described_class.external_id_capability_cache_key(
-          instance_url,
-          database: "site-a",
-          username: "integration@example.com",
-        )
-
-      expect(
-        described_class.external_id_capability_cache_key(
-          instance_url,
-          database: "site-b",
-          username: "integration@example.com",
-        ),
-      ).not_to eq(default_key)
-      expect(
-        described_class.external_id_capability_cache_key(
-          instance_url,
-          database: "site-a",
-          username: "other-integration@example.com",
-        ),
-      ).not_to eq(default_key)
-    end
-  end
-
   describe ".external_id_value" do
-    before do
-      PluginStore.set(Salesforce::PLUGIN_NAME, described_class::SITE_IDENTIFIER_KEY, "test-site")
-    end
+    it "separates sites with the same topic ID" do
+      first_key = described_class.external_id_value(topic.id, hostname: "one.example.com")
+      second_key = described_class.external_id_value(topic.id, hostname: "two.example.com")
 
-    it "separates backup clones restored under different hostnames" do
-      production_key = described_class.external_id_value(topic.id, hostname: "forum.example.com")
-      staging_key = described_class.external_id_value(topic.id, hostname: "staging.example.com")
-
-      expect(production_key).not_to eq(staging_key)
-      expect(production_key.length).to eq(64)
+      expect(first_key).not_to eq(second_key)
+      expect(first_key.length).to eq(64)
     end
   end
 
   describe ".sync!" do
     before do
       Salesforce.seed_groups!
-      PluginStore.set(Salesforce::PLUGIN_NAME, described_class::SITE_IDENTIFIER_KEY, "test-site")
-      Discourse.redis.del(described_class.external_id_capability_cache_key(instance_url))
 
       stub_case_description
 
@@ -203,12 +171,6 @@ RSpec.describe Salesforce::Case do
       end
 
       it "creates the case with an idempotent upsert" do
-        stub_request(:get, external_record_url).to_return(
-          status: 404,
-          body: [
-            { errorCode: "NOT_FOUND", message: "The requested resource does not exist" },
-          ].to_json,
-        )
         stub_request(:patch, external_record_url).with(body: base_payload_json).to_return(
           status: 201,
           body: %({"id":"234567","success":true,"errors":[],"created":true}),
@@ -218,16 +180,9 @@ RSpec.describe Salesforce::Case do
 
         expect(::Salesforce::Case.find_by(topic_id: topic.id).uid).to eq("234567")
         expect(a_request(:post, "#{api_path}/Case")).not_to have_been_made
-        expect(a_request(:get, external_record_url)).to have_been_made.once
       end
 
-      it "links the case when another writer creates it after the lookup" do
-        stub_request(:get, external_record_url).to_return(
-          status: 404,
-          body: [
-            { errorCode: "NOT_FOUND", message: "The requested resource does not exist" },
-          ].to_json,
-        )
+      it "links and refreshes an existing case returned by the upsert" do
         stub_request(:patch, external_record_url).with(body: base_payload_json).to_return(
           status: 200,
           body: %({"id":"234567","success":true,"errors":[],"created":false}),
@@ -237,19 +192,7 @@ RSpec.describe Salesforce::Case do
 
         expect(::Salesforce::Case.find_by(topic_id: topic.id).uid).to eq("234567")
         expect(a_request(:post, "#{api_path}/Case")).not_to have_been_made
-      end
-
-      it "links a case a crashed request already created without overwriting it" do
-        stub_request(:get, external_record_url).to_return(
-          status: 200,
-          body: { Id: "234567", Subject: "Edited in Salesforce" }.to_json,
-        )
-
-        expect { ::Salesforce::Case.sync!(topic) }.to change { ::Salesforce::Case.count }.by(1)
-
-        expect(::Salesforce::Case.find_by(topic_id: topic.id).uid).to eq("234567")
-        expect(a_request(:post, "#{api_path}/Case")).not_to have_been_made
-        expect(a_request(:patch, external_record_url)).not_to have_been_made
+        expect(a_request(:patch, external_record_url)).to have_been_made.once
       end
 
       it "keeps the external ID out of the request body even when a modifier adds it" do
@@ -260,12 +203,6 @@ RSpec.describe Salesforce::Case do
           end
         plugin_instance.register_modifier(:salesforce_case_payload, &modifier)
 
-        stub_request(:get, external_record_url).to_return(
-          status: 404,
-          body: [
-            { errorCode: "NOT_FOUND", message: "The requested resource does not exist" },
-          ].to_json,
-        )
         stub_request(:patch, external_record_url).with(body: base_payload_json).to_return(
           status: 201,
           body: %({"id":"234567","success":true,"errors":[],"created":true}),
@@ -284,13 +221,12 @@ RSpec.describe Salesforce::Case do
     context "when the canonical external ID field is unavailable" do
       before { SiteSetting.salesforce_skip_contact_creation_on_case_sync = true }
 
-      it "retains legacy creation and shows an admin warning" do
+      it "retains legacy creation" do
         stub_new_case_request
 
         expect { ::Salesforce::Case.sync!(topic) }.to change { ::Salesforce::Case.count }.by(1)
 
         expect(a_request(:post, "#{api_path}/Case")).to have_been_made.once
-        expect(ProblemCheckTracker[:salesforce_case_external_id].failing?).to eq(true)
       end
     end
 
@@ -344,7 +280,6 @@ RSpec.describe Salesforce::Case do
         expect { ::Salesforce::Case.sync!(topic) }.to change { ::Salesforce::Case.count }.by(1)
 
         expect(a_request(:post, "#{api_path}/Case")).to have_been_made.once
-        expect(ProblemCheckTracker[:salesforce_case_external_id].failing?).to eq(true)
       end
     end
 

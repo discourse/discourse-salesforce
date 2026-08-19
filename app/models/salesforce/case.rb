@@ -7,7 +7,12 @@ module ::Salesforce
     belongs_to :topic
 
     def generate!
-      data = Salesforce::Api.new.post("sobjects/Case", payload)
+      data =
+        if SiteSetting.salesforce_case_external_id_field.present?
+          upsert
+        else
+          Salesforce::Api.new.post("sobjects/Case", payload)
+        end
 
       self.uid = data["id"]
       save!
@@ -78,6 +83,19 @@ module ::Salesforce
     end
 
     private
+
+    def upsert
+      field = SiteSetting.salesforce_case_external_id_field
+      if !Person::FIELD_NAME_PATTERN.match?(field)
+        raise Discourse::InvalidParameters.new(:salesforce_case_external_id_field)
+      end
+
+      external_id = CGI.escape("#{Discourse.current_hostname}:#{topic_id}")
+      Salesforce::Api.new.patch(
+        "sobjects/Case/#{field}/#{external_id}",
+        payload.except(field, field.to_sym),
+      )
+    end
 
     def payload
       default = {

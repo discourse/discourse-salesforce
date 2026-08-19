@@ -119,6 +119,77 @@ RSpec.describe Salesforce::Case do
       include_examples "existing contact"
     end
 
+    context "when an external ID field is configured" do
+      before do
+        SiteSetting.salesforce_skip_contact_creation_on_case_sync = true
+        SiteSetting.salesforce_case_external_id_field = "Discourse_Topic_Case_Id__c"
+      end
+
+      def upsert_url
+        external_id = CGI.escape("#{Discourse.current_hostname}:#{topic.id}")
+        "#{api_path}/Case/Discourse_Topic_Case_Id__c/#{external_id}"
+      end
+
+      def base_payload_json
+        {
+          ContactId: nil,
+          Subject: topic.title,
+          Description: "#{post.full_url}\n\n#{post.raw}",
+          Origin: "Web",
+        }.to_json
+      end
+
+      it "creates the case with an idempotent upsert" do
+        stub_request(:patch, upsert_url).with(body: base_payload_json).to_return(
+          status: 201,
+          body: %({"id":"234567","success":true,"errors":[],"created":true}),
+        )
+
+        expect { ::Salesforce::Case.sync!(topic) }.to change { ::Salesforce::Case.count }.by(1)
+
+        expect(::Salesforce::Case.find_by(topic_id: topic.id).uid).to eq("234567")
+        expect(a_request(:post, "#{api_path}/Case")).not_to have_been_made
+      end
+
+      it "links and refreshes an existing case returned by the upsert" do
+        stub_request(:patch, upsert_url).with(body: base_payload_json).to_return(
+          status: 200,
+          body: %({"id":"234567","success":true,"errors":[],"created":false}),
+        )
+
+        expect { ::Salesforce::Case.sync!(topic) }.to change { ::Salesforce::Case.count }.by(1)
+
+        expect(::Salesforce::Case.find_by(topic_id: topic.id).uid).to eq("234567")
+        expect(a_request(:post, "#{api_path}/Case")).not_to have_been_made
+        expect(a_request(:patch, upsert_url)).to have_been_made.once
+      end
+
+      it "keeps the external ID out of the request body even when a modifier adds it" do
+        plugin_instance = Plugin::Instance.new
+        modifier = Proc.new { |fields, _| fields.merge(Discourse_Topic_Case_Id__c: "hijacked") }
+        plugin_instance.register_modifier(:salesforce_case_payload, &modifier)
+
+        stub_request(:patch, upsert_url).with(body: base_payload_json).to_return(
+          status: 201,
+          body: %({"id":"234567","success":true,"errors":[],"created":true}),
+        )
+
+        expect { ::Salesforce::Case.sync!(topic) }.to change { ::Salesforce::Case.count }.by(1)
+      ensure
+        DiscoursePluginRegistry.unregister_modifier(
+          plugin_instance,
+          :salesforce_case_payload,
+          &modifier
+        )
+      end
+
+      it "rejects an invalid field name" do
+        expect { SiteSetting.salesforce_case_external_id_field = "bad name" }.to raise_error(
+          Discourse::InvalidParameters,
+        )
+      end
+    end
+
     context "with custom field" do
       let(:plugin_instance) { Plugin::Instance.new }
       let(:modifier_block) do

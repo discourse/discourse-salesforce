@@ -7,7 +7,7 @@ RSpec.describe "auto-creating contacts on signup" do
 
   fab!(:user) { Fabricate(:user, active: false) }
 
-  before { SiteSetting.salesforce_auto_create_contact_on_signup = true }
+  before { SiteSetting.salesforce_contact_auto_create_on_signup = true }
 
   it "syncs the user when they become active" do
     expect_enqueued_with(job: :sync_salesforce_user, args: { user_id: user.id }) do
@@ -22,7 +22,7 @@ RSpec.describe "auto-creating contacts on signup" do
   end
 
   it "does not sync on activation when the setting is disabled" do
-    SiteSetting.salesforce_auto_create_contact_on_signup = false
+    SiteSetting.salesforce_contact_auto_create_on_signup = false
 
     expect_not_enqueued_with(job: :sync_salesforce_user) { user.update!(active: true) }
   end

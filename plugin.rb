@@ -43,12 +43,9 @@ after_initialize do
     Jobs.enqueue(:sync_salesforce_user, user_id: user.id) if ::Salesforce::Api.has_credentials?
   end
 
-  # Users are usually inactive at :user_created, so contact auto-creation waits
-  # for activation. Watching the transition covers every activation path,
-  # including the ones that set the column directly without emitting an event.
   add_model_callback(User, :after_commit, on: :update) do
     if saved_change_to_active?(from: false, to: true) &&
-         SiteSetting.salesforce_auto_create_contact_on_signup && ::Salesforce::Api.has_credentials?
+         SiteSetting.salesforce_contact_auto_create_on_signup && ::Salesforce::Api.has_credentials?
       Jobs.enqueue(:sync_salesforce_user, user_id: self.id)
     end
   end

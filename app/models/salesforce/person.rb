@@ -15,9 +15,11 @@ module ::Salesforce
     ID_FIELD = ""
     FIELD_NAME_PATTERN = /\A[A-Za-z][A-Za-z0-9_]*\z/
 
+    def self.auto_create_eligible?(user)
+      user.active? && user.human? && !user.anonymous? && !user.staged? && !user.suspended?
+    end
+
     def self.create!(user)
-      # Serialized because concurrent callers would each pass the checks below
-      # and create duplicate records in Salesforce.
       DistributedMutex.synchronize("salesforce_person_create_#{user.id}") do
         user.reload
         return if user.custom_fields[self::ID_FIELD].present?

@@ -118,9 +118,9 @@ RSpec.describe Jobs::SyncSalesforceUser do
     expect(a_request(:post, %r{/sobjects/})).not_to have_been_made
   end
 
-  context "when salesforce_auto_create_contact_on_signup is enabled" do
+  context "when salesforce_contact_auto_create_on_signup is enabled" do
     before do
-      SiteSetting.salesforce_auto_create_contact_on_signup = true
+      SiteSetting.salesforce_contact_auto_create_on_signup = true
       Salesforce.seed_groups!
       stub_salesforce_person_lookup("Contact", user.email)
       stub_salesforce_person_lookup("Lead", user.email)
@@ -181,6 +181,15 @@ RSpec.describe Jobs::SyncSalesforceUser do
 
       expect { described_class.new.execute(user_id: user.id) }.not_to raise_error
       expect(user.reload.salesforce_contact_id).to be_nil
+    end
+
+    it "logs instead of raising when Salesforce cannot find the endpoint" do
+      stub_request(:post, "#{api_path}/Contact").to_return(
+        status: 404,
+        body: %([{"errorCode":"NOT_FOUND","message":"The requested resource does not exist"}]),
+      )
+
+      expect { described_class.new.execute(user_id: user.id) }.not_to raise_error
     end
 
     it "raises for transient Salesforce failures so the job retries" do

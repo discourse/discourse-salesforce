@@ -7,7 +7,7 @@ en:
     salesforce_rsa_private_key: "Salesforce connected app's RSA private key"
     salesforce_authorization_server_url: "Salesforce authorization server's URL"
     salesforce_username: "Salesforce account username"
-    salesforce_auto_create_contact_on_signup: "Automatically create a Salesforce Contact for new users when no Contact or Lead matches their email. Contacts are created once the user's email is confirmed."
+    salesforce_contact_auto_create_on_signup: "Automatically create a Salesforce Contact for new users when no Contact or Lead matches their email. Contacts are created once the user's email is confirmed."
     salesforce_contact_sync_mode: "Choose how selected Salesforce Contact fields are synchronized when a Discourse user matches an existing Contact. Matching Leads are linked but never updated."
     salesforce_contact_sync_fields: "Salesforce Contact fields populated from the Discourse user when {{setting:salesforce_contact_sync_mode}} is set to fill blank or overwrite. Description contains the Discourse profile URL."
     salesforce_max_feed_items_per_day: "Maximum number topic replies which can be posted as feed items on Salesforce objects (Case/Lead/Contact) per day"

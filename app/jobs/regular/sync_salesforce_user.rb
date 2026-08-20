@@ -2,6 +2,8 @@
 
 module ::Jobs
   class SyncSalesforceUser < ::Jobs::Base
+    sidekiq_options retry: 5
+
     def execute(args)
       return unless SiteSetting.salesforce_enabled
 
@@ -11,8 +13,8 @@ module ::Jobs
           if lead_id = ::Salesforce::Lead.find_id_by_email(user.email)
             user.salesforce_lead_id = lead_id
             user.save_custom_fields
-          elsif SiteSetting.salesforce_auto_create_contact_on_signup &&
-                eligible_for_contact_creation?(user)
+          elsif SiteSetting.salesforce_contact_auto_create_on_signup &&
+                ::Salesforce::Person.auto_create_eligible?(user)
             create_contact(user)
           end
         end
@@ -26,16 +28,10 @@ module ::Jobs
 
     private
 
-    def eligible_for_contact_creation?(user)
-      user.active? && user.human? && !user.anonymous? && !user.staged? && !user.suspended?
-    end
-
     def create_contact(user)
       user.create_salesforce_contact
     rescue Salesforce::InvalidApiResponse => error
-      # Duplicate or validation rules reject the record permanently, so retrying
-      # cannot succeed; transient failures propagate and retry via Sidekiq.
-      raise if error.status != 400
+      raise if error.status.nil? || error.status == 429 || error.status >= 500
       Rails.logger.warn(
         "Skipping Salesforce contact creation for Discourse user #{user.id}: #{error.message}",
       )

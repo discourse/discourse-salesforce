@@ -49,7 +49,7 @@ module ::Salesforce
 
         if c.new_record?
           post = topic.first_post
-          description = "#{post.full_url}\n\n#{post.raw}"
+          description = "#{post.full_url}\n\n#{PostContent.body_for(post, max_length: 30_000)}"
           c.contact_id =
             contact_id_for(user) || SiteSetting.salesforce_default_contact_id_for_case_sync.presence
           c.subject = topic.title

@@ -27,7 +27,7 @@ module ::Salesforce
 
     def payload
       {
-        Body: post.raw,
+        Body: PostContent.body_for(post, max_length: 9_500),
         LinkUrl: post.full_url,
         Title: post.topic.title,
         Type: "LinkPost",

@@ -15,22 +15,29 @@ module ::Salesforce
     ID_FIELD = ""
     FIELD_NAME_PATTERN = /\A[A-Za-z][A-Za-z0-9_]*\z/
 
+    def self.auto_create_eligible?(user)
+      user.active? && user.human? && !user.anonymous? && !user.staged? && !user.suspended?
+    end
+
     def self.create!(user)
-      return if user.custom_fields[self::ID_FIELD].present?
+      DistributedMutex.synchronize("salesforce_person_create_#{user.id}") do
+        user.reload
+        return if user.custom_fields[self::ID_FIELD].present?
 
-      if sync(user)
+        if sync(user)
+          group.add(user)
+          return user.custom_fields[self::ID_FIELD]
+        end
+
+        id = Salesforce::Api.new.post("sobjects/#{self::OBJECT_NAME}", payload(user))["id"]
+
+        user.custom_fields[self::ID_FIELD] = id
+        user.save_custom_fields
+
         group.add(user)
-        return user.custom_fields[self::ID_FIELD]
+
+        id
       end
-
-      id = Salesforce::Api.new.post("sobjects/#{self::OBJECT_NAME}", payload(user))["id"]
-
-      user.custom_fields[self::ID_FIELD] = id
-      user.save_custom_fields
-
-      group.add(user)
-
-      id
     end
 
     def self.sync(user)

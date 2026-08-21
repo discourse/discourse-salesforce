@@ -43,6 +43,13 @@ after_initialize do
     Jobs.enqueue(:sync_salesforce_user, user_id: user.id) if ::Salesforce::Api.has_credentials?
   end
 
+  add_model_callback(User, :after_commit, on: :update) do
+    if saved_change_to_active?(from: false, to: true) &&
+         SiteSetting.salesforce_contact_auto_create_on_signup && ::Salesforce::Api.has_credentials?
+      Jobs.enqueue(:sync_salesforce_user, user_id: self.id)
+    end
+  end
+
   on(:post_created) do |post, opts|
     topic = post.topic
 

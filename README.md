@@ -17,3 +17,10 @@ to the Discourse profile URL:
 
 Leads are linked but never updated. If multiple Contacts have the same email, the plugin skips
 linking and updating the ambiguous records when `fill_blank` or `overwrite` is selected.
+
+### Reconnecting Salesforce
+
+After connecting Discourse to a different Salesforce organization or refreshing a sandbox, run
+`bin/rake salesforce:prune_dead_associations`. The task removes local Contact, Lead, Case, and Case
+Comment references that the connected integration user cannot resolve. Assign the integration
+user full record-level read access to Contact, Lead, and Case records before running it.

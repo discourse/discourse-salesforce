@@ -39,6 +39,12 @@ after_initialize do
   CategoryList.preloaded_topic_custom_fields << ::CaseMixin::HAS_SALESFORCE_CASE
   Search.preloaded_topic_custom_fields << ::CaseMixin::HAS_SALESFORCE_CASE
 
+  on(:site_setting_changed) do |name|
+    next if ::Salesforce::Api::CREDENTIAL_SETTINGS.exclude?(name)
+
+    ::Salesforce::Api.reset_access_token_cache!
+  end
+
   on(:user_created) do |user, opts|
     Jobs.enqueue(:sync_salesforce_user, user_id: user.id) if ::Salesforce::Api.has_credentials?
   end

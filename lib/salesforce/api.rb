@@ -18,6 +18,13 @@ module ::Salesforce
   class Api
     VERSION = "49.0"
     INVALID_RESPONSE = "salesforce.error.invalid_response"
+    ACCESS_TOKEN_KEY = "salesforce_access_token"
+    CREDENTIAL_SETTINGS = %i[
+      salesforce_authorization_server_url
+      salesforce_client_id
+      salesforce_rsa_private_key
+      salesforce_username
+    ].freeze
 
     attr_reader :faraday, :prefix
 
@@ -110,12 +117,12 @@ module ::Salesforce
 
       ProblemCheckTracker[:salesforce_invalid_credentials].no_problem!
       data = JSON.parse(body)
-      Discourse.redis.setex("salesforce_access_token", 10.minutes, data["access_token"])
+      Discourse.redis.setex(ACCESS_TOKEN_KEY, 10.minutes, data["access_token"])
       SiteSetting.salesforce_instance_url = data["instance_url"]
     end
 
     def access_token
-      Discourse.redis.get("salesforce_access_token")
+      Discourse.redis.get(ACCESS_TOKEN_KEY)
     end
 
     def claims
@@ -140,6 +147,10 @@ module ::Salesforce
       SiteSetting.salesforce_client_id.present? && SiteSetting.salesforce_username.present? &&
         SiteSetting.salesforce_rsa_private_key.present? &&
         SiteSetting.salesforce_authorization_server_url.present?
+    end
+
+    def self.reset_access_token_cache!
+      Discourse.redis.del(ACCESS_TOKEN_KEY)
     end
   end
 end

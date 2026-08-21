@@ -6,7 +6,8 @@ module ::Salesforce
 
     def payload
       {
-        CommentBody: "@#{post.user.username}: #{post.raw}\n\n#{post.full_url}",
+        CommentBody:
+          "@#{post.user.username}: #{PostContent.body_for(post, max_length: 3_500)}\n\n#{post.full_url}",
         ParentId: parent_id,
       }
     end

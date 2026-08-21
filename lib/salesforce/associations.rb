@@ -109,24 +109,38 @@ module ::Salesforce
       dead_ids = ids - valid_ids
 
       valid_ids.each_slice(BATCH_SIZE) do |slice|
-        records = api.get("composite/sobjects/#{object_name}?fields=Id&ids=#{slice.join(",")}")
-        if !records.is_a?(Array) || records.length != slice.length
-          raise InvalidApiResponse, "Unexpected Salesforce #{object_name} lookup response"
-        end
-
-        slice
-          .zip(records)
-          .each do |id, record|
-            if record.nil?
-              dead_ids << id
-            elsif !matching_id?(record["Id"], id)
-              raise InvalidApiResponse, "Unexpected Salesforce #{object_name} lookup record"
-            end
-          end
+        dead_ids.concat(dead_in_slice(api, object_name, slice))
       end
 
       dead_ids
     end
+
+    def self.dead_in_slice(api, object_name, slice)
+      records = api.get("composite/sobjects/#{object_name}?fields=Id&ids=#{slice.join(",")}")
+      if !records.is_a?(Array) || records.length != slice.length
+        raise InvalidApiResponse, "Unexpected Salesforce #{object_name} lookup response"
+      end
+
+      slice
+        .zip(records)
+        .filter_map do |id, record|
+          if record.nil?
+            id
+          elsif !matching_id?(record["Id"], id)
+            raise InvalidApiResponse, "Unexpected Salesforce #{object_name} lookup record"
+          end
+        end
+    rescue InvalidApiResponse => error
+      # ID_PATTERN cannot see the checksum Salesforce validates, and one
+      # rejected ID fails its whole batch; split to isolate the offenders.
+      raise if !error.message.include?("MALFORMED_ID")
+      return slice if slice.length == 1
+
+      slice
+        .each_slice((slice.length / 2.0).ceil)
+        .flat_map { |half| dead_in_slice(api, object_name, half) }
+    end
+    private_class_method :dead_in_slice
 
     def self.matching_id?(returned_id, requested_id)
       ID_PATTERN.match?(returned_id.to_s) && returned_id.first(15) == requested_id.first(15)

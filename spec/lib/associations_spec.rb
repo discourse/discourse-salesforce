@@ -135,6 +135,41 @@ RSpec.describe ::Salesforce::Associations do
       expect(SiteSetting.salesforce_default_contact_id_for_case_sync).to eq(live_contact_id)
     end
 
+    it "isolates and removes IDs Salesforce rejects as malformed" do
+      checksum_invalid = "003DEMOCONTACT0001"
+      linked_user.upsert_custom_fields(::Salesforce::Contact::ID_FIELD => live_contact_id)
+      stale_user.upsert_custom_fields(::Salesforce::Contact::ID_FIELD => checksum_invalid)
+
+      stub_request(:get, "#{instance_url}services/data/v49.0/composite/sobjects/Contact").with(
+        query: {
+          fields: "Id",
+          ids: "#{live_contact_id},#{checksum_invalid}",
+        },
+      ).to_return(
+        status: 400,
+        body: %([{"errorCode":"MALFORMED_ID","message":"malformed id #{checksum_invalid}"}]),
+      )
+      stub_request(:get, "#{instance_url}services/data/v49.0/composite/sobjects/Contact").with(
+        query: {
+          fields: "Id",
+          ids: live_contact_id,
+        },
+      ).to_return(status: 200, body: [{ "Id" => "#{live_contact_id}AAA" }].to_json)
+      stub_request(:get, "#{instance_url}services/data/v49.0/composite/sobjects/Contact").with(
+        query: {
+          fields: "Id",
+          ids: checksum_invalid,
+        },
+      ).to_return(
+        status: 400,
+        body: %([{"errorCode":"MALFORMED_ID","message":"malformed id #{checksum_invalid}"}]),
+      )
+
+      expect(described_class.prune_dead![:users]).to eq(1)
+      expect(linked_user.reload.salesforce_contact_id).to eq(live_contact_id)
+      expect(stale_user.reload.salesforce_contact_id).to eq(nil)
+    end
+
     it "removes malformed local IDs without sending them to Salesforce" do
       stale_user.upsert_custom_fields(::Salesforce::Contact::ID_FIELD => "not-an-id")
 

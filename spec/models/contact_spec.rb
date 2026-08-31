@@ -30,6 +30,53 @@ RSpec.describe Salesforce::Contact do
     end
   end
 
+  describe ".sync" do
+    fab!(:user)
+
+    let(:plugin_instance) { Plugin::Instance.new }
+    let(:modifier_block) do
+      Proc.new do |fields, sync_payload, record|
+        fields.merge(Description: "#{record["Description"]}\n\n#{sync_payload[:Description]}")
+      end
+    end
+
+    before do
+      SiteSetting.salesforce_contact_sync_mode = "fill_blank"
+      plugin_instance.register_modifier(:salesforce_person_sync_fields, &modifier_block)
+    end
+
+    after do
+      DiscoursePluginRegistry.unregister_modifier(
+        plugin_instance,
+        :salesforce_person_sync_fields,
+        &modifier_block
+      )
+    end
+
+    it "applies the salesforce_person_sync_fields modifier before updating the record" do
+      stub_salesforce_person_lookup(
+        "Contact",
+        user.email,
+        record: {
+          Id: "123456",
+          Description: "Old description",
+        },
+        fields: [:Description],
+      )
+
+      update_contact =
+        stub_request(:patch, "#{api_path}/Contact/123456").with(
+          body: {
+            Description: "Old description\n\n#{user.salesforce_contact_payload[:Description]}",
+          },
+        ).to_return(status: 204, body: "")
+
+      expect(described_class.sync(user)).to eq(true)
+      expect(update_contact).to have_been_requested
+      expect(user.reload.salesforce_contact_id).to eq("123456")
+    end
+  end
+
   describe ".find_id_by_email" do
     it "escapes SOQL string values before querying by email" do
       email = "team+salesforce.o'hara@example.com"

@@ -11,7 +11,11 @@ module ::Salesforce
     end
 
     def self.payload(user)
-      user.salesforce_contact_payload
+      DiscoursePluginRegistry.apply_modifier(
+        :salesforce_contact_payload,
+        user.salesforce_contact_payload,
+        user,
+      )
     end
 
     def self.sync_mode

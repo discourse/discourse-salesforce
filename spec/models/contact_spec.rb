@@ -5,6 +5,31 @@ require_relative "../spec_helper"
 RSpec.describe Salesforce::Contact do
   include_context "with salesforce spec helper"
 
+  describe ".payload" do
+    fab!(:user)
+
+    let(:plugin_instance) { Plugin::Instance.new }
+    let(:modifier_block) do
+      Proc.new { |default_payload, _| default_payload.merge(CustomField__c: "Custom Value") }
+    end
+
+    before { plugin_instance.register_modifier(:salesforce_contact_payload, &modifier_block) }
+
+    after do
+      DiscoursePluginRegistry.unregister_modifier(
+        plugin_instance,
+        :salesforce_contact_payload,
+        &modifier_block
+      )
+    end
+
+    it "applies the salesforce_contact_payload modifier" do
+      expect(described_class.payload(user)).to eq(
+        user.salesforce_contact_payload.merge(CustomField__c: "Custom Value"),
+      )
+    end
+  end
+
   describe ".sync" do
     fab!(:user)
 

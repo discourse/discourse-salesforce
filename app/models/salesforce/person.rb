@@ -68,6 +68,14 @@ module ::Salesforce
 
           result[field] = value
         end
+
+      fields =
+        DiscoursePluginRegistry.apply_modifier(
+          :salesforce_person_sync_fields,
+          fields,
+          sync_payload,
+          record,
+        )
       return true if fields.empty?
 
       update!(record["Id"], fields)

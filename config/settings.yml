@@ -57,11 +57,7 @@ discourse_salesforce:
     default: -1
     min: -1
   salesforce_feed_item_visibility:
-    type: enum
     default: "InternalUsers"
-    choices:
-      - InternalUsers
-      - AllUsers
   salesforce_leads_group_id:
     default: ''
     hidden: true

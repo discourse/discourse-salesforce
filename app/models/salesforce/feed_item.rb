@@ -31,7 +31,7 @@ module ::Salesforce
         LinkUrl: post.full_url,
         Title: post.topic.title,
         Type: "LinkPost",
-        Visibility: "InternalUsers",
+        Visibility: SiteSetting.salesforce_feed_item_visibility,
         ParentId: parent_id,
       }
     end

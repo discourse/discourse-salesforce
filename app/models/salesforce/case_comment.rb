@@ -9,6 +9,7 @@ module ::Salesforce
         CommentBody:
           "@#{post.user.username}: #{PostContent.body_for(post, max_length: 3_500)}\n\n#{post.full_url}",
         ParentId: parent_id,
+        IsPublished: SiteSetting.salesforce_feed_item_visibility == "AllUsers",
       }
     end
   end

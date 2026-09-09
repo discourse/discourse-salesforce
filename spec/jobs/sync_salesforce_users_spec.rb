@@ -9,6 +9,54 @@ RSpec.describe Jobs::SyncSalesforceUsers do
   fab!(:user2, :user)
   let!(:path) { api_path.sub("sobjects", "composite/sobjects") }
 
+  describe "#execute" do
+    it "continues syncing contact merges after a missing contact" do
+      user1.salesforce_contact_id = "missing_contact"
+      user1.save_custom_fields
+      user2.salesforce_contact_id = "contact_123"
+      user2.save_custom_fields
+
+      stub_request(
+        :get,
+        "#{path}/Contact?fields=MasterRecordId&ids=missing_contact,contact_123",
+      ).to_return(
+        status: 200,
+        body: [nil, { Id: "contact_123", MasterRecordId: "contact_456" }].to_json,
+      )
+
+      described_class.new.execute({})
+
+      expect(user1.reload.salesforce_contact_id).to eq("missing_contact")
+      expect(user2.reload.salesforce_contact_id).to eq("contact_456")
+    end
+
+    it "continues syncing lead conversions after a missing lead" do
+      user1.salesforce_lead_id = "missing_lead"
+      user1.save_custom_fields
+      user2.salesforce_lead_id = "lead_123"
+      user2.save_custom_fields
+
+      stub_request(
+        :get,
+        "#{path}/Lead?fields=ConvertedContactId&ids=missing_lead,lead_123",
+      ).to_return(
+        status: 200,
+        body: [nil, { Id: "lead_123", ConvertedContactId: "contact_456" }].to_json,
+      )
+      stub_request(:get, "#{path}/Contact?fields=MasterRecordId&ids=contact_456").to_return(
+        status: 200,
+        body: [{ Id: "contact_456", MasterRecordId: nil }].to_json,
+      )
+
+      described_class.new.execute({})
+
+      expect(user1.reload.salesforce_lead_id).to eq("missing_lead")
+      expect(user1.salesforce_contact_id).to be_nil
+      expect(user2.reload.salesforce_lead_id).to be_nil
+      expect(user2.salesforce_contact_id).to eq("contact_456")
+    end
+  end
+
   describe "proper leads and contacts in response" do
     before do
       user1.salesforce_lead_id = "lead_123"

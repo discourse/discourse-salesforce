@@ -21,6 +21,8 @@ module ::Jobs
           data =
             api_client.get("composite/sobjects/Lead?fields=ConvertedContactId&ids=#{ids.join(",")}")
           data.each do |lead|
+            next if lead.nil?
+
             contact_id = lead["ConvertedContactId"]
             next if contact_id.blank?
 
@@ -39,6 +41,8 @@ module ::Jobs
           data =
             api_client.get("composite/sobjects/Contact?fields=MasterRecordId&ids=#{ids.join(",")}")
           data.each do |contact|
+            next if contact.nil?
+
             new_contact_id = contact["MasterRecordId"]
             next if new_contact_id.blank?
 

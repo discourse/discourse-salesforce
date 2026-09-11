@@ -26,8 +26,6 @@ register_asset "stylesheets/salesforce.scss"
 register_svg_icon "fab-salesforce"
 register_svg_icon "address-card"
 
-require_relative "lib/validators/salesforce_login_enabled_validator"
-
 after_initialize do
   SeedFu.fixture_paths << Rails.root.join("plugins", "discourse-salesforce", "db", "fixtures").to_s
   register_problem_check Salesforce::ProblemCheck::SalesforceInvalidCredentials
@@ -200,8 +198,12 @@ class Auth::SalesforceAuthenticator < Auth::ManagedAuthenticator
                         }
   end
 
-  def enabled?
-    SiteSetting.salesforce_login_enabled
+  def enable_setting
+    :salesforce_login_enabled
+  end
+
+  def required_settings
+    %i[salesforce_client_id salesforce_client_secret salesforce_authorization_server_url]
   end
 
   # salesforce doesn't return unverified emails in their API so we can assume

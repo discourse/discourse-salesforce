@@ -4,7 +4,7 @@ discourse_salesforce:
   salesforce_login_enabled:
     default: false
     client: true
-    validator: 'SalesforceLoginEnabledValidator'
+    validator: 'AuthProviderCredentialsValidator'
   salesforce_client_id:
     default: ''
     client: true

@@ -39,5 +39,23 @@ RSpec.describe Salesforce::CaseComment do
 
       expect(post.custom_fields[::Salesforce::CaseComment::ID_FIELD]).to eq("case_comment_123")
     end
+
+    it "does not post replies when the daily limit is zero" do
+      reply = Fabricate(:post, topic: topic)
+      SiteSetting.salesforce_max_feed_items_per_day = 0
+      RateLimiter.enable
+
+      case_comment = ::Salesforce::CaseComment.new(salesforce_case.uid, reply)
+      salesforce_request =
+        stub_request(:post, "#{api_path}/CaseComment").with(
+          body: case_comment.payload.to_json,
+        ).to_return(status: 200, body: { id: "case_comment_123" }.to_json)
+
+      expect { case_comment.create! }.not_to raise_error
+      expect(salesforce_request).not_to have_been_requested
+      expect(reply.custom_fields[::Salesforce::CaseComment::ID_FIELD]).to be_nil
+    ensure
+      RateLimiter.disable
+    end
   end
 end

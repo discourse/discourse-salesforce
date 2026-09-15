@@ -13,15 +13,12 @@ fr:
     salesforce_rsa_private_key: "Clé privée RSA de l'application connectée Salesforce"
     salesforce_authorization_server_url: "URL du serveur d'autorisation Salesforce"
     salesforce_username: "Nom d'utilisateur du compte Salesforce"
-    salesforce_max_feed_items_per_day: "Nombre maximal de réponses aux sujets pouvant être publiées sous forme d'éléments de fil sur les objets Salesforce (cas/prospect/contact) par jour"
     salesforce_case_tag_name: "Nom d'étiquette à ajouter aux sujets avec un cas Salesforce"
     salesforce_case_status_tag_enabled: "Activer pour ajouter des étiquettes en fonction du statut du cas Salesforce"
     salesforce_case_status_tag_prefix: "Préfixe à ajouter avant les étiquettes de statut de cas Salesforce. Par exemple, si le préfixe est « cas », les étiquettes seront ajoutées, comme case-open, case-closed, etc."
     salesforce_skip_contact_creation_on_case_sync: "Ignorer la création d'un contact Salesforce lors de la synchronisation d'un cas"
     salesforce_default_contact_id_for_case_sync: "ID de contact Salesforce par défaut à utiliser lors de la synchronisation des cas. Utile lorsque « salesforce_skip_contact_creation_on_case_sync » est activé."
     salesforce_auth_verbose_logging: "Afficher les journaux d'authentification Salesforce détaillés dans /logs pour résoudre les problèmes"
-    errors:
-      salesforce_client_credentials_required: "Les paramètres d'identifiant client et de secret client Salesforce sont requis"
   salesforce:
     error:
       invalid_response: "Réponse invalide de l'API Salesforce"

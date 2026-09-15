@@ -13,15 +13,12 @@ de:
     salesforce_rsa_private_key: "RSA-Private-Key der verbundenen Salesforce-App"
     salesforce_authorization_server_url: "URL des Salesforce-Autorisierungsservers"
     salesforce_username: "Benutzername des Salesforce-Kontos"
-    salesforce_max_feed_items_per_day: "Maximale Anzahl von Themenantworten, die pro Tag als Feed-Elemente zu Salesforce-Objekten (Kundenvorgang/Lead/Kontakt) gepostet werden können"
     salesforce_case_tag_name: "Schlagwort-Name zum Hinzufügen in Themen mit einem Salesforce-Kundenvorgang"
     salesforce_case_status_tag_enabled: "Aktivieren, um Schlagwörter basierend auf dem Salesforce-Kundenvorgangsstatus hinzuzufügen"
     salesforce_case_status_tag_prefix: "Präfix, das vor Salesforce-Kundenvorgangsstatus-Schlagwörtern hinzugefügt werden soll. Wenn das Präfix beispielsweise „kundenvorgang“ ist, werden die Schlagwörter kundenvorgang-offen, kundenvorgang-geschlossen usw. hinzugefügt."
     salesforce_skip_contact_creation_on_case_sync: "Erstellung eines Salesforce-Kontakts während der Kundenvorgangssynchronisierung überspringen"
     salesforce_default_contact_id_for_case_sync: "Standardmäßige Salesforce-Kontakt-ID zur Verwendung während der Kundenvorgangssynchronisierung. Nützlich, wenn „salesforce_skip_contact_creation_on_case_sync“ aktiviert ist."
     salesforce_auth_verbose_logging: "Ausführliche Salesforce-Authentifizierungsprotokolle in /logs zur Fehlerbehebung anzeigen"
-    errors:
-      salesforce_client_credentials_required: "Salesforce-Client-ID- und Salesforce-Client-Geheimnis-Einstellungen sind erforderlich"
   salesforce:
     error:
       invalid_response: "Ungültige Antwort von Salesforce-API"

@@ -13,15 +13,12 @@ pt_BR:
     salesforce_rsa_private_key: "Chave privada RSA do aplicativo conectado ao Salesforce"
     salesforce_authorization_server_url: "URL do servidor de autorização do Salesforce"
     salesforce_username: "Nome de usuário da conta do Salesforce"
-    salesforce_max_feed_items_per_day: "Número máximo de respostas de tópicos que podem ser postadas como itens de feed em objetos do Salesforce (Caso/Lead/Contato) por dia"
     salesforce_case_tag_name: "Nome da etiqueta para adicionar tópicos com um caso do Salesforce"
     salesforce_case_status_tag_enabled: "Ativar a adição de etiquetas com base no status do caso do Salesforce"
     salesforce_case_status_tag_prefix: "Prefixo a ser adicionado antes das tags de status do caso do Salesforce. Por exemplo, se o prefixo for 'case', as tags serão adicionadas como case-open, case-closed, etc."
     salesforce_skip_contact_creation_on_case_sync: "Pular criação do contato do Salesforce durante sincronização de casos"
     salesforce_default_contact_id_for_case_sync: "ID de Contato do Salesforce padrão para usar durante sincronização de casos. Útil quando \"salesforce_skip_contact_creation_on_case_sync\" estiver ativado."
     salesforce_auth_verbose_logging: "Mostrar logs de autenticação detalhados do Salesforce em /logs para solucionar problemas"
-    errors:
-      salesforce_client_credentials_required: "As configurações de ID do cliente e segredo do cliente do Salesforce são obrigatórias"
   salesforce:
     error:
       invalid_response: "Resposta inválida da API do Salesforce"

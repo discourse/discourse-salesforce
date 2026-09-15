@@ -16,7 +16,7 @@ module ::Salesforce
       return if post.post_type != Post.types[:regular]
 
       limiter = RateLimiter.new(nil, "#{self.class::ID_FIELD}_#{parent_id}", max_feed_items, 1.day)
-      limiter.performed! if has_rate_limit? && !limiter.can_perform?
+      return if has_rate_limit? && (max_feed_items.zero? || !limiter.can_perform?)
 
       data = Api.new.post("sobjects/#{self.class.name.demodulize}", payload)
       limiter.performed! if has_rate_limit?

@@ -40,5 +40,68 @@ RSpec.describe Salesforce::FeedItem do
 
       expect(create_feed_item).to have_been_requested
     end
+
+    it "does not post replies when the daily limit is zero" do
+      reply = Fabricate(:post, topic: post.topic, user: user)
+      SiteSetting.salesforce_max_feed_items_per_day = 0
+      RateLimiter.enable
+
+      feed_item = ::Salesforce::FeedItem.new("lead_123", reply)
+      salesforce_request =
+        stub_request(:post, "#{api_path}/FeedItem").with(body: feed_item.payload.to_json).to_return(
+          status: 200,
+          body: { id: "feed_item_123" }.to_json,
+        )
+
+      expect { feed_item.create! }.not_to raise_error
+      expect(salesforce_request).not_to have_been_requested
+      expect(reply.custom_fields[::Salesforce::FeedItem::ID_FIELD]).to be_nil
+    ensure
+      RateLimiter.disable
+    end
+
+    it "does not post a reply after the daily limit is exhausted" do
+      SiteSetting.salesforce_max_feed_items_per_day = 1
+      parent_id = "lead_#{post.topic_id}"
+      first_post_feed_item = ::Salesforce::FeedItem.new(parent_id, post)
+      first_reply = Fabricate(:post, topic: post.topic, user: user)
+      first_reply_feed_item = ::Salesforce::FeedItem.new(parent_id, first_reply)
+      limited_reply = Fabricate(:post, topic: post.topic, user: user)
+      limited_feed_item = ::Salesforce::FeedItem.new(parent_id, limited_reply)
+      RateLimiter.enable
+      limiter =
+        RateLimiter.new(
+          nil,
+          "#{::Salesforce::FeedItem::ID_FIELD}_#{parent_id}",
+          SiteSetting.salesforce_max_feed_items_per_day,
+          1.day,
+        )
+      limiter.clear!
+
+      first_post_request =
+        stub_request(:post, "#{api_path}/FeedItem").with(
+          body: first_post_feed_item.payload.to_json,
+        ).to_return(status: 200, body: { id: "feed_item_123" }.to_json)
+      first_reply_request =
+        stub_request(:post, "#{api_path}/FeedItem").with(
+          body: first_reply_feed_item.payload.to_json,
+        ).to_return(status: 200, body: { id: "feed_item_456" }.to_json)
+      limited_reply_request =
+        stub_request(:post, "#{api_path}/FeedItem").with(
+          body: limited_feed_item.payload.to_json,
+        ).to_return(status: 200, body: { id: "feed_item_789" }.to_json)
+
+      expect { first_post_feed_item.create! }.not_to raise_error
+      expect { first_reply_feed_item.create! }.not_to raise_error
+      expect { limited_feed_item.create! }.not_to raise_error
+
+      expect(first_post_request).to have_been_requested
+      expect(first_reply_request).to have_been_requested
+      expect(limited_reply_request).not_to have_been_requested
+      expect(limited_reply.custom_fields[::Salesforce::FeedItem::ID_FIELD]).to be_nil
+    ensure
+      limiter&.clear!
+      RateLimiter.disable
+    end
   end
 end

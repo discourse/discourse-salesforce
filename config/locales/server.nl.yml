@@ -13,15 +13,12 @@ nl:
     salesforce_rsa_private_key: "Private RSA-sleutel van verbonden Salesforce-app"
     salesforce_authorization_server_url: "URL van Salesforce-autorisatieserver"
     salesforce_username: "Gebruikersnaam van Salesforce-account"
-    salesforce_max_feed_items_per_day: "Maximaal aantal topicantwoorden dat per dag kan worden geplaatst als feeditems in Salesforce-objecten (Case/Lead/Contact)."
     salesforce_case_tag_name: "Tagnaam om toe te voegen aan topics met een Salesforce-case"
     salesforce_case_status_tag_enabled: "Schakel dit in om tags toe te voegen op basis van de status van de Salesforce-case"
     salesforce_case_status_tag_prefix: "Voorvoegsel dat moet worden toegevoegd vóór statustags van Salesforce-cases. Als het voorvoegsel bijvoorbeeld 'case' is, worden de tags toegevoegd als case-open, case-closed, etc."
     salesforce_skip_contact_creation_on_case_sync: "Salesforce-contact maken overslaan tijdens casesynchronisatie"
     salesforce_default_contact_id_for_case_sync: "Standaard Salesforce-contact-ID voor gebruik tijdens casesynchronisatie. Nuttig wanneer 'salesforce_skip_contact_creation_on_case_sync' is ingeschakeld."
     salesforce_auth_verbose_logging: "Uitgebreide Salesforce-verificatielogs weergeven in /logs voor probleemoplossing"
-    errors:
-      salesforce_client_credentials_required: "De instellingen Salesforce-client-ID en -clientgeheim zijn vereist"
   salesforce:
     error:
       invalid_response: "Ongeldig antwoord van Salesforce-API"

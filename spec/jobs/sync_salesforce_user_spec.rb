@@ -107,6 +107,33 @@ RSpec.describe Jobs::SyncSalesforceUser do
     expect(patch_request).to have_been_requested
   end
 
+  it "logs instead of raising when Salesforce rejects the contact lookup" do
+    stub_request(:get, query_path).with(
+      query: {
+        q: "SELECT Id FROM Contact WHERE Email = '#{user.email}'",
+      },
+    ).to_return(
+      status: 400,
+      body: %([{"message":"unexpected token: SELECT","errorCode":"MALFORMED_QUERY"}]),
+    )
+
+    expect { described_class.new.execute(user_id: user.id) }.not_to raise_error
+    expect(user.reload.salesforce_contact_id).to be_nil
+    expect(user.salesforce_lead_id).to be_nil
+  end
+
+  it "raises for transient contact lookup failures so the job retries" do
+    stub_request(:get, query_path).with(
+      query: {
+        q: "SELECT Id FROM Contact WHERE Email = '#{user.email}'",
+      },
+    ).to_return(status: 503, body: "")
+
+    expect { described_class.new.execute(user_id: user.id) }.to raise_error(
+      Salesforce::InvalidApiResponse,
+    )
+  end
+
   it "creates nothing when no contact or lead matches by default" do
     stub_salesforce_person_lookup("Contact", user.email)
     stub_salesforce_person_lookup("Lead", user.email)
@@ -137,6 +164,28 @@ RSpec.describe Jobs::SyncSalesforceUser do
       expect(create_request).to have_been_requested
       expect(user.reload.salesforce_contact_id).to eq("contact_new")
       expect(Salesforce.contacts_group.users.exists?(user.id)).to eq(true)
+    end
+
+    it "creates a contact when Leads are disabled in the Salesforce org" do
+      stub_request(:get, query_path).with(
+        query: {
+          q: "SELECT Id FROM Lead WHERE Email = '#{user.email}'",
+        },
+      ).to_return(
+        status: 400,
+        body: %([{"message":"sObject type 'Lead' is not supported","errorCode":"INVALID_TYPE"}]),
+      )
+      create_request =
+        stub_request(:post, "#{api_path}/Contact").to_return(
+          status: 200,
+          body: %({"id":"contact_new"}),
+        )
+
+      described_class.new.execute(user_id: user.id)
+
+      expect(create_request).to have_been_requested
+      expect(user.reload.salesforce_contact_id).to eq("contact_new")
+      expect(user.salesforce_lead_id).to be_nil
     end
 
     it "links a matching lead instead of creating a contact" do

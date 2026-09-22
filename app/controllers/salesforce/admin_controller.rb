@@ -26,6 +26,9 @@ module Salesforce
 
     private
 
+    # The code this redirect returns is never redeemed: the round trip only exists
+    # to capture the user's consent for the JWT bearer grant. Discarding the
+    # verifier is deliberate, and leaves the emitted code unusable by anyone.
     def pkce_code_challenge
       verifier = SecureRandom.urlsafe_base64(64, false)
       Base64.urlsafe_encode64(Digest::SHA256.digest(verifier), padding: false)

@@ -7,7 +7,7 @@ RSpec.describe Jobs::SyncSalesforceUser do
 
   fab!(:user) do
     Fabricate(
-      :user,
+      :verified_user,
       email: "person@example.com",
       name: "Example Person",
       username: "example_person",
@@ -104,6 +104,57 @@ RSpec.describe Jobs::SyncSalesforceUser do
     described_class.new.execute(user_id: user.id)
 
     expect(user.reload.salesforce_contact_id).to eq("contact_123")
+    expect(patch_request).to have_been_requested
+  end
+
+  it "links a staged user in overwrite mode without updating the contact" do
+    SiteSetting.salesforce_contact_sync_mode = "overwrite"
+    SiteSetting.salesforce_contact_sync_fields = "FirstName"
+    staged_user = Fabricate(:user, staged: true, active: false, email: "staged@example.com")
+    stub_salesforce_person_lookup("Contact", staged_user.email, id: "contact_123")
+
+    described_class.new.execute(user_id: staged_user.id)
+
+    expect(staged_user.reload.salesforce_contact_id).to eq("contact_123")
+    expect(a_request(:patch, %r{/sobjects/})).not_to have_been_made
+  end
+
+  it "links a user with an unconfirmed email in fill_blank mode without updating the contact" do
+    SiteSetting.salesforce_contact_sync_mode = "fill_blank"
+    unconfirmed_user = Fabricate(:user, email: "unconfirmed@example.com")
+    stub_salesforce_person_lookup("Contact", unconfirmed_user.email, id: "contact_123")
+
+    described_class.new.execute(user_id: unconfirmed_user.id)
+
+    expect(unconfirmed_user.reload.salesforce_contact_id).to eq("contact_123")
+    expect(a_request(:patch, %r{/sobjects/})).not_to have_been_made
+  end
+
+  it "updates the contact once the user confirms their email" do
+    SiteSetting.salesforce_contact_sync_mode = "overwrite"
+    SiteSetting.salesforce_contact_sync_fields = "FirstName"
+    unconfirmed_user = Fabricate(:user, email: "unconfirmed@example.com", name: "Example Person")
+    stub_salesforce_person_lookup("Contact", unconfirmed_user.email, id: "contact_123")
+    stub_salesforce_person_lookup(
+      "Contact",
+      unconfirmed_user.email,
+      fields: %i[FirstName],
+      record: {
+        Id: "contact_123",
+        FirstName: "Old name",
+      },
+    )
+    patch_request =
+      stub_request(:patch, "#{api_path}/Contact/contact_123").with(
+        body: { FirstName: "Example" }.to_json,
+      ).to_return(status: 204)
+
+    described_class.new.execute(user_id: unconfirmed_user.id)
+    expect(patch_request).not_to have_been_requested
+
+    unconfirmed_user.activate
+    described_class.new.execute(user_id: unconfirmed_user.id)
+
     expect(patch_request).to have_been_requested
   end
 

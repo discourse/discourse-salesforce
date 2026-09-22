@@ -46,7 +46,8 @@ RSpec.describe ::Salesforce::PersonsController do
     end
 
     it "links an existing contact by email and syncs its configured fields" do
-      existing_user = Fabricate(:user, email: "team+salesforce-discourse-dev-ed@example.com")
+      existing_user =
+        Fabricate(:verified_user, email: "team+salesforce-discourse-dev-ed@example.com")
       existing_contact_id = "123456"
       SiteSetting.salesforce_contact_sync_mode = "fill_blank"
 

@@ -10,3 +10,5 @@ Fabricator(:salesforce_case, class_name: ::Salesforce::Case) do
   status "New"
   last_synced_at 1.minute.ago
 end
+
+Fabricator(:verified_user, from: :user) { after_create { |user| user.activate } }

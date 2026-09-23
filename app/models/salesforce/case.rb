@@ -80,12 +80,9 @@ module ::Salesforce
     private
 
     def payload
-      default = {
-        ContactId: self.contact_id,
-        Subject: self.subject,
-        Description: self.description,
-        Origin: SiteSetting.salesforce_case_origin,
-      }
+      default = { ContactId: self.contact_id, Subject: self.subject, Description: self.description }
+      origin = SiteSetting.salesforce_case_origin
+      default[:Origin] = origin if origin.present?
 
       DiscoursePluginRegistry.apply_modifier(:salesforce_case_payload, default, topic)
     end

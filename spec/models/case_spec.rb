@@ -119,6 +119,32 @@ RSpec.describe Salesforce::Case do
       include_examples "existing contact"
     end
 
+    context "with salesforce_case_origin" do
+      before { SiteSetting.salesforce_skip_contact_creation_on_case_sync = true }
+
+      it "sends the configured origin" do
+        SiteSetting.salesforce_case_origin = "Community"
+        create_case = stub_new_case_request({ Origin: "Community" })
+
+        ::Salesforce::Case.sync!(topic)
+
+        expect(create_case).to have_been_requested
+      end
+
+      it "omits the origin when it is blank" do
+        SiteSetting.salesforce_case_origin = ""
+
+        create_case =
+          stub_request(:post, "#{api_path}/Case")
+            .with { |request| JSON.parse(request.body).exclude?("Origin") }
+            .to_return(status: 200, body: %({"id":"234567"}))
+
+        ::Salesforce::Case.sync!(topic)
+
+        expect(create_case).to have_been_requested
+      end
+    end
+
     context "with custom field" do
       let(:plugin_instance) { Plugin::Instance.new }
       let(:modifier_block) do

@@ -36,10 +36,11 @@ module Salesforce
       payload = {
         Email: self.email,
         LastName: last_name,
-        LeadSource: ::Salesforce::Contact::SOURCE,
         Description: "#{Discourse.base_url}/u/#{UrlHelper.encode_component(self.username)}",
       }
 
+      lead_source = SiteSetting.salesforce_lead_source
+      payload[:LeadSource] = lead_source if lead_source.present?
       payload.merge!(FirstName: first_name) if first_name.present?
 
       payload

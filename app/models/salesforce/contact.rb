@@ -3,7 +3,6 @@
 module ::Salesforce
   class Contact < Person
     ID_FIELD = "salesforce_contact_id"
-    SOURCE = "Web"
     OBJECT_NAME = "Contact"
 
     def self.group

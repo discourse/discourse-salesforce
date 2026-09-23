@@ -15,6 +15,8 @@ en:
     salesforce_case_tag_name: "Tag name to add in topics with a Salesforce case"
     salesforce_case_status_tag_enabled: "Enable to add tags based on Salesforce case status"
     salesforce_case_status_tag_prefix: "Prefix to add before Salesforce case status tags. For example, if prefix is 'case' then the tags will be added like case-open, case-closed, etc."
+    salesforce_case_origin: "Case Origin sent on new Salesforce Cases. Leave blank to not send it."
+    salesforce_lead_source: "Lead Source sent when creating Salesforce Contacts and Leads, and when {{setting:salesforce_contact_sync_fields}} includes it. Leave blank to never send it, for example when the {{setting:salesforce_username}} account can't see the Lead Source field."
     salesforce_send_rendered_post_content: "When enabled, send post content to Salesforce as rendered plain text: markdown syntax is removed and every link, image, and attachment becomes a full URL. When disabled, the raw markdown source is sent."
     salesforce_skip_contact_creation_on_case_sync: "Skip creation of Salesforce Contact during Case sync"
     salesforce_default_contact_id_for_case_sync: "Default Salesforce Contact ID to use during Case sync. Useful when 'salesforce_skip_contact_creation_on_case_sync' is enabled."

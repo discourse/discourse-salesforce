@@ -33,6 +33,48 @@ RSpec.describe Salesforce::Case do
       ).to_return(status: 200, body: default_resp_body.merge(expected_resp_body).to_json)
     end
 
+    context "with case tagging enabled" do
+      before do
+        SiteSetting.salesforce_skip_contact_creation_on_case_sync = true
+        SiteSetting.tagging_enabled = true
+        SiteSetting.salesforce_case_tag_name = "salesforce-case"
+        SiteSetting.salesforce_case_status_tag_enabled = true
+        SiteSetting.salesforce_case_status_tag_prefix = "case"
+        topic.tags = [Fabricate(:tag, name: "billing"), Fabricate(:tag, name: "urgent")]
+
+        stub_new_case_request
+      end
+
+      it "preserves existing tags when a case is initially synced" do
+        ::Salesforce::Case.sync!(topic)
+
+        expect(topic.reload.tags.pluck(:name)).to contain_exactly(
+          "billing",
+          "urgent",
+          "salesforce-case",
+          "case-new",
+        )
+      end
+
+      it "replaces the previous Salesforce case status tag on later syncs" do
+        ::Salesforce::Case.sync!(topic)
+
+        stub_request(:get, "#{api_path}/Case/234567").to_return(
+          status: 200,
+          body: %({"CaseNumber":"345678","Status":"Closed"}),
+        )
+
+        ::Salesforce::Case.sync!(topic)
+
+        expect(topic.reload.tags.pluck(:name)).to contain_exactly(
+          "billing",
+          "urgent",
+          "salesforce-case",
+          "case-closed",
+        )
+      end
+    end
+
     shared_examples "existing contact" do
       it "uses the existing contact" do
         topic.user.salesforce_contact_id = "123456"

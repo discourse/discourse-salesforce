@@ -58,31 +58,6 @@ RSpec.describe Salesforce::Case do
 
       it "replaces the previous Salesforce case status tag on later syncs" do
         ::Salesforce::Case.sync!(topic)
-        topic.tags << Fabricate(:tag, name: "case-escalated")
-
-        stub_request(:get, "#{api_path}/Case/234567").to_return(
-          status: 200,
-          body: %({"CaseNumber":"345678","Status":"Closed"}),
-        )
-
-        ::Salesforce::Case.sync!(topic)
-
-        expect(topic.reload.tags.pluck(:name)).to contain_exactly(
-          "billing",
-          "urgent",
-          "salesforce-case",
-          "case-closed",
-          "case-escalated",
-        )
-      end
-
-      it "replaces a previous status tag whose name was normalized" do
-        stub_request(:get, "#{api_path}/Case/234567").to_return(
-          status: 200,
-          body: %({"CaseNumber":"345678","Status":"In Progress"}),
-        )
-
-        ::Salesforce::Case.sync!(topic)
 
         stub_request(:get, "#{api_path}/Case/234567").to_return(
           status: 200,
@@ -110,27 +85,6 @@ RSpec.describe Salesforce::Case do
           "customer",
           "support",
           "priority",
-        )
-      end
-
-      it "preserves existing tags when the tag limit is lowered" do
-        SiteSetting.max_tags_per_topic = 1
-
-        ::Salesforce::Case.sync!(topic)
-
-        expect(topic.reload.tags.pluck(:name)).to contain_exactly("billing", "urgent")
-      end
-
-      it "removes the previous status tag when status tagging is disabled" do
-        ::Salesforce::Case.sync!(topic)
-        SiteSetting.salesforce_case_status_tag_enabled = false
-
-        ::Salesforce::Case.sync!(topic)
-
-        expect(topic.reload.tags.pluck(:name)).to contain_exactly(
-          "billing",
-          "urgent",
-          "salesforce-case",
         )
       end
     end

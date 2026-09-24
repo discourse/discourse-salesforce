@@ -14,7 +14,6 @@ module ::Salesforce
     end
 
     def sync!
-      previous_status = status
       data = Salesforce::Api.new.get("sobjects/Case/#{self.uid}")
 
       self.number = data["CaseNumber"]
@@ -26,15 +25,6 @@ module ::Salesforce
         topic = Topic.find_by(id: topic_id)
         return if topic.blank?
 
-        existing_tag_names = topic.tags.pluck(:name)
-        if previous_status.present?
-          existing_tag_names.delete(
-            DiscourseTagging.clean_tag(
-              "#{SiteSetting.salesforce_case_status_tag_prefix}-#{previous_status.downcase}",
-            ),
-          )
-        end
-
         tags = []
         if SiteSetting.salesforce_case_tag_name.present?
           tags << SiteSetting.salesforce_case_tag_name
@@ -43,9 +33,22 @@ module ::Salesforce
           tags << "#{SiteSetting.salesforce_case_status_tag_prefix}-#{self.status.downcase}"
         end
 
-        tag_names = (existing_tag_names + tags).uniq
-        if tag_names.size <= SiteSetting.max_tags_per_topic
-          DiscourseTagging.tag_topic_by_names(topic, Discourse.system_user.guardian, tag_names)
+        if tags.present?
+          existing_tag_names = topic.tags.pluck(:name)
+          if SiteSetting.salesforce_case_status_tag_enabled
+            existing_tag_names.reject! do |tag_name|
+              tag_name.start_with?("#{SiteSetting.salesforce_case_status_tag_prefix}-")
+            end
+          end
+
+          tag_names = (existing_tag_names + tags).uniq
+          if tag_names.size <= SiteSetting.max_tags_per_topic
+            DiscourseTagging.tag_topic_by_names(
+              topic,
+              Guardian.new(Discourse.system_user),
+              tag_names,
+            )
+          end
         end
       end
 

@@ -166,26 +166,39 @@ RSpec.describe Jobs::SyncSalesforceUser do
       expect(Salesforce.contacts_group.users.exists?(user.id)).to eq(true)
     end
 
-    it "creates a contact when Leads are disabled in the Salesforce org" do
-      stub_request(:get, query_path).with(
-        query: {
-          q: "SELECT Id FROM Lead WHERE Email = '#{user.email}'",
-        },
-      ).to_return(
-        status: 400,
-        body: %([{"message":"sObject type 'Lead' is not supported","errorCode":"INVALID_TYPE"}]),
-      )
+    it "creates a contact without querying Leads when Salesforce Leads are disabled" do
+      SiteSetting.salesforce_leads_enabled = false
       create_request =
         stub_request(:post, "#{api_path}/Contact").to_return(
           status: 200,
           body: %({"id":"contact_new"}),
         )
 
-      described_class.new.execute(user_id: user.id)
+      logger = track_log_messages { described_class.new.execute(user_id: user.id) }
 
       expect(create_request).to have_been_requested
       expect(user.reload.salesforce_contact_id).to eq("contact_new")
       expect(user.salesforce_lead_id).to be_nil
+      expect(
+        a_request(:get, query_path).with(
+          query: {
+            q: "SELECT Id FROM Lead WHERE Email = '#{user.email}'",
+          },
+        ),
+      ).not_to have_been_made
+      expect(logger.warnings).to be_empty
+    end
+
+    it "reports unexpected Lead lookup errors" do
+      stub_request(:get, query_path).with(
+        query: {
+          q: "SELECT Id FROM Lead WHERE Email = '#{user.email}'",
+        },
+      ).to_return(status: 400, body: %([{"message":"Invalid query","errorCode":"MALFORMED_QUERY"}]))
+
+      logger = track_log_messages { described_class.new.execute(user_id: user.id) }
+
+      expect(logger.warnings.grep(/Invalid response from Salesforce API/).length).to eq(1)
     end
 
     it "links a matching lead instead of creating a contact" do

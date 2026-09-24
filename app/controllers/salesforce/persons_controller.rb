@@ -11,6 +11,9 @@ module Salesforce
     def create
       type = params.require(:type).capitalize
       raise ArgumentError.new :type if [Lead::OBJECT_NAME, Contact::OBJECT_NAME].exclude?(type)
+      if type == Lead::OBJECT_NAME && !SiteSetting.salesforce_leads_enabled
+        raise Discourse::InvalidParameters.new(:type)
+      end
 
       begin
         klass = "::Salesforce::#{type}".constantize

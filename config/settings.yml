@@ -20,6 +20,9 @@ discourse_salesforce:
     default: ''
   salesforce_contact_auto_create_on_signup:
     default: false
+  salesforce_leads_enabled:
+    default: true
+    client: true
   salesforce_contact_sync_mode:
     type: enum
     enum: "Salesforce::ContactSyncModeSiteSetting"

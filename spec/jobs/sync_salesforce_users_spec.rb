@@ -55,6 +55,17 @@ RSpec.describe Jobs::SyncSalesforceUsers do
       expect(user2.reload.salesforce_lead_id).to be_nil
       expect(user2.salesforce_contact_id).to eq("contact_456")
     end
+
+    it "skips existing Lead links when Salesforce Leads are disabled" do
+      SiteSetting.salesforce_leads_enabled = false
+      user1.salesforce_lead_id = "lead_123"
+      user1.save_custom_fields
+
+      described_class.new.execute({})
+
+      expect(user1.reload.salesforce_lead_id).to eq("lead_123")
+      expect(a_request(:get, %r{/composite/sobjects/Lead})).not_to have_been_made
+    end
   end
 
   describe "proper leads and contacts in response" do

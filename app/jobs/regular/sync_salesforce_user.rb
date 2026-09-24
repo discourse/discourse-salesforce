@@ -10,17 +10,18 @@ module ::Jobs
       user = User.find(args[:user_id])
       return if ::Salesforce::Contact.sync(user)
 
-      lead_id =
+      lead_id = nil
+      if SiteSetting.salesforce_leads_enabled
         begin
-          ::Salesforce::Lead.find_id_by_email(user.email)
+          lead_id = ::Salesforce::Lead.find_id_by_email(user.email)
         rescue Salesforce::InvalidApiResponse => error
           # Salesforce answers INVALID_TYPE when the API user cannot see the Lead object
           # (Leads disabled or not licensed), so treat it as "no lead" and keep going.
           unless error.status == 400 && error.message.match?(/"errorCode"\s*:\s*"INVALID_TYPE"/)
             raise
           end
-          nil
         end
+      end
 
       if lead_id
         user.salesforce_lead_id = lead_id

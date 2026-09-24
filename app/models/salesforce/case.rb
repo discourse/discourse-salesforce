@@ -27,33 +27,25 @@ module ::Salesforce
         return if topic.blank?
 
         existing_tag_names = topic.tags.pluck(:name)
-        previous_status_tag =
-          if previous_status.present?
+        if previous_status.present?
+          existing_tag_names.delete(
             DiscourseTagging.clean_tag(
               "#{SiteSetting.salesforce_case_status_tag_prefix}-#{previous_status.downcase}",
-            )
-          end
-        retained_tag_names = existing_tag_names - [previous_status_tag]
+            ),
+          )
+        end
 
         tags = []
-        if SiteSetting.salesforce_case_status_tag_enabled
-          tags << "#{SiteSetting.salesforce_case_status_tag_prefix}-#{self.status.downcase}"
-        end
         if SiteSetting.salesforce_case_tag_name.present?
           tags << SiteSetting.salesforce_case_tag_name
         end
+        if SiteSetting.salesforce_case_status_tag_enabled
+          tags << "#{SiteSetting.salesforce_case_status_tag_prefix}-#{self.status.downcase}"
+        end
 
-        if retained_tag_names.size <= SiteSetting.max_tags_per_topic
-          available_slots = SiteSetting.max_tags_per_topic - retained_tag_names.size
-          tag_names = retained_tag_names + (tags - retained_tag_names).first(available_slots)
-
-          if tag_names.sort != existing_tag_names.sort
-            DiscourseTagging.tag_topic_by_names(
-              topic,
-              Guardian.new(Discourse.system_user),
-              tag_names,
-            )
-          end
+        tag_names = (existing_tag_names + tags).uniq
+        if tag_names.size <= SiteSetting.max_tags_per_topic
+          DiscourseTagging.tag_topic_by_names(topic, Discourse.system_user.guardian, tag_names)
         end
       end
 

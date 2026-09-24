@@ -121,27 +121,6 @@ RSpec.describe Salesforce::Case do
         expect(topic.reload.tags.pluck(:name)).to contain_exactly("billing", "urgent")
       end
 
-      it "replaces the previous status tag when only one slot is available" do
-        topic.tags += %w[customer support].map { |name| Fabricate(:tag, name: name) }
-
-        ::Salesforce::Case.sync!(topic)
-
-        stub_request(:get, "#{api_path}/Case/234567").to_return(
-          status: 200,
-          body: %({"CaseNumber":"345678","Status":"Closed"}),
-        )
-
-        ::Salesforce::Case.sync!(topic)
-
-        expect(topic.reload.tags.pluck(:name)).to contain_exactly(
-          "billing",
-          "urgent",
-          "customer",
-          "support",
-          "case-closed",
-        )
-      end
-
       it "removes the previous status tag when status tagging is disabled" do
         ::Salesforce::Case.sync!(topic)
         SiteSetting.salesforce_case_status_tag_enabled = false

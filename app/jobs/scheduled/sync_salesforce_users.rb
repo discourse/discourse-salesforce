@@ -14,23 +14,27 @@ module ::Jobs
         return
       end
 
-      lead_fields = UserCustomField.where(name: ::Salesforce::Lead::ID_FIELD)
-      lead_fields.find_in_batches(batch_size: 100) do |fields|
-        ids = fields.pluck(:value)
-        begin
-          data =
-            api_client.get("composite/sobjects/Lead?fields=ConvertedContactId&ids=#{ids.join(",")}")
-          data.each do |lead|
-            next if lead.nil?
+      if SiteSetting.salesforce_leads_enabled
+        lead_fields = UserCustomField.where(name: ::Salesforce::Lead::ID_FIELD)
+        lead_fields.find_in_batches(batch_size: 100) do |fields|
+          ids = fields.pluck(:value)
+          begin
+            data =
+              api_client.get(
+                "composite/sobjects/Lead?fields=ConvertedContactId&ids=#{ids.join(",")}",
+              )
+            data.each do |lead|
+              next if lead.nil?
 
-            contact_id = lead["ConvertedContactId"]
-            next if contact_id.blank?
+              contact_id = lead["ConvertedContactId"]
+              next if contact_id.blank?
 
-            field = lead_fields.find_by(value: lead["Id"])
-            field.update(name: ::Salesforce::Contact::ID_FIELD, value: contact_id)
+              field = lead_fields.find_by(value: lead["Id"])
+              field.update(name: ::Salesforce::Contact::ID_FIELD, value: contact_id)
+            end
+          rescue => e
+            Discourse.warn_exception(e, message: "Failed to sync Salesforce leads")
           end
-        rescue => e
-          Discourse.warn_exception(e, message: "Failed to sync Salesforce leads")
         end
       end
 

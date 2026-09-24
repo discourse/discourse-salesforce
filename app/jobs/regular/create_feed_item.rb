@@ -12,7 +12,8 @@ module ::Jobs
       return if post.blank? || post.custom_fields[::Salesforce::FeedItem::ID_FIELD].present?
 
       user = post.user
-      uid = user.salesforce_contact_id || user.salesforce_lead_id
+      uid = user.salesforce_contact_id
+      uid ||= user.salesforce_lead_id if SiteSetting.salesforce_leads_enabled
       return if uid.blank?
 
       begin

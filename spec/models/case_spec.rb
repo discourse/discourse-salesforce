@@ -76,6 +76,29 @@ RSpec.describe Salesforce::Case do
         )
       end
 
+      it "replaces a previous status tag whose name was normalized" do
+        stub_request(:get, "#{api_path}/Case/234567").to_return(
+          status: 200,
+          body: %({"CaseNumber":"345678","Status":"In Progress"}),
+        )
+
+        ::Salesforce::Case.sync!(topic)
+
+        stub_request(:get, "#{api_path}/Case/234567").to_return(
+          status: 200,
+          body: %({"CaseNumber":"345678","Status":"Closed"}),
+        )
+
+        ::Salesforce::Case.sync!(topic)
+
+        expect(topic.reload.tags.pluck(:name)).to contain_exactly(
+          "billing",
+          "urgent",
+          "salesforce-case",
+          "case-closed",
+        )
+      end
+
       it "preserves existing tags when the topic is at the tag limit" do
         topic.tags += %w[customer support priority].map { |name| Fabricate(:tag, name: name) }
 

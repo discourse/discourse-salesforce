@@ -29,7 +29,9 @@ module ::Salesforce
         existing_tag_names = topic.tags.pluck(:name)
         previous_status_tag =
           if previous_status.present?
-            "#{SiteSetting.salesforce_case_status_tag_prefix}-#{previous_status.downcase}"
+            DiscourseTagging.clean_tag(
+              "#{SiteSetting.salesforce_case_status_tag_prefix}-#{previous_status.downcase}",
+            )
           end
         retained_tag_names = existing_tag_names - [previous_status_tag]
 

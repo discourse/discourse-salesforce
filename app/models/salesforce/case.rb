@@ -32,8 +32,23 @@ module ::Salesforce
         if SiteSetting.salesforce_case_status_tag_enabled
           tags << "#{SiteSetting.salesforce_case_status_tag_prefix}-#{self.status.downcase}"
         end
+
         if tags.present?
-          DiscourseTagging.tag_topic_by_names(topic, Guardian.new(Discourse.system_user), tags)
+          existing_tag_names = topic.tags.pluck(:name)
+          if SiteSetting.salesforce_case_status_tag_enabled
+            existing_tag_names.reject! do |tag_name|
+              tag_name.start_with?("#{SiteSetting.salesforce_case_status_tag_prefix}-")
+            end
+          end
+
+          tag_names = (existing_tag_names + tags).uniq
+          if tag_names.size <= SiteSetting.max_tags_per_topic
+            DiscourseTagging.tag_topic_by_names(
+              topic,
+              Guardian.new(Discourse.system_user),
+              tag_names,
+            )
+          end
         end
       end
 

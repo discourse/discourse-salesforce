@@ -14,6 +14,7 @@ module ::Salesforce
 
     def create!
       return if post.post_type != Post.types[:regular]
+      return if self.class == ::Salesforce::FeedItem && post.topic.private_message?
 
       limiter = RateLimiter.new(nil, "#{self.class::ID_FIELD}_#{parent_id}", max_feed_items, 1.day)
       limiter.performed! if has_rate_limit? && !limiter.can_perform?

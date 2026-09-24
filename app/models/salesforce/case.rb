@@ -14,6 +14,7 @@ module ::Salesforce
     end
 
     def sync!
+      previous_status = status
       data = Salesforce::Api.new.get("sobjects/Case/#{self.uid}")
 
       self.number = data["CaseNumber"]
@@ -25,26 +26,32 @@ module ::Salesforce
         topic = Topic.find_by(id: topic_id)
         return if topic.blank?
 
+        existing_tag_names = topic.tags.pluck(:name)
+        previous_status_tag =
+          if previous_status.present?
+            "#{SiteSetting.salesforce_case_status_tag_prefix}-#{previous_status.downcase}"
+          end
+        retained_tag_names = existing_tag_names - [previous_status_tag]
+
         tags = []
-        if SiteSetting.salesforce_case_tag_name.present?
-          tags << SiteSetting.salesforce_case_tag_name
-        end
         if SiteSetting.salesforce_case_status_tag_enabled
           tags << "#{SiteSetting.salesforce_case_status_tag_prefix}-#{self.status.downcase}"
         end
-        if tags.present?
-          existing_tag_names = topic.tags.pluck(:name)
-          if SiteSetting.salesforce_case_status_tag_enabled
-            existing_tag_names.reject! do |tag_name|
-              tag_name.start_with?("#{SiteSetting.salesforce_case_status_tag_prefix}-")
-            end
-          end
+        if SiteSetting.salesforce_case_tag_name.present?
+          tags << SiteSetting.salesforce_case_tag_name
+        end
 
-          DiscourseTagging.tag_topic_by_names(
-            topic,
-            Guardian.new(Discourse.system_user),
-            existing_tag_names + tags,
-          )
+        if retained_tag_names.size <= SiteSetting.max_tags_per_topic
+          available_slots = SiteSetting.max_tags_per_topic - retained_tag_names.size
+          tag_names = retained_tag_names + (tags - retained_tag_names).first(available_slots)
+
+          if tag_names.sort != existing_tag_names.sort
+            DiscourseTagging.tag_topic_by_names(
+              topic,
+              Guardian.new(Discourse.system_user),
+              tag_names,
+            )
+          end
         end
       end
 

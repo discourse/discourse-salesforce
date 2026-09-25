@@ -53,6 +53,47 @@ RSpec.describe ::Salesforce::Api do
     end
   end
 
+  context "when the access token is missing the api scope" do
+    let(:api_response_body) do
+      %({"access_token":"#{access_token}","instance_url":"#{instance_url}","scope":"web id"})
+    end
+
+    before { SiteSetting.salesforce_instance_url = "https://previous.my.salesforce.com" }
+
+    it "creates an admin notice and does not store the token" do
+      expect { described_class.new }.to raise_error(::Salesforce::MissingApiScope)
+
+      problem = AdminNotice.find_by(identifier: "salesforce_missing_api_scope")
+      expect(problem.message).to match_html(
+        I18n.t("dashboard.problem.salesforce_missing_api_scope", base_path: Discourse.base_path),
+      )
+      expect(ProblemCheckTracker["salesforce_missing_api_scope"].failing?).to eq(true)
+      expect(ProblemCheckTracker["salesforce_invalid_credentials"].failing?).to eq(false)
+      expect(Discourse.redis.get("salesforce_access_token")).to be_nil
+      expect(SiteSetting.salesforce_instance_url).to eq("https://previous.my.salesforce.com")
+    end
+  end
+
+  %w[api full].each do |scope|
+    context "when the access token has the #{scope} scope" do
+      let(:api_response_body) do
+        %({"access_token":"#{access_token}","instance_url":"#{instance_url}","scope":"web #{scope} id"})
+      end
+
+      it "stores the token and clears a previous missing api scope notice" do
+        ProblemCheckTracker["salesforce_missing_api_scope"].problem!
+        expect(AdminNotice.exists?(identifier: "salesforce_missing_api_scope")).to eq(true)
+
+        api = described_class.new
+
+        expect(api.access_token).to eq(access_token)
+        expect(SiteSetting.salesforce_instance_url).to eq(instance_url)
+        expect(ProblemCheckTracker["salesforce_missing_api_scope"].failing?).to eq(false)
+        expect(AdminNotice.exists?(identifier: "salesforce_missing_api_scope")).to eq(false)
+      end
+    end
+  end
+
   it "resets invalid credentials error when Salesforce client ID is present" do
     SiteSetting.salesforce_client_id = "client_id"
     ProblemCheckTracker["salesforce_invalid_credentials"].problem!

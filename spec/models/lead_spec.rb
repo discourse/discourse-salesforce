@@ -40,5 +40,35 @@ RSpec.describe Salesforce::Lead do
       expect(create_request).to have_been_requested
       expect(Salesforce.leads_group.users.exists?(user.id)).to eq(true)
     end
+
+    it "sends the configured lead source" do
+      Salesforce.seed_groups!
+      Salesforce.leads_group.add(user)
+      SiteSetting.salesforce_lead_source = "Community"
+      stub_salesforce_person_lookup("Lead", user.email)
+      create_lead =
+        stub_request(:post, "#{api_path}/Lead").with(
+          body: hash_including(LeadSource: "Community"),
+        ).to_return(status: 200, body: %({"id":"123456"}))
+
+      described_class.create!(user)
+
+      expect(create_lead).to have_been_requested
+    end
+
+    it "omits the lead source when it is blank" do
+      Salesforce.seed_groups!
+      Salesforce.leads_group.add(user)
+      SiteSetting.salesforce_lead_source = ""
+      stub_salesforce_person_lookup("Lead", user.email)
+      create_lead =
+        stub_request(:post, "#{api_path}/Lead")
+          .with { |request| JSON.parse(request.body).exclude?("LeadSource") }
+          .to_return(status: 200, body: %({"id":"123456"}))
+
+      described_class.create!(user)
+
+      expect(create_lead).to have_been_requested
+    end
   end
 end

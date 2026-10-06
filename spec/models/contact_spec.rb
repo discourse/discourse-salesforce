@@ -30,6 +30,39 @@ RSpec.describe Salesforce::Contact do
     end
   end
 
+  describe ".create!" do
+    fab!(:user)
+
+    before do
+      Salesforce.seed_groups!
+      stub_salesforce_person_lookup("Contact", user.email)
+    end
+
+    it "sends Web as the lead source by default" do
+      create_contact =
+        stub_request(:post, "#{api_path}/Contact").with(
+          body: hash_including(LeadSource: "Web"),
+        ).to_return(status: 200, body: %({"id":"123456"}))
+
+      described_class.create!(user)
+
+      expect(create_contact).to have_been_requested
+    end
+
+    it "omits the lead source when it is blank" do
+      SiteSetting.salesforce_lead_source = ""
+
+      create_contact =
+        stub_request(:post, "#{api_path}/Contact")
+          .with { |request| JSON.parse(request.body).exclude?("LeadSource") }
+          .to_return(status: 200, body: %({"id":"123456"}))
+
+      described_class.create!(user)
+
+      expect(create_contact).to have_been_requested
+    end
+  end
+
   describe ".sync" do
     fab!(:user)
 
@@ -74,6 +107,20 @@ RSpec.describe Salesforce::Contact do
       expect(described_class.sync(user)).to eq(true)
       expect(update_contact).to have_been_requested
       expect(user.reload.salesforce_contact_id).to eq("123456")
+    end
+
+    it "leaves a blank lead source out of the lookup and update" do
+      SiteSetting.salesforce_lead_source = ""
+      SiteSetting.salesforce_contact_sync_fields = "Description|LeadSource"
+      stub_salesforce_person_lookup("Contact", user.email, id: "123456", fields: [:Description])
+
+      update_contact =
+        stub_request(:patch, "#{api_path}/Contact/123456")
+          .with { |request| JSON.parse(request.body).exclude?("LeadSource") }
+          .to_return(status: 204, body: "")
+
+      expect(described_class.sync(user)).to eq(true)
+      expect(update_contact).to have_been_requested
     end
   end
 

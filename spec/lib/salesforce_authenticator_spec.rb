@@ -17,6 +17,27 @@ RSpec.describe Auth::SalesforceAuthenticator do
     expect(SiteSetting.salesforce_enabled).to eq(false)
   end
 
+  it "enables PKCE for the authorization code flow" do
+    omniauth =
+      Class
+        .new do
+          attr_reader :provider_options
+
+          def provider(_name, **options)
+            @provider_options = options
+          end
+        end
+        .new
+
+    authenticator.register_middleware(omniauth)
+
+    strategy_options = { client_options: {} }
+    strategy = stub(options: strategy_options)
+    omniauth.provider_options[:setup].call("omniauth.strategy" => strategy)
+
+    expect(strategy_options[:pkce]).to eq(true)
+  end
+
   %i[
     salesforce_client_id
     salesforce_client_secret

@@ -21,5 +21,10 @@ skip Lead operations, including manual creation. Adding any member enables Lead 
 all users; membership is not a per-user eligibility rule. Removing all members retains existing
 Lead links but stops Lead API calls. Contact operations continue independently.
 
+Before upgrading an existing site that uses Leads, check that its Salesforce Leads group has
+at least one member. Signup matching previously stored Lead links without adding group members,
+so an empty group can exist on a site that already uses Leads. Such a site will skip Lead
+operations after this upgrade until an administrator adds a group member.
+
 Leads are linked but never updated. If multiple Contacts have the same email, the plugin skips
 linking and updating the ambiguous records when `fill_blank` or `overwrite` is selected.

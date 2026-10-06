@@ -46,4 +46,21 @@ RSpec.describe Jobs::CreateFeedItem do
 
     expect(a_request(:post, %r{/sobjects/FeedItem})).not_to have_been_made
   end
+
+  it "exports to an existing Contact when Leads are disabled and an old Lead link remains" do
+    Salesforce.leads_group.users.clear
+    user.salesforce_contact_id = "contact_123"
+    user.salesforce_lead_id = "lead_123"
+    user.save_custom_fields
+    create_request =
+      stub_request(:post, "#{api_path}/FeedItem").with(
+        body: hash_including(ParentId: user.salesforce_contact_id),
+      ).to_return(status: 201, body: %({"id":"feed_123"}))
+
+    described_class.new.execute(post_id: post.id)
+
+    expect(create_request).to have_been_requested
+    expect(post.reload.custom_fields[Salesforce::FeedItem::ID_FIELD]).to eq("feed_123")
+    expect(user.reload.salesforce_lead_id).to eq("lead_123")
+  end
 end

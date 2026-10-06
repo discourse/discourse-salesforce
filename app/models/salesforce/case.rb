@@ -97,16 +97,16 @@ end
 # Table name: salesforce_cases
 #
 #  id             :bigint           not null, primary key
-#  uid            :string
-#  topic_id       :integer          not null
-#  contact_id     :string
-#  number         :string
-#  subject        :string
 #  description    :string
-#  status         :string
 #  last_synced_at :datetime
+#  number         :string
+#  status         :string
+#  subject        :string
+#  uid            :string
 #  created_at     :datetime         not null
 #  updated_at     :datetime         not null
+#  contact_id     :string
+#  topic_id       :integer          not null
 #
 # Indexes
 #

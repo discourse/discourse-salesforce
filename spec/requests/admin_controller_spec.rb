@@ -10,11 +10,21 @@ RSpec.describe ::Salesforce::AdminController do
   describe "#authorize" do
     before { sign_in(admin) }
 
-    it "redirects to the Salesforce authorization server" do
+    it "redirects to the Salesforce authorization server with PKCE" do
       get "/salesforce/admin/authorize"
-      expect(response).to redirect_to(
-        "https://login.salesforce.com/services/oauth2/authorize?client_id=SALESFORCE_CLIENT_ID&redirect_uri=#{Discourse.base_url}&response_type=code",
+
+      uri = URI(response.location)
+      expect("#{uri.scheme}://#{uri.host}#{uri.path}").to eq(
+        "https://login.salesforce.com/services/oauth2/authorize",
       )
+
+      params = URI.decode_www_form(uri.query).to_h
+      expect(params["client_id"]).to eq("SALESFORCE_CLIENT_ID")
+      expect(params["redirect_uri"]).to eq(Discourse.base_url)
+      expect(params["response_type"]).to eq("code")
+      expect(params["code_challenge_method"]).to eq("S256")
+      # An unpadded base64url SHA-256 digest is always 43 characters.
+      expect(params["code_challenge"]).to match(/\A[A-Za-z0-9\-_]{43}\z/)
     end
   end
 end

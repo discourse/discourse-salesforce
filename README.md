@@ -24,3 +24,8 @@ After connecting Discourse to a different Salesforce organization or refreshing 
 `bin/rake salesforce:prune_dead_associations`. The task removes local Contact, Lead, Case, and Case
 Comment references that the connected integration user cannot resolve. Assign the integration
 user full record-level read access to Contact, Lead, and Case records before running it.
+
+When the Salesforce Leads group identified by `salesforce_leads_group_id` is empty, the task
+skips Lead reporting and cleanup, retaining existing Lead links. Pruning stale Lead links
+preserves Leads group membership so cleanup does not turn off Lead operations. Contact group
+memberships are still removed when their Contact links are pruned.

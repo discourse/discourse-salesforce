@@ -73,7 +73,8 @@ RSpec.describe ::Salesforce::Associations do
       expect(stale_user.reload.salesforce_contact_id).to eq(nil)
       expect(stale_user.salesforce_lead_id).to eq(nil)
       expect(contacts_group.users.exists?(stale_user.id)).to eq(false)
-      expect(leads_group.users.exists?(stale_user.id)).to eq(false)
+      expect(leads_group.users.exists?(stale_user.id)).to eq(true)
+      expect(Salesforce.leads_enabled?).to eq(true)
       expect(SiteSetting.salesforce_default_contact_id_for_case_sync).to eq("")
       expect(::Salesforce::Case.exists?(live_case.id)).to eq(true)
       expect(::Salesforce::Case.exists?(dead_case.id)).to eq(false)
@@ -81,6 +82,39 @@ RSpec.describe ::Salesforce::Associations do
       expect(live_case.topic.reload.has_salesforce_case).to eq(true)
       expect(dead_case.topic.reload.has_salesforce_case).to eq(false)
       expect(dead_case_post.reload.custom_fields[::Salesforce::CaseComment::ID_FIELD]).to eq(nil)
+    end
+
+    it "preserves Lead links while cleaning Contacts and Cases when Leads are disabled" do
+      stale_user.upsert_custom_fields(
+        ::Salesforce::Contact::ID_FIELD => dead_contact_id,
+        ::Salesforce::Lead::ID_FIELD => dead_lead_id,
+      )
+      dead_case = Fabricate(:salesforce_case, uid: dead_case_id)
+      stub_request(:get, "#{instance_url}services/data/v49.0/composite/sobjects/Contact").with(
+        query: {
+          fields: "Id",
+          ids: dead_contact_id,
+        },
+      ).to_return(status: 200, body: [nil].to_json)
+      stub_request(:get, "#{instance_url}services/data/v49.0/composite/sobjects/Case").with(
+        query: {
+          fields: "Id",
+          ids: dead_case_id,
+        },
+      ).to_return(status: 200, body: [nil].to_json)
+      lead_request =
+        stub_request(:get, "#{instance_url}services/data/v49.0/composite/sobjects/Lead").to_return(
+          status: 400,
+          body: %([{"errorCode":"INVALID_TYPE","message":"Lead is unavailable"}]),
+        )
+
+      counts = described_class.prune_dead!
+
+      expect(counts).to eq(users: 1, posts: 0, cases: 1, settings: 0)
+      expect(stale_user.reload.salesforce_contact_id).to be_nil
+      expect(stale_user.salesforce_lead_id).to eq(dead_lead_id)
+      expect(::Salesforce::Case.exists?(dead_case.id)).to eq(false)
+      expect(lead_request).not_to have_been_requested
     end
 
     it "preserves a user link replaced while Salesforce is responding" do

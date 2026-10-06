@@ -20,6 +20,10 @@ module ::Salesforce
     Group.find_by(id: group_id)
   end
 
+  def self.leads_enabled?
+    leads_group&.users&.exists? || false
+  end
+
   def self.contacts_group
     group_id = SiteSetting.salesforce_contacts_group_id
     return if group_id.blank?

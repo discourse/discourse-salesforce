@@ -8,6 +8,8 @@ task "salesforce:prune_dead_associations" => :environment do
   found = 0
 
   { Salesforce::Contact => "contact", Salesforce::Lead => "lead" }.each do |person_class, label|
+    next if person_class == Salesforce::Lead && !Salesforce.leads_enabled?
+
     fields = UserCustomField.where(name: person_class::ID_FIELD)
     dead = Salesforce::Associations.dead_ids(api, person_class::OBJECT_NAME, fields.pluck(:value))
     fields

@@ -10,7 +10,7 @@ module ::Salesforce
       counts = { users: 0, posts: 0, cases: 0, settings: 0 }
 
       counts[:users] += prune_user_links(api, Contact)
-      counts[:users] += prune_user_links(api, Lead)
+      counts[:users] += prune_user_links(api, Lead) if Salesforce.leads_enabled?
       counts[:settings] = prune_default_contact(api)
       case_counts = prune_cases(api)
       counts.merge!(case_counts) { |_, total, count| total + count }
@@ -41,6 +41,8 @@ module ::Salesforce
             count += fields.delete_all
           end
 
+          # Leads membership controls whether Lead operations are enabled.
+          next if person_class == Lead
           next if user_ids.empty? || person_class.group.blank?
 
           linked_user_ids =

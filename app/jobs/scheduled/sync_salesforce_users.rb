@@ -14,7 +14,7 @@ module ::Jobs
         return
       end
 
-      if SiteSetting.salesforce_leads_enabled
+      if ::Salesforce.leads_enabled?
         lead_fields = UserCustomField.where(name: ::Salesforce::Lead::ID_FIELD)
         lead_fields.find_in_batches(batch_size: 100) do |fields|
           ids = fields.pluck(:value)

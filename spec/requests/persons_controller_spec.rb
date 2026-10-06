@@ -90,6 +90,7 @@ RSpec.describe ::Salesforce::PersonsController do
     end
 
     it "creates a new lead object in Salesforce" do
+      Salesforce.leads_group.add(admin)
       stub_salesforce_person_lookup("Lead", user.email)
 
       stub_request(:post, "#{api_path}/Lead").with(
@@ -102,9 +103,7 @@ RSpec.describe ::Salesforce::PersonsController do
       expect(user.salesforce_lead_id).to eq("123456")
     end
 
-    it "rejects Lead creation when Salesforce Leads are disabled" do
-      SiteSetting.salesforce_leads_enabled = false
-
+    it "rejects Lead creation when the Leads group is empty" do
       post "/salesforce/persons/create.json", params: { type: "lead", user_id: user.id }
 
       expect(response.status).to eq(400)

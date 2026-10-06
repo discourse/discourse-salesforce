@@ -8,6 +8,11 @@ RSpec.describe Jobs::CreateFeedItem do
   fab!(:user)
   fab!(:post) { Fabricate(:post, user: user) }
 
+  before do
+    Salesforce.seed_groups!
+    Salesforce.leads_group.add(user)
+  end
+
   it "will not create feed item if user not linked to Salesforce lead" do
     ::Salesforce::FeedItem.any_instance.expects(:create!).never
     described_class.new.execute(post_id: post.id)
@@ -32,8 +37,8 @@ RSpec.describe Jobs::CreateFeedItem do
     described_class.new.execute(post_id: post.id)
   end
 
-  it "skips Lead feed items when Salesforce Leads are disabled" do
-    SiteSetting.salesforce_leads_enabled = false
+  it "skips Lead feed items when the Leads group is empty" do
+    Salesforce.leads_group.users.clear
     user.salesforce_lead_id = "lead_123"
     user.save_custom_fields
 

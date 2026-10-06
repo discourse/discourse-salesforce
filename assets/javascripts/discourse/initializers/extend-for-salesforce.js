@@ -43,7 +43,7 @@ function initializeWithApi(api, container) {
     const toasts = container.lookup("service:toasts");
     const salesforceUrl = siteSettings.salesforce_instance_url;
 
-    if (siteSettings.salesforce_leads_enabled) {
+    if (container.lookup("service:site").salesforce_leads_enabled) {
       api.addPostAdminMenuButton(() => {
         return {
           icon: "user-plus",

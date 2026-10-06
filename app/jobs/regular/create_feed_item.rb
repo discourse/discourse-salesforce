@@ -13,7 +13,7 @@ module ::Jobs
 
       user = post.user
       uid = user.salesforce_contact_id
-      uid ||= user.salesforce_lead_id if SiteSetting.salesforce_leads_enabled
+      uid ||= user.salesforce_lead_id if ::Salesforce.leads_enabled?
       return if uid.blank?
 
       begin

@@ -88,6 +88,10 @@ after_initialize do
     end,
   ) { ::Salesforce::CaseSerializer.new(object.topic.salesforce_case, root: false).as_json }
 
+  add_to_serializer(:site, :salesforce_leads_enabled, include_condition: -> { scope.is_staff? }) do
+    ::Salesforce.leads_enabled?
+  end
+
   TopicList.preloaded_custom_fields << "has_salesforce_case"
 
   class ::OmniAuth::Strategies::Salesforce

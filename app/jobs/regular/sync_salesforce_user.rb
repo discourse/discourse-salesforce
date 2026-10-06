@@ -11,7 +11,7 @@ module ::Jobs
       return if ::Salesforce::Contact.sync(user)
 
       lead_id = nil
-      if SiteSetting.salesforce_leads_enabled
+      if ::Salesforce.leads_enabled?
         begin
           lead_id = ::Salesforce::Lead.find_id_by_email(user.email)
         rescue Salesforce::InvalidApiResponse => error

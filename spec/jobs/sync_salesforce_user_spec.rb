@@ -14,6 +14,11 @@ RSpec.describe Jobs::SyncSalesforceUser do
     )
   end
 
+  before do
+    Salesforce.seed_groups!
+    Salesforce.leads_group.add(user)
+  end
+
   it "links an existing contact by default" do
     stub_salesforce_person_lookup("Contact", user.email, id: "contact_123")
 
@@ -166,8 +171,8 @@ RSpec.describe Jobs::SyncSalesforceUser do
       expect(Salesforce.contacts_group.users.exists?(user.id)).to eq(true)
     end
 
-    it "creates a contact without querying Leads when Salesforce Leads are disabled" do
-      SiteSetting.salesforce_leads_enabled = false
+    it "creates a contact without querying Leads when the Leads group is empty" do
+      Salesforce.leads_group.users.clear
       create_request =
         stub_request(:post, "#{api_path}/Contact").to_return(
           status: 200,

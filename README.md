@@ -15,5 +15,11 @@ to the Discourse profile URL:
 - `overwrite` replaces selected Salesforce field values with values from Discourse.
 - `Email` is only used to find the record and is not included in the default update payload.
 
+Lead lookups, creation, conversion sync, and feed items are enabled only while the group identified
+by `salesforce_leads_group_id` has at least one member. Leave the Salesforce Leads group empty to
+skip Lead operations, including manual creation. Adding any member enables Lead operations for
+all users; membership is not a per-user eligibility rule. Removing all members retains existing
+Lead links but stops Lead API calls. Contact operations continue independently.
+
 Leads are linked but never updated. If multiple Contacts have the same email, the plugin skips
 linking and updating the ambiguous records when `fill_blank` or `overwrite` is selected.

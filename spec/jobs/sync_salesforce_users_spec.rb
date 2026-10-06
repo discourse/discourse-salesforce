@@ -9,6 +9,11 @@ RSpec.describe Jobs::SyncSalesforceUsers do
   fab!(:user2, :user)
   let!(:path) { api_path.sub("sobjects", "composite/sobjects") }
 
+  before do
+    Salesforce.seed_groups!
+    Salesforce.leads_group.add(user1)
+  end
+
   describe "#execute" do
     it "continues syncing contact merges after a missing contact" do
       user1.salesforce_contact_id = "missing_contact"
@@ -56,8 +61,8 @@ RSpec.describe Jobs::SyncSalesforceUsers do
       expect(user2.salesforce_contact_id).to eq("contact_456")
     end
 
-    it "skips existing Lead links when Salesforce Leads are disabled" do
-      SiteSetting.salesforce_leads_enabled = false
+    it "skips existing Lead links when the Leads group is empty" do
+      Salesforce.leads_group.users.clear
       user1.salesforce_lead_id = "lead_123"
       user1.save_custom_fields
 

@@ -11,6 +11,8 @@ module Salesforce
       begin
         salesforce_case = Case.sync!(topic)
         render_serialized(salesforce_case, CaseSerializer)
+      rescue Salesforce::MissingApiScope => e
+        render json: { error: e.message }, status: :bad_gateway
       rescue Salesforce::InvalidCredentials
         render json: {
                  error: I18n.t("salesforce.error.invalid_client_credentials"),

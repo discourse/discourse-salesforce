@@ -81,5 +81,23 @@ RSpec.describe ::Salesforce::CasesController do
         { "error" => I18n.t("salesforce.error.invalid_client_credentials") },
       )
     end
+
+    it "explains when the access token is missing the api scope" do
+      sign_in(admin)
+      Salesforce.seed_groups!
+
+      stub_request(:post, "https://login.salesforce.com/services/oauth2/token").to_return(
+        status: 200,
+        body:
+          %({"access_token":"#{access_token}","instance_url":"#{instance_url}","scope":"web id"}),
+      )
+
+      post "/salesforce/cases/sync.json", params: { topic_id: topic.id }
+
+      expect(response.status).to eq(502)
+      expect(response.parsed_body).to eq(
+        { "error" => I18n.t("salesforce.error.missing_api_scope") },
+      )
+    end
   end
 end

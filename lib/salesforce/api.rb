@@ -14,6 +14,11 @@ module ::Salesforce
   end
   class InvalidCredentials < ::StandardError
   end
+  class MissingApiScope < InvalidCredentials
+    def initialize(message = I18n.t("salesforce.error.missing_api_scope"))
+      super
+    end
+  end
 
   class Api
     VERSION = "49.0"
@@ -110,12 +115,30 @@ module ::Salesforce
 
       ProblemCheckTracker[:salesforce_invalid_credentials].no_problem!
       data = JSON.parse(body)
+
+      if missing_api_scope?(data["scope"])
+        ProblemCheckTracker[:salesforce_missing_api_scope].problem!
+        if SiteSetting.salesforce_api_error_logs
+          Rails.logger.error("Salesforce access token is missing the api scope: #{data["scope"]}")
+        end
+        raise Salesforce::MissingApiScope
+      end
+
+      ProblemCheckTracker[:salesforce_missing_api_scope].no_problem!
       Discourse.redis.setex("salesforce_access_token", 10.minutes, data["access_token"])
       SiteSetting.salesforce_instance_url = data["instance_url"]
     end
 
     def access_token
       Discourse.redis.get("salesforce_access_token")
+    end
+
+    # Tokens without `api` (or `full`) pass the JWT grant but every REST call is
+    # rejected as INVALID_SESSION_ID. A response without scopes isn't blocked.
+    def missing_api_scope?(scope)
+      return false if scope.blank?
+
+      (scope.split & %w[api full]).empty?
     end
 
     def claims

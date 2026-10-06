@@ -101,5 +101,14 @@ RSpec.describe ::Salesforce::PersonsController do
       expect(response.status).to eq(200)
       expect(user.salesforce_lead_id).to eq("123456")
     end
+
+    it "rejects Lead creation when the source and Leads group are empty" do
+      SiteSetting.salesforce_lead_source = ""
+      post "/salesforce/persons/create.json", params: { type: "lead", user_id: user.id }
+
+      expect(response.status).to eq(400)
+      expect(user.reload.salesforce_lead_id).to be_nil
+      expect(a_request(:post, "#{api_path}/Lead")).not_to have_been_made
+    end
   end
 end

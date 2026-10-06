@@ -18,6 +18,7 @@ RSpec.describe ::Salesforce::Associations do
   let(:dead_case_id) { "500000000000002" }
 
   before do
+    SiteSetting.salesforce_lead_source = ""
     SiteSetting.salesforce_contacts_group_id = contacts_group.id
     SiteSetting.salesforce_leads_group_id = leads_group.id
   end

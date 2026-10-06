@@ -14,6 +14,7 @@ RSpec.describe "salesforce:prune_dead_associations" do
   let!(:salesforce_case) { Fabricate(:salesforce_case, uid: case_id) }
 
   before do
+    SiteSetting.salesforce_lead_source = ""
     SiteSetting.salesforce_leads_group_id = leads_group.id
     user.upsert_custom_fields(
       Salesforce::Contact::ID_FIELD => contact_id,

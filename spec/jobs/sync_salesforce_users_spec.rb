@@ -61,7 +61,8 @@ RSpec.describe Jobs::SyncSalesforceUsers do
       expect(user2.salesforce_contact_id).to eq("contact_456")
     end
 
-    it "skips existing Lead links when the Leads group is empty" do
+    it "skips existing Lead links when the source and Leads group are empty" do
+      SiteSetting.salesforce_lead_source = ""
       Salesforce.leads_group.users.clear
       user1.salesforce_lead_id = "lead_123"
       user1.save_custom_fields

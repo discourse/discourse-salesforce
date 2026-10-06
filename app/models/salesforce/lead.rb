@@ -9,6 +9,7 @@ module ::Salesforce
     def self.create!(user)
       return unless Salesforce.leads_enabled?
 
+      Salesforce.seed_groups! if group.blank?
       super
     end
 

@@ -15,16 +15,28 @@ to the Discourse profile URL:
 - `overwrite` replaces selected Salesforce field values with values from Discourse.
 - `Email` is only used to find the record and is not included in the default update payload.
 
-Lead lookups, creation, conversion sync, and feed items are enabled only while the group identified
-by `salesforce_leads_group_id` has at least one member. Leave the Salesforce Leads group empty to
-skip Lead operations, including manual creation. Adding any member enables Lead operations for
-all users; membership is not a per-user eligibility rule. Removing all members retains existing
-Lead links but stops Lead API calls. Contact operations continue independently.
+Lead lookups, creation, conversion sync, and feed items are enabled when
+`salesforce_lead_source` is nonblank or the group identified by `salesforce_leads_group_id` has
+at least one member. The default source, `Web`, preserves existing Lead behavior, including
+signup matching on sites with an empty Leads group.
 
-Before upgrading an existing site that uses Leads, check that its Salesforce Leads group has
-at least one member. Signup matching previously stored Lead links without adding group members,
-so an empty group can exist on a site that already uses Leads. Such a site will skip Lead
-operations after this upgrade until an administrator adds a group member.
+To disable all Lead operations, clear `salesforce_lead_source` and empty the Salesforce Leads
+group. Removing the group also counts as empty. Either a nonblank source or any group member
+keeps Leads enabled for all users. Disabling Leads retains existing Lead links and skips manual
+creation. Contact operations continue, although clearing the source also omits the `LeadSource`
+field from Contact payloads.
 
 Leads are linked but never updated. If multiple Contacts have the same email, the plugin skips
 linking and updating the ambiguous records when `fill_blank` or `overwrite` is selected.
+
+### Reconnecting Salesforce
+
+After connecting Discourse to a different Salesforce organization or refreshing a sandbox, run
+`bin/rake salesforce:prune_dead_associations`. The task removes local Contact, Lead, Case, and Case
+Comment references that the connected integration user cannot resolve. Assign the integration
+user full record-level read access to Contact, Lead, and Case records before running it.
+
+When `salesforce_lead_source` is blank and the Salesforce Leads group has no members, the task
+skips Lead reporting and cleanup, retaining existing Lead links. Pruning stale Lead links
+preserves Leads group membership so cleanup does not turn off Lead operations. Contact group
+memberships are still removed when their Contact links are pruned.

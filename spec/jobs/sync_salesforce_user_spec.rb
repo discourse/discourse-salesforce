@@ -41,7 +41,8 @@ RSpec.describe Jobs::SyncSalesforceUser do
     expect(a_request(:patch, %r{/sobjects/})).not_to have_been_made
   end
 
-  it "preserves ID-only lead linking when no contact exists" do
+  it "preserves signup Lead linking with the default source and an empty group" do
+    Salesforce.leads_group.users.clear
     SiteSetting.salesforce_contact_sync_mode = "fill_blank"
     stub_salesforce_person_lookup("Contact", user.email, fields: %i[Description])
     stub_salesforce_person_lookup("Lead", user.email, id: "lead_123")
@@ -171,7 +172,8 @@ RSpec.describe Jobs::SyncSalesforceUser do
       expect(Salesforce.contacts_group.users.exists?(user.id)).to eq(true)
     end
 
-    it "creates a contact without querying Leads when the Leads group is empty" do
+    it "creates a contact without querying Leads when the source and Leads group are empty" do
+      SiteSetting.salesforce_lead_source = ""
       Salesforce.leads_group.users.clear
       create_request =
         stub_request(:post, "#{api_path}/Contact").to_return(

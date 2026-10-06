@@ -7,8 +7,10 @@ module ::Salesforce
     config.autoload_paths << File.join(config.root, "lib")
   end
 
+  # Deliberately not memoized: the client binds the instance URL and the bearer
+  # token at construction, and both change when the credentials or the org do.
   def self.api
-    @api ||= Api.new
+    Api.new
   end
 
   def self.leads_group
@@ -19,7 +21,7 @@ module ::Salesforce
   end
 
   def self.leads_enabled?
-    leads_group&.users&.exists? || false
+    SiteSetting.salesforce_lead_source.present? || leads_group&.users&.exists? || false
   end
 
   def self.contacts_group

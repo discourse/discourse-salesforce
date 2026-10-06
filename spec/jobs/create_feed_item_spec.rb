@@ -37,7 +37,8 @@ RSpec.describe Jobs::CreateFeedItem do
     described_class.new.execute(post_id: post.id)
   end
 
-  it "skips Lead feed items when the Leads group is empty" do
+  it "skips Lead feed items when the source and Leads group are empty" do
+    SiteSetting.salesforce_lead_source = ""
     Salesforce.leads_group.users.clear
     user.salesforce_lead_id = "lead_123"
     user.save_custom_fields
@@ -48,6 +49,7 @@ RSpec.describe Jobs::CreateFeedItem do
   end
 
   it "exports to an existing Contact when Leads are disabled and an old Lead link remains" do
+    SiteSetting.salesforce_lead_source = ""
     Salesforce.leads_group.users.clear
     user.salesforce_contact_id = "contact_123"
     user.salesforce_lead_id = "lead_123"

@@ -31,7 +31,7 @@ RSpec.describe Salesforce::Contact do
   end
 
   describe ".sync" do
-    fab!(:user)
+    fab!(:user, :verified_user)
 
     let(:plugin_instance) { Plugin::Instance.new }
     let(:modifier_block) do

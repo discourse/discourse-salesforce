@@ -13,5 +13,12 @@ RSpec.describe User do
       job_args = Jobs::SyncSalesforceUser.jobs.last["args"].first
       expect(job_args["user_id"]).to eq(user.id)
     end
+
+    it "syncs staged users to Salesforce" do
+      user = Fabricate(:user, staged: true, active: false)
+
+      job_args = Jobs::SyncSalesforceUser.jobs.last["args"].first
+      expect(job_args["user_id"]).to eq(user.id)
+    end
   end
 end

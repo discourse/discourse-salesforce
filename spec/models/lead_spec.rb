@@ -8,8 +8,8 @@ RSpec.describe Salesforce::Lead do
   fab!(:user)
 
   describe ".create!" do
-    it "skips creation when the source is blank and the Leads group is missing" do
-      SiteSetting.salesforce_lead_source = ""
+    it "skips creation when Leads are disabled and the group is missing" do
+      SiteSetting.salesforce_leads_enabled = false
       SiteSetting.salesforce_leads_group_id = ""
 
       expect(described_class.create!(user)).to be_nil
@@ -18,9 +18,10 @@ RSpec.describe Salesforce::Lead do
       expect(a_request(:post, "#{api_path}/Lead")).not_to have_been_made
     end
 
-    it "skips creation when the source and Leads group are empty" do
-      SiteSetting.salesforce_lead_source = ""
+    it "skips creation when Leads are disabled despite a populated group" do
+      SiteSetting.salesforce_leads_enabled = false
       Salesforce.seed_groups!
+      Salesforce.leads_group.add(user)
 
       expect(described_class.create!(user)).to be_nil
       expect(user.reload.salesforce_lead_id).to be_nil
@@ -44,7 +45,8 @@ RSpec.describe Salesforce::Lead do
       expect(Salesforce.leads_group.users.exists?(user.id)).to eq(true)
     end
 
-    it "creates a lead with the default source when the Leads group is missing" do
+    it "creates the first lead with a blank source when the Leads group is missing" do
+      SiteSetting.salesforce_lead_source = ""
       SiteSetting.salesforce_leads_group_id = ""
       stub_salesforce_person_lookup("Lead", user.email)
       create_request =

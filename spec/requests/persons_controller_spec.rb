@@ -14,7 +14,8 @@ RSpec.describe ::Salesforce::PersonsController do
       Salesforce.seed_groups!
     end
 
-    it "creates a new contact object in Salesforce" do
+    it "creates a new contact object in Salesforce when Leads are disabled" do
+      SiteSetting.salesforce_leads_enabled = false
       sync_post = Fabricate(:post, user: user)
 
       stub_salesforce_person_lookup("Contact", user.email)
@@ -103,8 +104,8 @@ RSpec.describe ::Salesforce::PersonsController do
       expect(user.salesforce_lead_id).to eq("123456")
     end
 
-    it "rejects Lead creation when the source and Leads group are empty" do
-      SiteSetting.salesforce_lead_source = ""
+    it "rejects Lead creation when Leads are disabled" do
+      SiteSetting.salesforce_leads_enabled = false
       post "/salesforce/persons/create.json", params: { type: "lead", user_id: user.id }
 
       expect(response.status).to eq(400)

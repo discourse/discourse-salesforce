@@ -18,7 +18,6 @@ RSpec.describe ::Salesforce::Associations do
   let(:dead_case_id) { "500000000000002" }
 
   before do
-    SiteSetting.salesforce_lead_source = ""
     SiteSetting.salesforce_contacts_group_id = contacts_group.id
     SiteSetting.salesforce_leads_group_id = leads_group.id
   end
@@ -86,6 +85,8 @@ RSpec.describe ::Salesforce::Associations do
     end
 
     it "preserves Lead links while cleaning Contacts and Cases when Leads are disabled" do
+      SiteSetting.salesforce_leads_enabled = false
+      leads_group.add(stale_user)
       stale_user.upsert_custom_fields(
         ::Salesforce::Contact::ID_FIELD => dead_contact_id,
         ::Salesforce::Lead::ID_FIELD => dead_lead_id,

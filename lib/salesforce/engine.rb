@@ -21,7 +21,7 @@ module ::Salesforce
   end
 
   def self.leads_enabled?
-    SiteSetting.salesforce_lead_source.present? || leads_group&.users&.exists? || false
+    SiteSetting.salesforce_leads_enabled
   end
 
   def self.contacts_group

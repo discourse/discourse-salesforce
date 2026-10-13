@@ -4,8 +4,7 @@ import { acceptance } from "discourse/tests/helpers/qunit-helpers";
 
 acceptance("Salesforce Leads menu", function (needs) {
   needs.user({ admin: true, staff: true });
-  needs.settings({ salesforce_enabled: true });
-  needs.site({ salesforce_leads_enabled: false });
+  needs.settings({ salesforce_enabled: true, salesforce_leads_enabled: false });
 
   test("hides Lead creation while keeping Contact creation", async function (assert) {
     await visit("/t/internationalization-localization/280");
@@ -17,10 +16,9 @@ acceptance("Salesforce Leads menu", function (needs) {
   });
 });
 
-acceptance("Salesforce Leads menu with group members", function (needs) {
+acceptance("Salesforce Leads menu when enabled", function (needs) {
   needs.user({ admin: true, staff: true });
-  needs.settings({ salesforce_enabled: true });
-  needs.site({ salesforce_leads_enabled: true });
+  needs.settings({ salesforce_enabled: true, salesforce_leads_enabled: true });
 
   test("shows Lead creation", async function (assert) {
     await visit("/t/internationalization-localization/280");

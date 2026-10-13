@@ -1,6 +1,9 @@
 discourse_salesforce:
   salesforce_enabled:
     default: false
+  salesforce_leads_enabled:
+    default: true
+    client: true
   salesforce_login_enabled:
     default: false
     client: true

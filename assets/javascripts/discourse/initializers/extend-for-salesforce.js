@@ -43,16 +43,18 @@ function initializeWithApi(api, container) {
     const toasts = container.lookup("service:toasts");
     const salesforceUrl = siteSettings.salesforce_instance_url;
 
-    api.addPostAdminMenuButton(() => {
-      return {
-        icon: "user-plus",
-        label: "salesforce.lead.create",
-        action: async (post) => {
-          await createPerson("lead", post, toasts);
-        },
-        className: "create-lead",
-      };
-    });
+    if (siteSettings.salesforce_leads_enabled) {
+      api.addPostAdminMenuButton(() => {
+        return {
+          icon: "user-plus",
+          label: "salesforce.lead.create",
+          action: async (post) => {
+            await createPerson("lead", post, toasts);
+          },
+          className: "create-lead",
+        };
+      });
+    }
 
     api.addPostAdminMenuButton(() => {
       return {

@@ -15,6 +15,14 @@ to the Discourse profile URL:
 - `overwrite` replaces selected Salesforce field values with values from Discourse.
 - `Email` is only used to find the record and is not included in the default update payload.
 
+Lead lookups, creation, conversion sync, feed items, and association cleanup are controlled by
+`salesforce_leads_enabled`, which defaults to `true` to preserve existing behavior.
+
+For Contact-only integrations or Salesforce organizations where the integration user cannot
+access Leads, disable `salesforce_leads_enabled`. Existing Lead links are retained and Contact
+operations continue. Lead enablement is independent of Leads group membership and
+`salesforce_lead_source`; leaving the source blank only omits `LeadSource` from payloads.
+
 Leads are linked but never updated. If multiple Contacts have the same email, the plugin skips
 linking and updating the ambiguous records when `fill_blank` or `overwrite` is selected.
 
@@ -25,7 +33,6 @@ After connecting Discourse to a different Salesforce organization or refreshing 
 Comment references that the connected integration user cannot resolve. Assign the integration
 user full record-level read access to Contact, Lead, and Case records before running it.
 
-When the Salesforce Leads group identified by `salesforce_leads_group_id` is empty, the task
-skips Lead reporting and cleanup, retaining existing Lead links. Pruning stale Lead links
-preserves Leads group membership so cleanup does not turn off Lead operations. Contact group
+When `salesforce_leads_enabled` is disabled, the task skips Lead reporting and cleanup, retaining
+existing Lead links. Pruning stale Lead links preserves Leads group membership. Contact group
 memberships are still removed when their Contact links are pruned.

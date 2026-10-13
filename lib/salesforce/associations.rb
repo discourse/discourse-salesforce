@@ -41,7 +41,6 @@ module ::Salesforce
             count += fields.delete_all
           end
 
-          # Leads membership controls whether Lead operations are enabled.
           next if person_class == Lead
           next if user_ids.empty? || person_class.group.blank?
 

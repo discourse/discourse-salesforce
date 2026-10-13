@@ -85,6 +85,8 @@ RSpec.describe ::Salesforce::Associations do
     end
 
     it "preserves Lead links while cleaning Contacts and Cases when Leads are disabled" do
+      SiteSetting.salesforce_leads_enabled = false
+      leads_group.add(stale_user)
       stale_user.upsert_custom_fields(
         ::Salesforce::Contact::ID_FIELD => dead_contact_id,
         ::Salesforce::Lead::ID_FIELD => dead_lead_id,

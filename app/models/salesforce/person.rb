@@ -40,8 +40,12 @@ module ::Salesforce
       end
     end
 
+    def self.email_verified?(user)
+      user.active? && !user.staged? && user.email_confirmed?
+    end
+
     def self.sync(user)
-      mode = sync_mode
+      mode = email_verified?(user) ? sync_mode : "link_only"
       sync_payload =
         if mode == "link_only"
           {}

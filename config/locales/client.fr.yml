@@ -17,18 +17,24 @@ fr:
         title: "Se connecter avec Salesforce"
     salesforce:
       title: Salesforce
+      contact_sync_mode:
+        link_only: "Lier uniquement : associer l'utilisateur Discourse au contact Salesforce sans mettre à jour les champs Salesforce"
+        fill_blank: "Remplir les champs vides de Salesforce : mettre à jour les champs sélectionnés uniquement s'ils sont vides dans Salesforce"
+        overwrite: "Écraser les champs Salesforce : remplacer les valeurs des champs sélectionnés par celles de Discourse"
       lead:
-        create: "Créer un prospect"
+        create: "Créer une piste"
+        create_success: "Piste Salesforce synchronisée"
       contact:
         create: "Créer un contact"
+        create_success: "Contact Salesforce synchronisé"
       poster_icon:
         lead:
-          title: "Prospect Salesforce"
-          text: "Prospect"
+          title: "Piste Salesforce"
+          text: "Piste"
         contact:
-          title: "Contacter Salesforce"
+          title: "Contact Salesforce"
           text: "Contact"
     topic:
       actions:
-        create_salesforce_case: "Créer un cas"
-        sync_salesforce_case: "Synchroniser le cas"
+        create_salesforce_case: "Créer une requête"
+        sync_salesforce_case: "Synchroniser la requête"

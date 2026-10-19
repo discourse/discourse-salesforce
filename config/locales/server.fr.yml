@@ -6,23 +6,34 @@
 
 fr:
   site_settings:
-    salesforce_enabled: 'Activer le plugin discours-salesforce'
-    salesforce_login_enabled: 'Activer la connexion de réseau social Salesforce'
+    salesforce_leads_enabled: "Activer la recherche et la création de pistes Salesforce, la synchronisation des conversions, les éléments de fil et le nettoyage des associations. Désactivez cette option pour les organisations Salesforce dont l'utilisateur d'intégration n'a pas accès aux pistes. Les opérations sur les contacts se poursuivent et les liens existants avec les pistes sont conservés."
+    salesforce_enabled: 'Activer l''extension discourse-salesforce'
+    salesforce_login_enabled: 'Activer la connexion avec Salesforce'
     salesforce_client_id: "ID client de l'application connectée Salesforce"
     salesforce_client_secret: "Clé secrète client de l'application connectée Salesforce"
     salesforce_rsa_private_key: "Clé privée RSA de l'application connectée Salesforce"
     salesforce_authorization_server_url: "URL du serveur d'autorisation Salesforce"
     salesforce_username: "Nom d'utilisateur du compte Salesforce"
-    salesforce_case_tag_name: "Nom d'étiquette à ajouter aux sujets avec un cas Salesforce"
-    salesforce_case_status_tag_enabled: "Activer pour ajouter des étiquettes en fonction du statut du cas Salesforce"
-    salesforce_case_status_tag_prefix: "Préfixe à ajouter avant les étiquettes de statut de cas Salesforce. Par exemple, si le préfixe est « cas », les étiquettes seront ajoutées, comme case-open, case-closed, etc."
-    salesforce_skip_contact_creation_on_case_sync: "Ignorer la création d'un contact Salesforce lors de la synchronisation d'un cas"
-    salesforce_default_contact_id_for_case_sync: "ID de contact Salesforce par défaut à utiliser lors de la synchronisation des cas. Utile lorsque « salesforce_skip_contact_creation_on_case_sync » est activé."
-    salesforce_auth_verbose_logging: "Afficher les journaux d'authentification Salesforce détaillés dans /logs pour résoudre les problèmes"
+    salesforce_contact_auto_create_on_signup: "Créer automatiquement un contact Salesforce pour les nouveaux utilisateurs lorsqu'aucun contact ni aucune piste ne correspond à leur adresse e-mail. Les contacts sont créés après confirmation de l'adresse e-mail de l'utilisateur."
+    salesforce_contact_sync_mode: "Choisissez comment synchroniser les champs sélectionnés du contact Salesforce lorsqu'un utilisateur Discourse correspond à un contact existant. Les pistes correspondantes sont liées, mais jamais mises à jour."
+    salesforce_contact_sync_fields: "Champs des contacts Salesforce renseignés à partir du profil utilisateur Discourse lorsque {{setting:salesforce_contact_sync_mode}} est défini sur « Remplir les champs vides de Salesforce » ou « Écraser les champs Salesforce ». Le champ Description contient l'URL du profil Discourse."
+    salesforce_max_feed_items_per_day: "Nombre maximal de réponses à un sujet publiées chaque jour comme éléments de fil ou commentaires de requête sur chaque objet Salesforce (requête/piste/contact). La première publication d'un sujet est toujours envoyée. Utilisez -1 pour ne fixer aucune limite ou 0 pour n'envoyer que la première publication."
+    salesforce_feed_item_visibility: "Visibilité des éléments de fil et des commentaires de requête envoyés à Salesforce."
+    salesforce_case_tag_name: "Nom de l'étiquette à ajouter aux sujets associés à une requête Salesforce"
+    salesforce_case_status_tag_enabled: "Activer l'ajout d'étiquettes selon le statut des requêtes Salesforce"
+    salesforce_case_status_tag_prefix: "Préfixe à ajouter aux étiquettes de statut des requêtes Salesforce. Par exemple, si le préfixe est « case », les étiquettes seront case-open, case-closed, etc."
+    salesforce_case_origin: "Valeur « Origine de la requête » envoyée lors de la création de requêtes Salesforce. Laissez ce champ vide pour ne pas l'envoyer."
+    salesforce_lead_source: "Origine de la piste envoyée lors de la création des contacts et des pistes Salesforce, et lorsque {{setting:salesforce_contact_sync_fields}} inclut ce champ. Laissez ce champ vide pour ne pas l'envoyer."
+    salesforce_send_rendered_post_content: "Lorsque cette option est activée, le contenu des publications est envoyé à Salesforce en texte brut après conversion : la syntaxe Markdown est supprimée et chaque lien, image et pièce jointe devient une URL complète. Lorsqu'elle est désactivée, le texte source Markdown brut est envoyé."
+    salesforce_skip_contact_creation_on_case_sync: "Ignorer la création d'un contact Salesforce lors de la synchronisation d'une requête"
+    salesforce_default_contact_id_for_case_sync: "ID du contact Salesforce à utiliser par défaut lors de la synchronisation d'une requête. Utile lorsque « salesforce_skip_contact_creation_on_case_sync » est activé."
+    salesforce_auth_verbose_logging: "Afficher les journaux d'authentification Salesforce détaillés pour faciliter le dépannage (chemin : /logs)"
   salesforce:
     error:
+      ambiguous_email_match: "Plusieurs enregistrements %{object_name} de Salesforce utilisent la même adresse e-mail"
       invalid_response: "Réponse invalide de l'API Salesforce"
-      invalid_client_credentials: "Un problème s'est produit avec les informations d'identification Salesforce. Veuillez confirmer la validité de l'identifiant client Salesforce et des paramètres secrets du client"
+      invalid_client_credentials: "Un problème est survenu avec les identifiants Salesforce. Veuillez vérifier la validité des paramètres salesforce_client_id et salesforce_client_secret"
   dashboard:
     problem:
-      salesforce_invalid_credentials: "Un problème s'est produit avec les informations d'identification Salesforce. Veuillez confirmer la validité de l'identifiant client Salesforce et des paramètres secrets du client"
+      salesforce_invalid_credentials: "Un problème est survenu avec les identifiants Salesforce. Veuillez vérifier la validité des paramètres salesforce_client_id et salesforce_client_secret"
+      salesforce_app_not_approved: "L'application connectée Discourse n'a pas encore été autorisée dans Salesforce par l'utilisateur indiqué dans le paramètre de site `salesforce_username`. Suivez <a href='%{base_path}/salesforce/admin/authorize'>ce lien</a> pour l'autoriser."

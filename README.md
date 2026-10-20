@@ -26,6 +26,15 @@ operations continue. Lead enablement is independent of Leads group membership an
 Leads are linked but never updated. If multiple Contacts have the same email, the plugin skips
 linking and updating the ambiguous records when `fill_blank` or `overwrite` is selected.
 
+### Creating and syncing cases
+
+Only admins can create and manually sync Salesforce cases by default. Enable
+`salesforce_allow_moderators_to_create_cases` to allow moderators to perform these actions
+for topics they can see. Both actions use the site's Salesforce integration credentials.
+This setting does not affect automatic case synchronization through
+`salesforce_automatic_case_sync_tags` or grant access to Salesforce configuration or manual
+Contact/Lead creation.
+
 ### Reconnecting Salesforce
 
 After connecting Discourse to a different Salesforce organization or refreshing a sandbox, run

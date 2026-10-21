@@ -22,11 +22,31 @@ end
 require_relative "lib/salesforce/engine"
 
 register_asset "stylesheets/salesforce.scss"
+register_asset "stylesheets/common/salesforce-guided-sync.scss", :admin
+
+add_admin_route "salesforce.title", "discourse-salesforce", use_new_show_route: true
 
 register_svg_icon "fab-salesforce"
 register_svg_icon "address-card"
+%w[database shuffle user-pen wand-magic-sparkles].each { |icon| register_svg_icon icon }
 
 after_initialize do
+  register_modifier(:workflow_managed_by) do |owner, workflow|
+    configuration =
+      Salesforce::GuidedSyncConfiguration.all.find do |record|
+        record.fetch("workflows", []).any? { |generated| generated["id"].to_s == workflow.id.to_s }
+      end
+    if configuration
+      {
+        name: "Salesforce",
+        configuration_name: configuration["name"],
+        url: "/admin/plugins/discourse-salesforce/guided-sync?configuration=#{configuration["id"]}",
+      }
+    else
+      owner
+    end
+  end
+
   SeedFu.fixture_paths << Rails.root.join("plugins", "discourse-salesforce", "db", "fixtures").to_s
   register_problem_check Salesforce::ProblemCheck::SalesforceInvalidCredentials
   register_problem_check Salesforce::ProblemCheck::SalesforceAppNotApproved

@@ -1,0 +1,487 @@
+@use "lib/viewport";
+
+.salesforce-guided-sync {
+  min-width: 0;
+
+  &__demo-notice {
+    display: flex;
+    align-items: baseline;
+    gap: 0.6em;
+  }
+
+  &__tabs {
+    margin-block-start: 1.5em;
+  }
+
+  &__steps {
+    display: grid;
+    grid-template-columns: repeat(5, minmax(0, 1fr));
+    gap: 0.5em;
+    margin-block: 1em 1.5em;
+  }
+
+  &__step {
+    display: flex;
+    flex-direction: column;
+    gap: 0.5em;
+    white-space: normal;
+    color: var(--primary-medium);
+    padding: 0.5em 0.25em;
+
+    &.--current {
+      color: var(--tertiary);
+      font-weight: bold;
+    }
+
+    &.--completed .salesforce-guided-sync__step-number {
+      color: var(--success);
+      background: var(--success-low);
+      border-color: transparent;
+    }
+  }
+
+  &__step-number {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 1.8em;
+    min-height: 1.8em;
+    border: 1px solid var(--primary-low);
+    border-radius: 50%;
+  }
+
+  &__step.--current &__step-number {
+    color: var(--secondary);
+    background: var(--tertiary);
+    border-color: var(--tertiary);
+  }
+
+  &__connection {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 1em;
+    margin-block-end: 1.5em;
+
+    > .d-icon {
+      font-size: 2.5em;
+      color: var(--tertiary);
+    }
+
+    h4,
+    p {
+      margin: 0;
+    }
+  }
+
+  &__status {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.4em;
+    color: var(--success);
+    font-size: var(--font-down-1);
+    margin-inline-start: auto;
+  }
+
+  &__section-title {
+    margin-block: 0.5em 0.25em;
+  }
+
+  &__description,
+  &__help {
+    color: var(--primary-high);
+  }
+
+  &__help {
+    font-size: var(--font-down-1);
+  }
+
+  &__form {
+    align-items: stretch;
+    gap: 0.75em;
+
+    > h3,
+    > p {
+      margin-block: 0 0.5em;
+    }
+  }
+
+  &__mapping-headings {
+    display: none;
+    color: var(--primary-medium);
+    font-size: var(--font-down-1);
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.025em;
+    padding-block: 0.75em;
+    border-block-end: 1px solid var(--primary-low);
+  }
+
+  &__mapping-arrow {
+    display: none;
+    color: var(--primary-medium);
+    justify-self: center;
+    align-self: center;
+  }
+
+  &__locked-mapping {
+    display: grid;
+    gap: 0.5em;
+    color: var(--primary-medium);
+    margin-block: 0.5em;
+  }
+
+  &__mapping-list {
+    display: grid;
+    gap: 0.75em;
+    width: 100%;
+  }
+
+  &__mapping-row {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    gap: 0.75em;
+    padding-block: 0;
+    align-items: start;
+
+    > .form-kit__field {
+      grid-column: 1;
+      min-width: 0;
+      margin: 0;
+    }
+  }
+
+  &__remove {
+    grid-column: 2;
+    grid-row: 1;
+    align-self: center;
+  }
+
+  &__actions {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 0.75em;
+    margin-block: 1.25em;
+
+    &.--spread {
+      justify-content: space-between;
+    }
+  }
+
+  &__footer {
+    position: sticky;
+    inset-block-end: 0;
+    z-index: 2;
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: flex-end;
+    gap: 0.75em;
+    width: 100%;
+    box-sizing: border-box;
+    padding: 1em;
+    margin-block-start: 2em;
+    border: 1px solid var(--primary-low);
+    border-radius: var(--d-border-radius);
+    background: var(--secondary);
+    box-shadow: var(--shadow-menu);
+
+    > p,
+    > span:first-child {
+      margin: 0;
+      margin-inline-end: auto;
+    }
+
+    .salesforce-guided-sync__actions {
+      margin: 0;
+    }
+  }
+
+  &__preview-table {
+    min-width: 0;
+    overflow-wrap: anywhere;
+
+    table {
+      table-layout: fixed;
+    }
+  }
+
+  &__outcome {
+    display: block;
+    color: var(--success);
+    font-size: var(--font-down-1);
+    margin-block-start: 0.25em;
+
+    &.--kept {
+      color: var(--primary-high);
+    }
+  }
+
+  &__stats {
+    margin-block: 1.5em;
+  }
+
+  &__workflow-list {
+    display: grid;
+    gap: 0.75em;
+    margin-block: 1.5em;
+  }
+
+  &__workflow-summary {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 1em;
+    padding: 1em;
+    border: 1px solid var(--primary-low);
+    border-radius: var(--d-border-radius);
+
+    > .d-icon {
+      color: var(--tertiary);
+    }
+
+    h4,
+    p {
+      margin: 0;
+    }
+
+    p {
+      color: var(--primary-high);
+      font-size: var(--font-down-1);
+    }
+  }
+
+  &__canvas {
+    display: flex;
+    flex-direction: column;
+    align-items: stretch;
+    gap: 1em;
+    padding: 1.5em;
+    margin-block: 1.5em;
+    background: var(--primary-very-low);
+    border: 1px solid var(--primary-low);
+    border-radius: var(--d-border-radius);
+  }
+
+  &__node {
+    display: flex;
+    flex: 1;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 0.75em;
+    min-width: 0;
+    padding: 1em;
+    text-align: start;
+    white-space: normal;
+    overflow-wrap: anywhere;
+    background: var(--secondary);
+    border: 1px solid var(--primary-low);
+    border-radius: var(--d-border-radius);
+
+    > .d-icon {
+      color: var(--tertiary);
+    }
+
+    > span:last-child {
+      font-size: var(--font-down-1);
+      color: var(--primary-high);
+    }
+
+    &.--selected {
+      border-color: var(--tertiary);
+      box-shadow: 0 0 0 1px var(--tertiary);
+    }
+  }
+
+  &__node-detail {
+    border-inline-start: 3px solid var(--tertiary);
+    padding-inline-start: 1em;
+
+    h4 {
+      margin-block: 0 0.5em;
+    }
+  }
+
+  &__customization,
+  &__message {
+    margin-block-start: 1.5em;
+  }
+
+  @include viewport.from(sm) {
+    &__step {
+      flex-direction: row;
+      justify-content: flex-start;
+    }
+  }
+
+  @include viewport.from(lg) {
+    &__mapping-headings,
+    &__locked-mapping,
+    &__mapping-row {
+      display: grid;
+      grid-template-columns:
+        minmax(0, 1fr) 1.75em minmax(0, 1fr) minmax(0, 0.7fr)
+        2em;
+      gap: 0.75em;
+      align-items: start;
+    }
+
+    &__mapping-arrow {
+      display: inline-flex;
+    }
+
+    &__mapping-row > .form-kit__field {
+      grid-column: auto;
+    }
+
+    &__remove {
+      grid-column: 5;
+      grid-row: 1;
+      margin: 0;
+    }
+
+    &__canvas {
+      flex-direction: row;
+      align-items: stretch;
+    }
+  }
+}
+
+.salesforce-guided-sync__mapping-row .form-kit__control-select,
+.salesforce-field-menu .form-kit__control-menu-trigger {
+  width: 100%;
+  min-width: 0;
+  min-height: 2.5rem;
+  box-sizing: border-box;
+  border: 1px solid var(--primary-medium);
+  border-radius: 0.25rem;
+  background-color: var(--secondary);
+  color: var(--primary);
+}
+
+.salesforce-field-menu {
+  position: relative;
+  width: 100%;
+  min-width: 0;
+
+  .form-kit__control-menu-trigger {
+    display: flex;
+    justify-content: space-between;
+    text-align: start;
+    font-family: var(--font-family-monospace, monospace);
+
+    .d-button-label {
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+  }
+
+  &__search {
+    width: min(26em, calc(100vw - 4em));
+    box-sizing: border-box;
+    padding: 0.5em;
+  }
+
+  &__option {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 0.35em;
+    width: 100%;
+    line-height: 1.4;
+    white-space: normal;
+    text-align: start;
+  }
+
+  &__option-label {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 1em;
+  }
+
+  &__selected-badge {
+    position: absolute;
+    inset-inline-end: 2.5em;
+    inset-block-start: 50%;
+    transform: translateY(-50%);
+    pointer-events: none;
+  }
+
+  &.--custom .d-button-label {
+    padding-inline-end: 4.5em;
+  }
+
+  &__badge,
+  &__selected-badge {
+    flex-shrink: 0;
+    padding: 0.1em 0.5em;
+    border-radius: 0.25em;
+    color: var(--primary-high);
+    background: var(--primary-very-low);
+    font-family: var(--font-family);
+    font-size: var(--font-down-1);
+  }
+
+  &__description {
+    color: var(--primary-high);
+    font-size: var(--font-down-1);
+    white-space: normal;
+  }
+}
+
+.salesforce-guided-sync__mapping-row .--unmapped {
+  .form-kit__control-menu-trigger {
+    // FormKit's default input border uses !important.
+    border-color: var(--danger) !important;
+  }
+
+  .form-kit__container-description {
+    order: 2;
+    color: var(--danger);
+    font-weight: normal;
+  }
+}
+
+.salesforce-sync-configurations__choices {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 20em), 1fr));
+  gap: 1.5em;
+  margin-block: 1.5em 2em;
+}
+
+.salesforce-guided-sync__locked-mapping code,
+.salesforce-field-menu__option-label code {
+  background: none;
+  padding: 0;
+}
+
+.salesforce-guided-sync__form-card > .admin-config-area-card__content {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 1.25em;
+
+  > p {
+    margin: 0;
+  }
+}
+
+.salesforce-guided-sync__workflow-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.5em;
+}
+
+.salesforce-guided-sync__connection-heading {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.75em;
+
+  .salesforce-guided-sync__status {
+    margin-inline-start: 0;
+  }
+}

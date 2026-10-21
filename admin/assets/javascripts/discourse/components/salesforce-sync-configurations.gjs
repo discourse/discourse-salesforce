@@ -20,6 +20,7 @@ import { createDemoConfiguration } from "discourse/plugins/discourse-salesforce/
 export default class SalesforceSyncConfigurations extends Component {
   @service a11y;
   @service dialog;
+  @service toasts;
 
   @tracked deletingId;
   @tracked records = this.args.records || [];
@@ -32,7 +33,9 @@ export default class SalesforceSyncConfigurations extends Component {
       (configuration) => configuration.id === this.args.selectedId
     );
     if (record) {
-      this.edit(record);
+      this.selected = { key: record.id, configuration: record };
+    } else if (["new-users", "new-posts"].includes(this.args.selectedId)) {
+      this.add(this.args.selectedId.slice(4));
     }
   }
 
@@ -56,6 +59,10 @@ export default class SalesforceSyncConfigurations extends Component {
 
   @action
   add(kind) {
+    if (this.args.onSelect && this.args.selectedId !== `new-${kind}`) {
+      this.args.onSelect(`new-${kind}`);
+      return;
+    }
     this.selected = {
       key: `new-${kind}`,
       configuration:
@@ -74,6 +81,10 @@ export default class SalesforceSyncConfigurations extends Component {
 
   @action
   edit(record) {
+    if (this.args.onSelect) {
+      this.args.onSelect(record.id);
+      return;
+    }
     this.selected = { key: record.id, configuration: record };
   }
 
@@ -147,6 +158,10 @@ export default class SalesforceSyncConfigurations extends Component {
         result.configuration,
       ];
       this.selected = { ...this.selected, configuration: result.configuration };
+      this.toasts.success({
+        duration: "short",
+        data: { message: i18n("salesforce.guided_sync.save_success") },
+      });
       return true;
     } catch (error) {
       popupAjaxError(error);
@@ -226,7 +241,6 @@ export default class SalesforceSyncConfigurations extends Component {
                 <th>{{i18n "salesforce.guided_sync.sync_type"}}</th>
                 <th>{{i18n "salesforce.guided_sync.salesforce_object"}}</th>
                 <th>{{i18n "salesforce.guided_sync.scope"}}</th>
-                <th>{{i18n "salesforce.guided_sync.workflow_count"}}</th>
                 <th></th>
               </tr></thead>
             <tbody class="d-table__body">
@@ -249,11 +263,6 @@ export default class SalesforceSyncConfigurations extends Component {
                     >{{i18n
                         "salesforce.guided_sync.scope"
                       }}</div>{{record.scope}}</td>
-                  <td class="d-table__cell --detail"><div
-                      class="d-table__mobile-label"
-                    >{{i18n
-                        "salesforce.guided_sync.workflow_count"
-                      }}</div>{{record.workflows.length}}</td>
                   <td class="d-table__cell --controls">
                     <div class="d-table__cell-actions">
                       <DButton

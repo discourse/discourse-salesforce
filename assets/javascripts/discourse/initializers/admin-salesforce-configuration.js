@@ -15,6 +15,7 @@ export default {
           label: "salesforce.guided_sync.title",
           description: "salesforce.guided_sync.description",
           route: "adminPlugins.show.salesforce-guided-sync",
+          query: { configuration: null },
         },
       ]);
     });

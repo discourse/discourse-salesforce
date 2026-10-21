@@ -6,6 +6,7 @@ export default <template>
     <SalesforceSyncConfigurations
       @connection={{model.connection}}
       @onClose={{@controller.clearConfiguration}}
+      @onSelect={{@controller.selectConfiguration}}
       @records={{model.configurations}}
       @selectedId={{model.selectedId}}
     />

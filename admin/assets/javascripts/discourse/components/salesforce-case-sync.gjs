@@ -5,7 +5,7 @@ import { action } from "@ember/object";
 import { service } from "@ember/service";
 import AdminConfigAreaCard from "discourse/admin/components/admin-config-area-card";
 import Form from "discourse/components/form";
-import { eq } from "discourse/truth-helpers";
+import { and, eq } from "discourse/truth-helpers";
 import DButton from "discourse/ui-kit/d-button";
 import DPageSubheader from "discourse/ui-kit/d-page-subheader";
 import dConcatClass from "discourse/ui-kit/helpers/d-concat-class";
@@ -235,40 +235,6 @@ export default class SalesforceCaseSync extends Component {
         @titleLabel={{this.configuration.name}}
         @descriptionLabel={{i18n "salesforce.guided_sync.cases.description"}}
       />
-
-      {{#if this.workflows.length}}
-        <AdminConfigAreaCard
-          @heading="salesforce.guided_sync.generated_workflows"
-        >
-          <:content>
-            <p>{{i18n "salesforce.guided_sync.generated_description"}}</p>
-            <div class="salesforce-guided-sync__workflow-list">
-              {{#each this.workflows key="id" as |workflow|}}
-                <div
-                  class="salesforce-guided-sync__workflow-summary"
-                  data-test-generated-workflow={{workflow.id}}
-                >
-                  <div><h4>{{workflow.name}}</h4><p>{{i18n
-                        "salesforce.guided_sync.published"
-                      }}</p></div>
-                  <div class="salesforce-guided-sync__workflow-actions"><DButton
-                      class="btn-default"
-                      @href={{workflow.url}}
-                      @label="salesforce.guided_sync.open_workflow"
-                    />
-                    <DButton
-                      class="btn-flat"
-                      data-test-workflow-executions={{workflow.id}}
-                      @href={{workflow.executionUrl}}
-                      @label="salesforce.guided_sync.view_executions"
-                    />
-                  </div>
-                </div>
-              {{/each}}
-            </div>
-          </:content>
-        </AdminConfigAreaCard>
-      {{/if}}
 
       <nav
         class="salesforce-guided-sync__steps"
@@ -590,6 +556,46 @@ export default class SalesforceCaseSync extends Component {
             </:content>
           </AdminConfigAreaCard>
         {{/if}}
+        {{#if (and (eq this.step 4) this.workflows.length)}}
+          <AdminConfigAreaCard
+            class="salesforce-guided-sync__advanced"
+            data-test-advanced-workflows
+            @collapsable={{true}}
+            @collapsed={{true}}
+            @heading="salesforce.guided_sync.generated_workflows"
+          >
+            <:content>
+              <p>{{i18n "salesforce.guided_sync.generated_description"}}</p>
+              <div class="salesforce-guided-sync__workflow-list">
+                {{#each this.workflows key="id" as |workflow|}}
+                  <div
+                    class="salesforce-guided-sync__workflow-summary"
+                    data-test-generated-workflow={{workflow.id}}
+                  >
+                    <div><h4>{{workflow.name}}</h4><p>{{i18n
+                          "salesforce.guided_sync.published"
+                        }}</p></div>
+                    <div
+                      class="salesforce-guided-sync__workflow-actions"
+                    ><DButton
+                        class="btn-default"
+                        @href={{workflow.url}}
+                        @label="salesforce.guided_sync.open_workflow"
+                      />
+                      <DButton
+                        class="btn-flat"
+                        data-test-workflow-executions={{workflow.id}}
+                        @href={{workflow.executionUrl}}
+                        @label="salesforce.guided_sync.view_executions"
+                      />
+                    </div>
+                  </div>
+                {{/each}}
+              </div>
+            </:content>
+          </AdminConfigAreaCard>
+        {{/if}}
+
         <div class="salesforce-guided-sync__footer">
           <span>{{i18n
               "salesforce.guided_sync.step_progress"

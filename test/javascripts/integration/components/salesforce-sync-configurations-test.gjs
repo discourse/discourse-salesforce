@@ -46,6 +46,14 @@ module(
         .doesNotExist("reuses the saved site connection");
       assert.dom("[data-test-connect-demo]").doesNotExist();
       assert
+        .dom("[data-test-generated-workflow]")
+        .doesNotExist("keeps workflow details collapsed by default");
+      assert
+        .dom("[data-test-advanced-workflows]")
+        .doesNotExist("hides advanced workflows before the review step");
+      await click('[data-test-step="review"]');
+      await click("[data-test-advanced-workflows] button");
+      assert
         .dom('[data-test-generated-workflow="81"] a')
         .hasAttribute(
           "href",
@@ -60,6 +68,9 @@ module(
           "links to the generated workflow execution history"
         );
       await click('[data-test-step="scope"]');
+      assert
+        .dom("[data-test-advanced-workflows]")
+        .doesNotExist("hides advanced workflows when leaving review");
       assert.strictEqual(
         formKit().field("group").value(),
         "partners",
@@ -69,12 +80,20 @@ module(
       await click("[data-test-configurations-back]");
       await click('[data-test-configuration="contact"] button');
       assert
+        .dom("[data-test-advanced-workflows]")
+        .doesNotExist("hides advanced workflows before the review step");
+      await click('[data-test-step="review"]');
+      await click("[data-test-advanced-workflows] button");
+      assert
         .dom('[data-test-generated-workflow="82"]')
         .exists("shows the Contact workflow");
       assert
         .dom('[data-test-generated-workflow="81"]')
         .doesNotExist("keeps Lead workflows separate");
       await click('[data-test-step="scope"]');
+      assert
+        .dom("[data-test-advanced-workflows]")
+        .doesNotExist("hides advanced workflows when leaving review");
       assert.strictEqual(
         formKit().field("object").value(),
         "Contact",

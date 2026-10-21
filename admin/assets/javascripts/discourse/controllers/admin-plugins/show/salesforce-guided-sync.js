@@ -8,6 +8,11 @@ export default class SalesforceGuidedSyncController extends Controller {
   queryParams = ["configuration"];
 
   @action
+  selectConfiguration(id) {
+    this.configuration = id;
+  }
+
+  @action
   clearConfiguration() {
     this.configuration = null;
   }

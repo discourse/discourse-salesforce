@@ -3,6 +3,10 @@
 .salesforce-guided-sync {
   min-width: 0;
 
+  &__advanced {
+    margin-block-start: var(--space-6);
+  }
+
   &__demo-notice {
     display: flex;
     align-items: baseline;

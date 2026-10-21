@@ -31,6 +31,15 @@ after_initialize do
     is_admin? || (is_moderator? && SiteSetting.salesforce_allow_moderators_to_create_cases)
   end
 
+  add_to_class(:guardian, :can_delete_salesforce_cases?) do
+    authenticated? &&
+      current_user.in_any_groups?(SiteSetting.salesforce_case_deletion_allowed_groups_map)
+  end
+
+  add_to_serializer(:topic_view, :can_delete_salesforce_case) do
+    SiteSetting.salesforce_enabled && scope.can_delete_salesforce_cases?
+  end
+
   SeedFu.fixture_paths << Rails.root.join("plugins", "discourse-salesforce", "db", "fixtures").to_s
   register_problem_check Salesforce::ProblemCheck::SalesforceInvalidCredentials
   register_problem_check Salesforce::ProblemCheck::SalesforceAppNotApproved
@@ -99,7 +108,8 @@ after_initialize do
     :topic_view,
     :salesforce_case,
     include_condition: -> do
-      SiteSetting.salesforce_enabled && scope.is_staff? && object.topic.has_salesforce_case
+      SiteSetting.salesforce_enabled && (scope.is_staff? || scope.can_delete_salesforce_cases?) &&
+        object.topic.has_salesforce_case
     end,
   ) { ::Salesforce::CaseSerializer.new(object.topic.salesforce_case, root: false).as_json }
 

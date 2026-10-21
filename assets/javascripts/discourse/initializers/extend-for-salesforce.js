@@ -38,6 +38,10 @@ function initializeWithApi(api, container) {
   const currentUser = api.getCurrentUser();
   const isStaff = currentUser?.staff;
 
+  if (currentUser) {
+    customizePost(api);
+  }
+
   if (isStaff) {
     const siteSettings = container.lookup("service:site-settings");
     const toasts = container.lookup("service:toasts");
@@ -96,8 +100,6 @@ function initializeWithApi(api, container) {
       }
     );
 
-    customizePost(api, container);
-
     api.addTopicAdminMenuButton((topic) => {
       if (
         currentUser.admin ||
@@ -134,6 +136,7 @@ function initializeWithApi(api, container) {
 }
 
 function customizePost(api) {
+  api.addModelField("topic", "can_delete_salesforce_case");
   api.addModelField("topic", "salesforce_case_loading");
   api.addModelField("topic", "salesforce_case");
 

@@ -15,6 +15,10 @@ en:
         link_only: "Link only — link the Discourse user to the Salesforce Contact without updating Salesforce fields"
         fill_blank: "Fill blank Salesforce fields — update selected fields only when they are empty in Salesforce"
         overwrite: "Overwrite Salesforce fields — replace selected Salesforce field values with values from Discourse"
+      case:
+        delete: "Delete case"
+        delete_confirmation: "Delete Salesforce case #%{number} and unlink it from this topic? This also removes its case and automatic sync tags."
+        delete_success: "Salesforce case deleted and unlinked"
       lead:
         create: "Create Lead"
         create_success: "Salesforce lead synced"

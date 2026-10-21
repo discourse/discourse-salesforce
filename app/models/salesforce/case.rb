@@ -55,6 +55,47 @@ module ::Salesforce
       MessageBus.publish("/topic/#{topic_id}", reload_topic: true)
     end
 
+    def delete_and_unlink!
+      with_lock do
+        Salesforce::Api.new.delete("sobjects/Case/#{uid}")
+
+        PostCustomField.where(
+          post_id: Post.where(topic_id: topic_id).select(:id),
+          name: CaseComment::ID_FIELD,
+        ).delete_all
+        TopicCustomField.where(
+          topic_id: topic_id,
+          name: ::CaseMixin::HAS_SALESFORCE_CASE,
+        ).delete_all
+
+        trigger_tags = SiteSetting.salesforce_automatic_case_sync_tags.split("|")
+        old_tag_names = topic.tags.pluck(:name)
+        removed_tag_names =
+          old_tag_names.select do |name|
+            name == SiteSetting.salesforce_case_tag_name || trigger_tags.include?(name) ||
+              (
+                SiteSetting.salesforce_case_status_tag_enabled &&
+                  name.start_with?("#{SiteSetting.salesforce_case_status_tag_prefix}-")
+              )
+          end
+        if removed_tag_names.present?
+          topic.tags = topic.tags.where.not(name: removed_tag_names)
+          topic.tags_changed = true
+          DiscourseEvent.trigger(
+            :topic_tags_changed,
+            topic,
+            old_tag_names: old_tag_names,
+            new_tag_names: topic.tags.map(&:name),
+            user: Discourse.system_user,
+          )
+        end
+
+        destroy!
+      end
+
+      MessageBus.publish("/topic/#{topic_id}", reload_topic: true)
+    end
+
     CASE_ID_FIELD = "salesforce_case_id"
 
     def self.sync!(topic)

@@ -8,6 +8,66 @@ RSpec.describe Salesforce::Case do
 
   include_context "with salesforce spec helper"
 
+  describe "#delete_and_unlink!" do
+    fab!(:salesforce_case) { Fabricate(:salesforce_case, topic: topic) }
+
+    it "deletes the remote case and clears only its local references and tags" do
+      SiteSetting.tagging_enabled = true
+      SiteSetting.salesforce_automatic_case_sync_tags = "support"
+      topic.tags =
+        %w[billing support salesforce-case case-new].map { |name| Fabricate(:tag, name: name) }
+      topic.upsert_custom_fields(::CaseMixin::HAS_SALESFORCE_CASE => true)
+      post.upsert_custom_fields(Salesforce::CaseComment::ID_FIELD => "comment-id")
+      other_case = Fabricate(:salesforce_case)
+      other_case.topic.upsert_custom_fields(::CaseMixin::HAS_SALESFORCE_CASE => true)
+      deletion =
+        stub_request(:delete, "#{api_path}/Case/#{salesforce_case.uid}").to_return(status: 204)
+
+      messages =
+        MessageBus.track_publish("/topic/#{topic.id}") { salesforce_case.delete_and_unlink! }
+
+      expect(deletion).to have_been_requested.once
+      expect(Salesforce::Case.exists?(salesforce_case.id)).to eq(false)
+      expect(topic.reload.has_salesforce_case).to eq(false)
+      expect(post.reload.custom_fields[Salesforce::CaseComment::ID_FIELD]).to eq(nil)
+      expect(topic.tags.pluck(:name)).to contain_exactly("billing")
+      Jobs::SyncCase.new.execute(topic_id: topic.id)
+      expect(Salesforce::Case.exists?(topic_id: topic.id)).to eq(false)
+      expect(other_case.topic.reload.has_salesforce_case).to eq(true)
+      expect(Salesforce::Case.exists?(other_case.id)).to eq(true)
+      expect(messages.map(&:data)).to include({ reload_topic: true })
+    end
+
+    it "removes automatic sync tags even when tagging has been disabled" do
+      SiteSetting.salesforce_automatic_case_sync_tags = "support"
+      topic.tags = [Fabricate(:tag, name: "support")]
+      SiteSetting.tagging_enabled = false
+      stub_request(:delete, "#{api_path}/Case/#{salesforce_case.uid}").to_return(status: 204)
+
+      salesforce_case.delete_and_unlink!
+
+      expect(topic.reload.tags).to be_empty
+    end
+
+    it "retains links and tags when remote deletion fails" do
+      SiteSetting.tagging_enabled = true
+      topic.tags = [Fabricate(:tag, name: "salesforce-case")]
+      topic.upsert_custom_fields(::CaseMixin::HAS_SALESFORCE_CASE => true)
+      post.upsert_custom_fields(Salesforce::CaseComment::ID_FIELD => "comment-id")
+      stub_request(:delete, "#{api_path}/Case/#{salesforce_case.uid}").to_return(
+        status: 403,
+        body: "Denied",
+      )
+
+      expect { salesforce_case.delete_and_unlink! }.to raise_error(Salesforce::InvalidApiResponse)
+
+      expect(Salesforce::Case.exists?(salesforce_case.id)).to eq(true)
+      expect(topic.reload.has_salesforce_case).to eq(true)
+      expect(post.reload.custom_fields[Salesforce::CaseComment::ID_FIELD]).to eq("comment-id")
+      expect(topic.tags.pluck(:name)).to contain_exactly("salesforce-case")
+    end
+  end
+
   describe ".sync!" do
     before do
       Salesforce.seed_groups!

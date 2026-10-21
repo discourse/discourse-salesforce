@@ -49,7 +49,7 @@ discourse_salesforce:
   salesforce_allow_moderators_to_create_cases:
     default: false
     client: true
-  salesforce_case_deletion_allowed_groups:
+  salesforce_case_unlink_allowed_groups:
     type: group_list
     default: ""
   salesforce_case_tag_name:

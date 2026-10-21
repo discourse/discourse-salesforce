@@ -38,13 +38,13 @@ export default class PostSalesforceCase extends Component {
   }
 
   @action
-  async deleteCase() {
+  async unlinkCase() {
     const caseId = this.case.id;
     const confirmed = await this.dialog.confirm({
-      message: i18n("salesforce.case.delete_confirmation", {
+      message: i18n("salesforce.case.unlink_confirmation", {
         number: this.case.number,
       }),
-      confirmButtonLabel: "salesforce.case.delete",
+      confirmButtonLabel: "salesforce.case.unlink",
       confirmButtonClass: "btn-danger",
     });
     if (!confirmed) {
@@ -56,7 +56,7 @@ export default class PostSalesforceCase extends Component {
       await ajax(`/salesforce/cases/${caseId}`, { type: "DELETE" });
       this.topic.salesforce_case = null;
       this.toasts.success({
-        data: { message: i18n("salesforce.case.delete_success") },
+        data: { message: i18n("salesforce.case.unlink_success") },
       });
     } catch (error) {
       popupAjaxError(error);
@@ -84,13 +84,13 @@ export default class PostSalesforceCase extends Component {
             Status:
             <strong>{{this.case.status}}</strong>
           </blockquote>
-          {{#if this.topic.can_delete_salesforce_case}}
+          {{#if this.topic.can_unlink_salesforce_case}}
             <DButton
-              class="btn-danger salesforce-case__delete"
-              @action={{this.deleteCase}}
+              class="btn-danger salesforce-case__unlink"
+              @action={{this.unlinkCase}}
               @disabled={{this.loading}}
               @icon="trash-can"
-              @label="salesforce.case.delete"
+              @label="salesforce.case.unlink"
             />
           {{/if}}
         </aside>

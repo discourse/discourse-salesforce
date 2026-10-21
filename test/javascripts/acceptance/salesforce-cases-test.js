@@ -67,24 +67,24 @@ acceptance("Salesforce Cases menu with moderator access", function (needs) {
   });
 });
 
-acceptance("Salesforce case deletion", function (needs) {
+acceptance("Salesforce case unlinking", function (needs) {
   needs.user({ admin: false, moderator: false });
   needs.settings({ salesforce_enabled: true });
 
-  let canDelete;
-  let deleted;
-  let rejectDeletion;
+  let canUnlink;
+  let unlinked;
+  let rejectUnlink;
 
   needs.hooks.beforeEach(() => {
-    canDelete = true;
-    deleted = false;
-    rejectDeletion = false;
+    canUnlink = true;
+    unlinked = false;
+    rejectUnlink = false;
   });
 
   needs.pretender((server, helper) => {
     server.get("/t/280.json", () => {
       const topic = cloneJSON(topicFixtures["/t/280/1.json"]);
-      topic.can_delete_salesforce_case = canDelete;
+      topic.can_unlink_salesforce_case = canUnlink;
       topic.salesforce_case = {
         id: 1,
         uid: "case-id",
@@ -94,60 +94,66 @@ acceptance("Salesforce case deletion", function (needs) {
       return helper.response(topic);
     });
     server.delete("/salesforce/cases/1", () => {
-      if (rejectDeletion) {
-        return helper.response(422, {
-          errors: ["Salesforce rejected deletion"],
+      if (rejectUnlink) {
+        return helper.response(500, {
+          errors: ["Unable to unlink case"],
         });
       }
-      deleted = true;
+      unlinked = true;
       return helper.response(204);
     });
   });
 
-  test("deletes and unlinks a case after confirmation", async function (assert) {
+  test("unlinks a case after confirmation", async function (assert) {
     await visit("/t/internationalization-localization/280");
-    await click(".salesforce-case__delete");
+    await click(".salesforce-case__unlink");
 
     assert
       .dom("#dialog-holder")
       .includesText("#123456", "The confirmation identifies the case");
-    assert.false(deleted, "Deletion waits for confirmation");
+    assert
+      .dom("#dialog-holder")
+      .includesText(
+        "The case will remain in Salesforce",
+        "The confirmation explains that the remote case is preserved"
+      );
+    assert.false(unlinked, "Unlinking waits for confirmation");
 
     await click("#dialog-holder .btn-danger");
 
-    assert.true(deleted, "The remote deletion endpoint was called");
+    assert.true(unlinked, "The local unlink endpoint was called");
     assert
       .dom(".salesforce-case")
       .doesNotExist("The case is unlinked from the topic");
   });
 
-  test("keeps the case when deletion is cancelled", async function (assert) {
+  test("keeps the case when unlinking is cancelled", async function (assert) {
     await visit("/t/internationalization-localization/280");
-    await click(".salesforce-case__delete");
+    await click(".salesforce-case__unlink");
     await click("#dialog-holder .btn-default");
 
-    assert.false(deleted, "Cancelling leaves the remote case untouched");
+    assert.false(unlinked, "Cancelling keeps the case linked");
     assert.dom(".salesforce-case").exists("The case remains linked");
   });
 
-  test("keeps the case when Salesforce rejects deletion", async function (assert) {
-    rejectDeletion = true;
+  test("keeps the case when unlinking fails", async function (assert) {
+    rejectUnlink = true;
     await visit("/t/internationalization-localization/280");
-    await click(".salesforce-case__delete");
+    await click(".salesforce-case__unlink");
     await click("#dialog-holder .btn-danger");
 
     assert
       .dom("#dialog-holder")
-      .includesText("Salesforce rejected deletion", "The error is shown");
+      .includesText("Unable to unlink case", "The error is shown");
     assert.dom(".salesforce-case").exists("The case remains linked");
   });
 
-  test("hides deletion when permission is absent", async function (assert) {
-    canDelete = false;
+  test("hides unlinking when permission is absent", async function (assert) {
+    canUnlink = false;
     await visit("/t/internationalization-localization/280");
 
     assert
-      .dom(".salesforce-case__delete")
-      .doesNotExist("Deletion is unavailable without permission");
+      .dom(".salesforce-case__unlink")
+      .doesNotExist("Unlinking is unavailable without permission");
   });
 });

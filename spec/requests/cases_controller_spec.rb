@@ -146,7 +146,7 @@ RSpec.describe ::Salesforce::CasesController do
 
     before { topic.upsert_custom_fields(::CaseMixin::HAS_SALESFORCE_CASE => true) }
 
-    it "disables deletion for admins and moderators when no groups are selected" do
+    it "disables unlinking for admins and moderators when no groups are selected" do
       [admin, moderator].each do |user|
         sign_in(user)
 
@@ -158,31 +158,27 @@ RSpec.describe ::Salesforce::CasesController do
     end
 
     %i[admins moderators].each do |group_name|
-      it "allows members of the selected #{group_name} group to delete cases" do
-        SiteSetting.salesforce_case_deletion_allowed_groups = Group::AUTO_GROUPS[group_name].to_s
+      it "allows members of the selected #{group_name} group to unlink cases" do
+        SiteSetting.salesforce_case_unlink_allowed_groups = Group::AUTO_GROUPS[group_name].to_s
         sign_in(group_name == :admins ? admin : moderator)
-        deletion =
-          stub_request(:delete, "#{api_path}/Case/#{salesforce_case.uid}").to_return(status: 204)
 
         delete "/salesforce/cases/#{salesforce_case.id}.json"
 
         expect(response.status).to eq(204)
         expect(response.body).to be_empty
-        expect(deletion).to have_been_requested.once
         expect(Salesforce::Case.exists?(salesforce_case.id)).to eq(false)
       end
     end
 
-    it "allows custom group members to view and delete cases without create permission" do
+    it "allows custom group members to view and unlink cases without create permission" do
       group = Fabricate(:group)
       group.add(topic.user)
-      SiteSetting.salesforce_case_deletion_allowed_groups = group.id.to_s
+      SiteSetting.salesforce_case_unlink_allowed_groups = group.id.to_s
       sign_in(topic.user)
-      stub_request(:delete, "#{api_path}/Case/#{salesforce_case.uid}").to_return(status: 204)
 
       get "/t/#{topic.id}.json"
       expect(response.status).to eq(200)
-      expect(response.parsed_body["can_delete_salesforce_case"]).to eq(true)
+      expect(response.parsed_body["can_unlink_salesforce_case"]).to eq(true)
       expect(response.parsed_body.dig("salesforce_case", "uid")).to eq(salesforce_case.uid)
 
       delete "/salesforce/cases/#{salesforce_case.id}.json"
@@ -192,7 +188,7 @@ RSpec.describe ::Salesforce::CasesController do
     end
 
     it "denies nonmembers even when they are admins" do
-      SiteSetting.salesforce_case_deletion_allowed_groups = Fabricate(:group).id.to_s
+      SiteSetting.salesforce_case_unlink_allowed_groups = Fabricate(:group).id.to_s
       sign_in(admin)
 
       delete "/salesforce/cases/#{salesforce_case.id}.json"
@@ -202,7 +198,7 @@ RSpec.describe ::Salesforce::CasesController do
     end
 
     it "requires login" do
-      SiteSetting.salesforce_case_deletion_allowed_groups = Group::AUTO_GROUPS[:everyone].to_s
+      SiteSetting.salesforce_case_unlink_allowed_groups = Group::AUTO_GROUPS[:everyone].to_s
 
       delete "/salesforce/cases/#{salesforce_case.id}.json"
 
@@ -211,7 +207,7 @@ RSpec.describe ::Salesforce::CasesController do
     end
 
     it "denies members access to private topics they cannot see" do
-      SiteSetting.salesforce_case_deletion_allowed_groups = Group::AUTO_GROUPS[:moderators].to_s
+      SiteSetting.salesforce_case_unlink_allowed_groups = Group::AUTO_GROUPS[:moderators].to_s
       private_case = Fabricate(:salesforce_case, topic: Fabricate(:private_message_topic))
       sign_in(moderator)
 
@@ -222,7 +218,7 @@ RSpec.describe ::Salesforce::CasesController do
     end
 
     it "returns 404 for a missing case" do
-      SiteSetting.salesforce_case_deletion_allowed_groups = Group::AUTO_GROUPS[:admins].to_s
+      SiteSetting.salesforce_case_unlink_allowed_groups = Group::AUTO_GROUPS[:admins].to_s
       sign_in(admin)
 
       delete "/salesforce/cases/0.json"
@@ -230,39 +226,20 @@ RSpec.describe ::Salesforce::CasesController do
       expect(response.status).to eq(404)
     end
 
-    it "keeps the association when Salesforce rejects deletion" do
-      SiteSetting.salesforce_case_deletion_allowed_groups = Group::AUTO_GROUPS[:admins].to_s
+    it "unlinks locally even when Salesforce credentials are unavailable" do
+      SiteSetting.salesforce_case_unlink_allowed_groups = Group::AUTO_GROUPS[:admins].to_s
+      SiteSetting.salesforce_client_id = ""
       sign_in(admin)
-      error = [
-        { message: "Insufficient access", errorCode: "INSUFFICIENT_ACCESS_OR_READONLY" },
-      ].to_json
-      stub_request(:delete, "#{api_path}/Case/#{salesforce_case.uid}").to_return(
-        status: 403,
-        body: error,
-      )
 
       delete "/salesforce/cases/#{salesforce_case.id}.json"
 
-      expect(response.status).to eq(422)
-      expect(response.parsed_body["errors"]).to eq([error])
-      expect(Salesforce::Case.exists?(salesforce_case.id)).to eq(true)
-      expect(topic.reload.has_salesforce_case).to eq(true)
-    end
-
-    it "returns a readable error for invalid credentials" do
-      SiteSetting.salesforce_case_deletion_allowed_groups = Group::AUTO_GROUPS[:admins].to_s
-      sign_in(admin)
-      stub_request(:post, "https://login.salesforce.com/services/oauth2/token").to_return(
-        status: 400,
-      )
-
-      delete "/salesforce/cases/#{salesforce_case.id}.json"
-
-      expect(response.status).to eq(502)
-      expect(response.parsed_body["error"]).to eq(
-        I18n.t("salesforce.error.invalid_client_credentials"),
-      )
-      expect(Salesforce::Case.exists?(salesforce_case.id)).to eq(true)
+      expect(response.status).to eq(204)
+      expect(Salesforce::Case.exists?(salesforce_case.id)).to eq(false)
+      expect(topic.reload.has_salesforce_case).to eq(false)
+      expect(a_request(:any, %r{https://test\.my\.salesforce\.com/})).not_to have_been_made
+      expect(
+        a_request(:post, "https://login.salesforce.com/services/oauth2/token"),
+      ).not_to have_been_made
     end
   end
 end

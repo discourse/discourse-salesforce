@@ -16,9 +16,9 @@ en:
         fill_blank: "Fill blank Salesforce fields — update selected fields only when they are empty in Salesforce"
         overwrite: "Overwrite Salesforce fields — replace selected Salesforce field values with values from Discourse"
       case:
-        delete: "Delete case"
-        delete_confirmation: "Delete Salesforce case #%{number} and unlink it from this topic? This also removes its case and automatic sync tags."
-        delete_success: "Salesforce case deleted and unlinked"
+        unlink: "Unlink case"
+        unlink_confirmation: "Unlink Salesforce case #%{number} from this topic? The case will remain in Salesforce. This also removes the topic’s case and automatic sync tags."
+        unlink_success: "Salesforce case unlinked"
       lead:
         create: "Create Lead"
         create_success: "Salesforce lead synced"

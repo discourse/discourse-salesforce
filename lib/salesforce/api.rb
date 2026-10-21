@@ -49,10 +49,6 @@ module ::Salesforce
       call(path) { |uri| faraday.get(uri) }
     end
 
-    def delete(path)
-      call(path) { |uri| faraday.delete(uri) }
-    end
-
     def post(path, fields)
       call(path) { |uri| faraday.post(uri, fields.to_json, "Content-Type": "application/json") }
     end

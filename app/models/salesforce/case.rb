@@ -55,10 +55,8 @@ module ::Salesforce
       MessageBus.publish("/topic/#{topic_id}", reload_topic: true)
     end
 
-    def delete_and_unlink!
+    def unlink!
       with_lock do
-        Salesforce::Api.new.delete("sobjects/Case/#{uid}")
-
         PostCustomField.where(
           post_id: Post.where(topic_id: topic_id).select(:id),
           name: CaseComment::ID_FIELD,

@@ -35,20 +35,20 @@ This setting does not affect automatic case synchronization through
 `salesforce_automatic_case_sync_tags` or grant access to Salesforce configuration or manual
 Contact/Lead creation.
 
-### Deleting cases
+### Unlinking cases
 
-`salesforce_case_deletion_allowed_groups` controls who can delete cases. It defaults to empty,
-which disables deletion for everyone, including admins. Add the admins, moderators, or custom
+`salesforce_case_unlink_allowed_groups` controls who can unlink cases. It defaults to empty,
+which disables unlinking for everyone, including admins. Add the admins, moderators, or custom
 groups that should have access. Members must also be able to see the topic.
 
-The **Delete case** button beside the case details asks for confirmation, deletes the case in
-Salesforce using the integration account, and removes the Discourse case and comment links.
-The integration account needs permission to delete Cases. If Salesforce rejects deletion,
-Discourse keeps the association intact.
+The **Unlink case** button beside the case details asks for confirmation and removes the
+Discourse case and comment links. The case and its comments remain in Salesforce. Unlinking
+only changes local data and works even when Salesforce credentials are unavailable.
 
-Deletion also removes the configured case tag, enabled case status tags, and automatic case
-sync trigger tags from the topic so subsequent edits do not recreate the case. Other tags remain.
-It does not delete the Discourse topic. This action is separate from create/sync permissions.
+Unlinking also removes the configured case tag, enabled case status tags, and automatic case
+sync trigger tags from the topic so subsequent edits do not create another case. Already queued
+automatic sync jobs skip creating a case once its trigger tags and local association are gone.
+Other tags and the Discourse topic remain. This action is separate from create/sync permissions.
 
 ### Reconnecting Salesforce
 

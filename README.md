@@ -41,7 +41,9 @@ each selected sync behavior. HTTP requests use simulation mode and never contact
 the placeholder destination. Configuration settings are included in the request
 step so changes can be inspected in the generated definitions.
 
-The native Workflows list marks generated definitions **Managed by Salesforce** with a lock icon. The workflow detail page also identifies its owner.
+The native Workflows list groups generated definitions under **Salesforce plugin**,
+with a shared explanation that these workflows are read-only. The workflow detail
+page also identifies its owner.
 They are read-only there, including direct mutation API requests. **Edit plugin
 configuration** opens the owning configuration using the `configuration` query
 parameter. Direct links and page reloads retain the selected configuration;

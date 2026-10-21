@@ -1,12 +1,16 @@
 # frozen_string_literal: true
 
 module Salesforce
-  class CasesController < ::Admin::AdminController
+  class CasesController < ::ApplicationController
+    requires_login
     requires_plugin PLUGIN_NAME
+
+    before_action { guardian.ensure_can_sync_salesforce_cases! }
 
     def sync
       params.require(:topic_id)
       topic = Topic.find(params[:topic_id])
+      guardian.ensure_can_see!(topic)
 
       begin
         salesforce_case = Case.sync!(topic)

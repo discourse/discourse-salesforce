@@ -99,8 +99,11 @@ function initializeWithApi(api, container) {
     customizePost(api, container);
 
     api.addTopicAdminMenuButton((topic) => {
-      const canManageTopic = api.getCurrentUser()?.canManageTopic;
-      if (canManageTopic) {
+      if (
+        currentUser.admin ||
+        (currentUser.moderator &&
+          siteSettings.salesforce_allow_moderators_to_create_cases)
+      ) {
         return {
           className: "topic-admin-salesforce-case",
           icon: "briefcase",

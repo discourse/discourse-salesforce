@@ -8,36 +8,95 @@ RSpec.describe ::Salesforce::CasesController do
   fab!(:topic)
   fab!(:first_post) { Fabricate(:post, topic: topic) }
   fab!(:admin)
+  fab!(:moderator)
 
   describe "#sync" do
-    it "creates a new case object in Salesforce" do
-      sign_in(admin)
-      Salesforce.seed_groups!
+    %i[admin moderator].each do |role|
+      it "creates a new case object in Salesforce as #{role}" do
+        SiteSetting.salesforce_allow_moderators_to_create_cases = true if role == :moderator
+        sign_in(public_send(role))
+        Salesforce.seed_groups!
 
-      stub_salesforce_person_lookup("Contact", topic.user.email)
+        stub_salesforce_person_lookup("Contact", topic.user.email)
 
-      stub_request(:post, "#{api_path}/Contact").with(
-        body: topic.user.salesforce_contact_payload.to_json,
-      ).to_return(status: 200, body: %({"id":"123456"}), headers: {})
+        stub_request(:post, "#{api_path}/Contact").with(
+          body: topic.user.salesforce_contact_payload.to_json,
+        ).to_return(status: 200, body: %({"id":"123456"}), headers: {})
 
-      stub_request(:post, "#{api_path}/Case").with(
-        body:
-          %({"ContactId":"123456","Subject":"#{topic.title}","Description":"#{first_post.full_url}\\n\\n#{first_post.raw}","Origin":"Web"}),
-      ).to_return(status: 200, body: %({"id":"234567"}), headers: {})
+        stub_request(:post, "#{api_path}/Case").with(
+          body:
+            %({"ContactId":"123456","Subject":"#{topic.title}","Description":"#{first_post.full_url}\\n\\n#{first_post.raw}","Origin":"Web"}),
+        ).to_return(status: 200, body: %({"id":"234567"}), headers: {})
 
-      stub_request(:get, "#{api_path}/Case/234567").to_return(
+        stub_request(:get, "#{api_path}/Case/234567").to_return(
+          status: 200,
+          body: %({"CaseNumber":"345678","Status":"New"}),
+          headers: {
+          },
+        )
+
+        post "/salesforce/cases/sync.json", params: { topic_id: topic.id }
+
+        expect(response.status).to eq(200)
+        salesforce_case = ::Salesforce::Case.last
+        expect(salesforce_case.number).to eq("345678")
+        expect(salesforce_case.status).to eq("New")
+      end
+    end
+
+    it "denies moderators by default" do
+      sign_in(moderator)
+
+      post "/salesforce/cases/sync.json", params: { topic_id: topic.id }
+
+      expect(response.status).to eq(403)
+      expect(Salesforce::Case.exists?(topic_id: topic.id)).to eq(false)
+    end
+
+    it "denies regular users even when moderator access is enabled" do
+      SiteSetting.salesforce_allow_moderators_to_create_cases = true
+      sign_in(topic.user)
+
+      post "/salesforce/cases/sync.json", params: { topic_id: topic.id }
+
+      expect(response.status).to eq(403)
+      expect(Salesforce::Case.exists?(topic_id: topic.id)).to eq(false)
+    end
+
+    it "requires login even when moderator access is enabled" do
+      SiteSetting.salesforce_allow_moderators_to_create_cases = true
+
+      post "/salesforce/cases/sync.json", params: { topic_id: topic.id }
+
+      expect(response.status).to eq(403)
+      expect(Salesforce::Case.exists?(topic_id: topic.id)).to eq(false)
+    end
+
+    it "denies moderators access to private messages they cannot see" do
+      SiteSetting.salesforce_allow_moderators_to_create_cases = true
+      private_topic = Fabricate(:private_message_topic)
+      sign_in(moderator)
+
+      post "/salesforce/cases/sync.json", params: { topic_id: private_topic.id }
+
+      expect(response.status).to eq(403)
+      expect(Salesforce::Case.exists?(topic_id: private_topic.id)).to eq(false)
+    end
+
+    it "allows moderators to sync existing cases when enabled" do
+      SiteSetting.salesforce_allow_moderators_to_create_cases = true
+      salesforce_case = Fabricate(:salesforce_case, topic: topic)
+      sign_in(moderator)
+      stub_request(:get, "#{api_path}/Case/#{salesforce_case.uid}").to_return(
         status: 200,
-        body: %({"CaseNumber":"345678","Status":"New"}),
-        headers: {
-        },
+        body: { CaseNumber: salesforce_case.number, Status: "Closed" }.to_json,
       )
 
       post "/salesforce/cases/sync.json", params: { topic_id: topic.id }
 
       expect(response.status).to eq(200)
-      salesforce_case = ::Salesforce::Case.last
-      expect(salesforce_case.number).to eq("345678")
-      expect(salesforce_case.status).to eq("New")
+      expect(salesforce_case.reload.status).to eq("Closed")
+      expect(response.parsed_body.dig("case", "status")).to eq("Closed")
     end
 
     it "returns the Salesforce error when case creation is rejected" do

@@ -27,6 +27,10 @@ register_svg_icon "fab-salesforce"
 register_svg_icon "address-card"
 
 after_initialize do
+  add_to_class(:guardian, :can_sync_salesforce_cases?) do
+    is_admin? || (is_moderator? && SiteSetting.salesforce_allow_moderators_to_create_cases)
+  end
+
   SeedFu.fixture_paths << Rails.root.join("plugins", "discourse-salesforce", "db", "fixtures").to_s
   register_problem_check Salesforce::ProblemCheck::SalesforceInvalidCredentials
   register_problem_check Salesforce::ProblemCheck::SalesforceAppNotApproved

@@ -46,6 +46,9 @@ discourse_salesforce:
         - overwrite
     depends_behavior: hidden
     dependent_setting_display: inline
+  salesforce_allow_moderators_to_create_cases:
+    default: false
+    client: true
   salesforce_case_tag_name:
     default: 'salesforce-case'
   salesforce_case_status_tag_enabled:

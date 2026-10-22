@@ -8,6 +8,47 @@ RSpec.describe Salesforce::Case do
 
   include_context "with salesforce spec helper"
 
+  describe "#unlink!" do
+    fab!(:salesforce_case) { Fabricate(:salesforce_case, topic: topic) }
+
+    it "clears only the case’s local references and tags without calling Salesforce" do
+      SiteSetting.tagging_enabled = true
+      SiteSetting.salesforce_automatic_case_sync_tags = "support"
+      topic.tags =
+        %w[billing support salesforce-case case-new].map { |name| Fabricate(:tag, name: name) }
+      topic.upsert_custom_fields(::CaseMixin::HAS_SALESFORCE_CASE => true)
+      post.upsert_custom_fields(Salesforce::CaseComment::ID_FIELD => "comment-id")
+      other_case = Fabricate(:salesforce_case)
+      other_case.topic.upsert_custom_fields(::CaseMixin::HAS_SALESFORCE_CASE => true)
+
+      messages = MessageBus.track_publish("/topic/#{topic.id}") { salesforce_case.unlink! }
+
+      expect(Salesforce::Case.exists?(salesforce_case.id)).to eq(false)
+      expect(topic.reload.has_salesforce_case).to eq(false)
+      expect(post.reload.custom_fields[Salesforce::CaseComment::ID_FIELD]).to eq(nil)
+      expect(topic.tags.pluck(:name)).to contain_exactly("billing")
+      Jobs::SyncCase.new.execute(topic_id: topic.id)
+      expect(Salesforce::Case.exists?(topic_id: topic.id)).to eq(false)
+      expect(other_case.topic.reload.has_salesforce_case).to eq(true)
+      expect(Salesforce::Case.exists?(other_case.id)).to eq(true)
+      expect(messages.map(&:data)).to include({ reload_topic: true })
+      expect(a_request(:any, %r{https://test\.my\.salesforce\.com/})).not_to have_been_made
+      expect(
+        a_request(:post, "https://login.salesforce.com/services/oauth2/token"),
+      ).not_to have_been_made
+    end
+
+    it "removes automatic sync tags even when tagging has been disabled" do
+      SiteSetting.salesforce_automatic_case_sync_tags = "support"
+      topic.tags = [Fabricate(:tag, name: "support")]
+      SiteSetting.tagging_enabled = false
+
+      salesforce_case.unlink!
+
+      expect(topic.reload.tags).to be_empty
+    end
+  end
+
   describe ".sync!" do
     before do
       Salesforce.seed_groups!

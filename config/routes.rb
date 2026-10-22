@@ -3,6 +3,7 @@
 Salesforce::Engine.routes.draw do
   post "/persons/create" => "persons#create"
   post "/cases/sync" => "cases#sync"
+  delete "/cases/:id" => "cases#destroy"
   get "/admin/authorize" => "admin#authorize"
 end
 

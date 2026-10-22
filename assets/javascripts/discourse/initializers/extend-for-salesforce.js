@@ -96,7 +96,7 @@ function initializeWithApi(api, container) {
       }
     );
 
-    customizePost(api, container);
+    customizePost(api);
 
     api.addTopicAdminMenuButton((topic) => {
       if (
@@ -134,6 +134,7 @@ function initializeWithApi(api, container) {
 }
 
 function customizePost(api) {
+  api.addModelField("topic", "can_unlink_salesforce_case");
   api.addModelField("topic", "salesforce_case_loading");
   api.addModelField("topic", "salesforce_case");
 

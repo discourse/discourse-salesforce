@@ -35,6 +35,21 @@ This setting does not affect automatic case synchronization through
 `salesforce_automatic_case_sync_tags` or grant access to Salesforce configuration or manual
 Contact/Lead creation.
 
+### Unlinking cases
+
+`salesforce_case_unlink_allowed_groups` controls who can unlink cases. It defaults to empty,
+which disables unlinking for everyone, including admins. The fixed list offers only Admins and
+Moderators; select either or both to grant access. They must also be able to see the topic.
+
+The **Unlink case** button beside the case details asks for confirmation and removes the
+Discourse case and comment links. The case and its comments remain in Salesforce. Unlinking
+only changes local data and works even when Salesforce credentials are unavailable.
+
+Unlinking also removes the configured case tag, enabled case status tags, and automatic case
+sync trigger tags from the topic so subsequent edits do not create another case. Already queued
+automatic sync jobs skip creating a case once its trigger tags and local association are gone.
+Other tags and the Discourse topic remain. This action is separate from create/sync permissions.
+
 ### Reconnecting Salesforce
 
 After connecting Discourse to a different Salesforce organization or refreshing a sandbox, run

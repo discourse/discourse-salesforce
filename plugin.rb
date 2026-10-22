@@ -31,6 +31,16 @@ after_initialize do
     is_admin? || (is_moderator? && SiteSetting.salesforce_allow_moderators_to_create_cases)
   end
 
+  add_to_class(:guardian, :can_unlink_salesforce_cases?) do
+    groups = SiteSetting.salesforce_case_unlink_allowed_groups.split("|")
+    authenticated? &&
+      ((is_admin? && groups.include?("admins")) || (is_moderator? && groups.include?("moderators")))
+  end
+
+  add_to_serializer(:topic_view, :can_unlink_salesforce_case) do
+    SiteSetting.salesforce_enabled && scope.can_unlink_salesforce_cases?
+  end
+
   SeedFu.fixture_paths << Rails.root.join("plugins", "discourse-salesforce", "db", "fixtures").to_s
   register_problem_check Salesforce::ProblemCheck::SalesforceInvalidCredentials
   register_problem_check Salesforce::ProblemCheck::SalesforceAppNotApproved

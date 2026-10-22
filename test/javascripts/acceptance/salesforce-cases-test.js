@@ -68,7 +68,7 @@ acceptance("Salesforce Cases menu with moderator access", function (needs) {
 });
 
 acceptance("Salesforce case unlinking", function (needs) {
-  needs.user({ admin: false, moderator: false });
+  needs.user({ admin: false, moderator: true });
   needs.settings({ salesforce_enabled: true });
 
   let canUnlink;

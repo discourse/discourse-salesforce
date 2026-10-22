@@ -32,8 +32,9 @@ after_initialize do
   end
 
   add_to_class(:guardian, :can_unlink_salesforce_cases?) do
+    groups = SiteSetting.salesforce_case_unlink_allowed_groups.split("|")
     authenticated? &&
-      current_user.in_any_groups?(SiteSetting.salesforce_case_unlink_allowed_groups_map)
+      ((is_admin? && groups.include?("admins")) || (is_moderator? && groups.include?("moderators")))
   end
 
   add_to_serializer(:topic_view, :can_unlink_salesforce_case) do
@@ -108,8 +109,7 @@ after_initialize do
     :topic_view,
     :salesforce_case,
     include_condition: -> do
-      SiteSetting.salesforce_enabled && (scope.is_staff? || scope.can_unlink_salesforce_cases?) &&
-        object.topic.has_salesforce_case
+      SiteSetting.salesforce_enabled && scope.is_staff? && object.topic.has_salesforce_case
     end,
   ) { ::Salesforce::CaseSerializer.new(object.topic.salesforce_case, root: false).as_json }
 

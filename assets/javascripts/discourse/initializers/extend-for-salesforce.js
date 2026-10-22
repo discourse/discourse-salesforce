@@ -38,10 +38,6 @@ function initializeWithApi(api, container) {
   const currentUser = api.getCurrentUser();
   const isStaff = currentUser?.staff;
 
-  if (currentUser) {
-    customizePost(api);
-  }
-
   if (isStaff) {
     const siteSettings = container.lookup("service:site-settings");
     const toasts = container.lookup("service:toasts");
@@ -99,6 +95,8 @@ function initializeWithApi(api, container) {
         updateSalesforcePersonFields(controller.model, message);
       }
     );
+
+    customizePost(api);
 
     api.addTopicAdminMenuButton((topic) => {
       if (

@@ -38,8 +38,8 @@ Contact/Lead creation.
 ### Unlinking cases
 
 `salesforce_case_unlink_allowed_groups` controls who can unlink cases. It defaults to empty,
-which disables unlinking for everyone, including admins. Add the admins, moderators, or custom
-groups that should have access. Members must also be able to see the topic.
+which disables unlinking for everyone, including admins. The fixed list offers only Admins and
+Moderators; select either or both to grant access. They must also be able to see the topic.
 
 The **Unlink case** button beside the case details asks for confirmation and removes the
 Discourse case and comment links. The case and its comments remain in Salesforce. Unlinking

@@ -41,7 +41,7 @@ Contact/Lead creation.
 which disables unlinking for everyone, including admins. The fixed list offers only Admins and
 Moderators; select either or both to grant access. They must also be able to see the topic.
 
-Open the first post’s **…** menu and choose **Unlink case** to remove the Discourse case and
+Open the first post’s **wrench** menu and choose **Unlink case** to remove the Discourse case and
 comment links after confirmation. The case and its comments remain in Salesforce. Unlinking
 only changes local data and works even when Salesforce credentials are unavailable.
 

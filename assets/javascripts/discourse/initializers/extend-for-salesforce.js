@@ -2,7 +2,6 @@ import { ajax } from "discourse/lib/ajax";
 import { popupAjaxError } from "discourse/lib/ajax-error";
 import { withPluginApi } from "discourse/lib/plugin-api";
 import { i18n } from "discourse-i18n";
-import PostMenuUnlinkSalesforceCase from "../components/post-menu-unlink-salesforce-case";
 import PostSalesforceCase from "../components/post-salesforce-case";
 
 export function updateSalesforcePersonFields(topic, message) {
@@ -32,6 +31,32 @@ async function createPerson(type, post, toasts) {
     });
   } catch (error) {
     popupAjaxError(error);
+  }
+}
+
+async function unlinkCase(topic, dialog, toasts) {
+  const caseId = topic.salesforce_case.id;
+  const confirmed = await dialog.confirm({
+    message: i18n("salesforce.case.unlink_confirmation", {
+      number: topic.salesforce_case.number,
+    }),
+    confirmButtonLabel: "salesforce.case.unlink",
+  });
+  if (!confirmed) {
+    return;
+  }
+
+  topic.salesforce_case_loading = true;
+  try {
+    await ajax(`/salesforce/cases/${caseId}`, { type: "DELETE" });
+    topic.salesforce_case = null;
+    toasts.success({
+      data: { message: i18n("salesforce.case.unlink_success") },
+    });
+  } catch (error) {
+    popupAjaxError(error);
+  } finally {
+    topic.salesforce_case_loading = false;
   }
 }
 
@@ -99,14 +124,24 @@ function initializeWithApi(api, container) {
 
     customizePost(api);
 
-    api.registerValueTransformer(
-      "post-menu-buttons",
-      ({ value: dag, context: { buttonKeys } }) => {
-        dag.add("unlink-salesforce-case", PostMenuUnlinkSalesforceCase, {
-          before: buttonKeys.ADMIN,
-        });
+    api.addPostAdminMenuButton((post) => {
+      const topic = post.topic;
+      if (
+        post.post_number !== 1 ||
+        !topic?.salesforce_case ||
+        !topic.can_unlink_salesforce_case
+      ) {
+        return;
       }
-    );
+
+      return {
+        icon: "link-slash",
+        label: "salesforce.case.unlink",
+        className: "unlink-salesforce-case",
+        action: () =>
+          unlinkCase(topic, container.lookup("service:dialog"), toasts),
+      };
+    });
 
     api.addTopicAdminMenuButton((topic) => {
       if (

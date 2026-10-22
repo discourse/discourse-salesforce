@@ -104,18 +104,19 @@ acceptance("Salesforce case unlinking", function (needs) {
     });
   });
 
-  test("unlinks a case from the first post’s expanded menu after confirmation", async function (assert) {
+  test("unlinks a case from the first post’s admin menu after confirmation", async function (assert) {
     await visit("/t/internationalization-localization/280");
 
     assert
-      .dom(".post-action-menu__unlink-salesforce-case")
-      .doesNotExist("Unlinking is hidden until the post menu is expanded");
+      .dom(".unlink-salesforce-case")
+      .doesNotExist("Unlinking is hidden until the post admin menu is opened");
     assert
       .dom(".salesforce-case button")
       .doesNotExist("Case details have no standalone action button");
 
     await click("#post_1 .show-more-actions");
-    await click(".post-action-menu__unlink-salesforce-case");
+    await click("#post_1 .show-post-admin-menu");
+    await click(".unlink-salesforce-case");
 
     assert
       .dom("#dialog-holder")
@@ -139,7 +140,8 @@ acceptance("Salesforce case unlinking", function (needs) {
   test("keeps the case when unlinking is cancelled", async function (assert) {
     await visit("/t/internationalization-localization/280");
     await click("#post_1 .show-more-actions");
-    await click(".post-action-menu__unlink-salesforce-case");
+    await click("#post_1 .show-post-admin-menu");
+    await click(".unlink-salesforce-case");
     await click("#dialog-holder .btn-default");
 
     assert.false(unlinked, "Cancelling keeps the case linked");
@@ -150,7 +152,8 @@ acceptance("Salesforce case unlinking", function (needs) {
     rejectUnlink = true;
     await visit("/t/internationalization-localization/280");
     await click("#post_1 .show-more-actions");
-    await click(".post-action-menu__unlink-salesforce-case");
+    await click("#post_1 .show-post-admin-menu");
+    await click(".unlink-salesforce-case");
     await click("#dialog-holder .btn-primary");
 
     assert
@@ -163,9 +166,10 @@ acceptance("Salesforce case unlinking", function (needs) {
     canUnlink = false;
     await visit("/t/internationalization-localization/280");
     await click("#post_1 .show-more-actions");
+    await click("#post_1 .show-post-admin-menu");
 
     assert
-      .dom(".post-action-menu__unlink-salesforce-case")
+      .dom(".unlink-salesforce-case")
       .doesNotExist("Unlinking is unavailable without permission");
   });
 });

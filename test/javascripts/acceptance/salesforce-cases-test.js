@@ -104,9 +104,19 @@ acceptance("Salesforce case unlinking", function (needs) {
     });
   });
 
-  test("unlinks a case after confirmation", async function (assert) {
+  test("unlinks a case from the first post’s admin menu after confirmation", async function (assert) {
     await visit("/t/internationalization-localization/280");
-    await click(".salesforce-case__unlink");
+
+    assert
+      .dom(".unlink-salesforce-case")
+      .doesNotExist("Unlinking is hidden until the post admin menu is opened");
+    assert
+      .dom(".salesforce-case button")
+      .doesNotExist("Case details have no standalone action button");
+
+    await click("#post_1 .show-more-actions");
+    await click("#post_1 .show-post-admin-menu");
+    await click(".unlink-salesforce-case");
 
     assert
       .dom("#dialog-holder")
@@ -119,7 +129,7 @@ acceptance("Salesforce case unlinking", function (needs) {
       );
     assert.false(unlinked, "Unlinking waits for confirmation");
 
-    await click("#dialog-holder .btn-danger");
+    await click("#dialog-holder .btn-primary");
 
     assert.true(unlinked, "The local unlink endpoint was called");
     assert
@@ -129,7 +139,9 @@ acceptance("Salesforce case unlinking", function (needs) {
 
   test("keeps the case when unlinking is cancelled", async function (assert) {
     await visit("/t/internationalization-localization/280");
-    await click(".salesforce-case__unlink");
+    await click("#post_1 .show-more-actions");
+    await click("#post_1 .show-post-admin-menu");
+    await click(".unlink-salesforce-case");
     await click("#dialog-holder .btn-default");
 
     assert.false(unlinked, "Cancelling keeps the case linked");
@@ -139,8 +151,10 @@ acceptance("Salesforce case unlinking", function (needs) {
   test("keeps the case when unlinking fails", async function (assert) {
     rejectUnlink = true;
     await visit("/t/internationalization-localization/280");
-    await click(".salesforce-case__unlink");
-    await click("#dialog-holder .btn-danger");
+    await click("#post_1 .show-more-actions");
+    await click("#post_1 .show-post-admin-menu");
+    await click(".unlink-salesforce-case");
+    await click("#dialog-holder .btn-primary");
 
     assert
       .dom("#dialog-holder")
@@ -151,9 +165,11 @@ acceptance("Salesforce case unlinking", function (needs) {
   test("hides unlinking when permission is absent", async function (assert) {
     canUnlink = false;
     await visit("/t/internationalization-localization/280");
+    await click("#post_1 .show-more-actions");
+    await click("#post_1 .show-post-admin-menu");
 
     assert
-      .dom(".salesforce-case__unlink")
+      .dom(".unlink-salesforce-case")
       .doesNotExist("Unlinking is unavailable without permission");
   });
 });

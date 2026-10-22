@@ -2,6 +2,7 @@ import { ajax } from "discourse/lib/ajax";
 import { popupAjaxError } from "discourse/lib/ajax-error";
 import { withPluginApi } from "discourse/lib/plugin-api";
 import { i18n } from "discourse-i18n";
+import PostMenuUnlinkSalesforceCase from "../components/post-menu-unlink-salesforce-case";
 import PostSalesforceCase from "../components/post-salesforce-case";
 
 export function updateSalesforcePersonFields(topic, message) {
@@ -97,6 +98,15 @@ function initializeWithApi(api, container) {
     );
 
     customizePost(api);
+
+    api.registerValueTransformer(
+      "post-menu-buttons",
+      ({ value: dag, context: { buttonKeys } }) => {
+        dag.add("unlink-salesforce-case", PostMenuUnlinkSalesforceCase, {
+          before: buttonKeys.ADMIN,
+        });
+      }
+    );
 
     api.addTopicAdminMenuButton((topic) => {
       if (

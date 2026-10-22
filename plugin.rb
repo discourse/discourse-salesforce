@@ -25,6 +25,7 @@ register_asset "stylesheets/salesforce.scss"
 
 register_svg_icon "fab-salesforce"
 register_svg_icon "address-card"
+register_svg_icon "link-slash"
 
 after_initialize do
   add_to_class(:guardian, :can_sync_salesforce_cases?) do

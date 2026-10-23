@@ -5,3 +5,8 @@
 # https://translate.discourse.org/
 
 sl:
+  js:
+    salesforce:
+      case_unlink_allowed_groups:
+        admins: "Administratorji"
+        moderators: "Moderatorji"

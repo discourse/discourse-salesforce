@@ -7,6 +7,9 @@
 be:
   js:
     salesforce:
+      case_unlink_allowed_groups:
+        admins: "Адміністратары"
+        moderators: "Мадэратары"
       poster_icon:
         contact:
           text: "кантакт"

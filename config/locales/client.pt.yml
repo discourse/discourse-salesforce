@@ -17,6 +17,9 @@ pt:
         title: "Iniciar sessão com Salesforce"
     salesforce:
       title: Salesforce
+      case_unlink_allowed_groups:
+        admins: "Administradores"
+        moderators: "Moderadores"
       lead:
         create: "Criar Lead"
       contact:

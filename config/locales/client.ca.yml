@@ -7,6 +7,9 @@
 ca:
   js:
     salesforce:
+      case_unlink_allowed_groups:
+        admins: "Administradors"
+        moderators: "Moderadors"
       poster_icon:
         contact:
           text: "Contacte"

@@ -17,6 +17,9 @@ ar:
         title: "تسجيل الدخول من خلال Salesforce"
     salesforce:
       title: Salesforce
+      case_unlink_allowed_groups:
+        admins: "المسؤولون"
+        moderators: "المشرفون"
       lead:
         create: "إنشاء عميل محتمل"
       contact:

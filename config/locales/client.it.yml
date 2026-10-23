@@ -17,6 +17,9 @@ it:
         title: "Accedi con Salesforce"
     salesforce:
       title: Salesforce
+      case_unlink_allowed_groups:
+        admins: "Amministratori"
+        moderators: "Moderatori"
       lead:
         create: "Crea lead"
       contact:

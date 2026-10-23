@@ -7,6 +7,9 @@
 el:
   js:
     salesforce:
+      case_unlink_allowed_groups:
+        admins: "Διαχειριστές"
+        moderators: "Συντονιστές"
       poster_icon:
         contact:
           text: "Επικοινωνία"

@@ -5,3 +5,8 @@
 # https://translate.discourse.org/
 
 vi:
+  js:
+    salesforce:
+      case_unlink_allowed_groups:
+        admins: "Quản trị"
+        moderators: "Điều hành viên"

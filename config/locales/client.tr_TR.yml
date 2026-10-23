@@ -17,6 +17,9 @@ tr_TR:
         title: "Salesforce ile Giriş Yapın"
     salesforce:
       title: Salesforce
+      case_unlink_allowed_groups:
+        admins: "Yöneticiler"
+        moderators: "Moderatörler"
       lead:
         create: "Potansiyel Müşteri Oluştur"
         create_success: "Salesforce potansiyel müşterisi senkronize edildi"

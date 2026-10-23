@@ -7,6 +7,9 @@
 zh_TW:
   js:
     salesforce:
+      case_unlink_allowed_groups:
+        admins: "管理員"
+        moderators: "版主"
       poster_icon:
         contact:
           text: "聯繫"

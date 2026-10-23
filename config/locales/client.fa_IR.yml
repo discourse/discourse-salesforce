@@ -12,6 +12,9 @@ fa_IR:
         title: "ورود با سلزفورس"
     salesforce:
       title: سلزفورس
+      case_unlink_allowed_groups:
+        admins: "مدیران ارشد"
+        moderators: "ناظران"
       poster_icon:
         contact:
           text: "تماس"

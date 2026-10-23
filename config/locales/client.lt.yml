@@ -7,6 +7,9 @@
 lt:
   js:
     salesforce:
+      case_unlink_allowed_groups:
+        admins: "Administratoriai"
+        moderators: "Moderatoriai"
       poster_icon:
         contact:
           text: "Susisiekite"

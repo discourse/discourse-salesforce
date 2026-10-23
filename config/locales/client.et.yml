@@ -7,6 +7,9 @@
 et:
   js:
     salesforce:
+      case_unlink_allowed_groups:
+        admins: "Adminnid"
+        moderators: "Moderaatorid"
       poster_icon:
         contact:
           text: "Kontakt"

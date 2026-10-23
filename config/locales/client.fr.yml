@@ -21,6 +21,9 @@ fr:
         link_only: "Lier uniquement : associer l'utilisateur Discourse au contact Salesforce sans mettre à jour les champs Salesforce"
         fill_blank: "Remplir les champs vides de Salesforce : mettre à jour les champs sélectionnés uniquement s'ils sont vides dans Salesforce"
         overwrite: "Écraser les champs Salesforce : remplacer les valeurs des champs sélectionnés par celles de Discourse"
+      case_unlink_allowed_groups:
+        admins: "Administrateurs "
+        moderators: "Modérateurs"
       lead:
         create: "Créer une piste"
         create_success: "Piste Salesforce synchronisée"

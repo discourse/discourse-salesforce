@@ -7,6 +7,9 @@
 pl_PL:
   js:
     salesforce:
+      case_unlink_allowed_groups:
+        admins: "Administratorzy"
+        moderators: "Moderatorzy"
       poster_icon:
         contact:
           text: "Dane kontaktowe"

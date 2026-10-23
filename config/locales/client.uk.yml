@@ -7,6 +7,9 @@
 uk:
   js:
     salesforce:
+      case_unlink_allowed_groups:
+        admins: "Адміни"
+        moderators: "Модератори"
       poster_icon:
         contact:
           text: "Контакти"

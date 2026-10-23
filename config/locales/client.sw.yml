@@ -7,6 +7,9 @@
 sw:
   js:
     salesforce:
+      case_unlink_allowed_groups:
+        admins: "Viongozi"
+        moderators: "Wasimamizi"
       poster_icon:
         contact:
           text: "Wasiliana"

@@ -5,3 +5,8 @@
 # https://translate.discourse.org/
 
 th:
+  js:
+    salesforce:
+      case_unlink_allowed_groups:
+        admins: "แอดมิน"
+        moderators: "ผู้ดูแลระบบ"

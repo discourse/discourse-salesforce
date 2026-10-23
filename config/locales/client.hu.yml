@@ -7,6 +7,9 @@
 hu:
   js:
     salesforce:
+      case_unlink_allowed_groups:
+        admins: "Adminisztrátorok"
+        moderators: "Moderátorok"
       poster_icon:
         contact:
           text: "Kapcsolat"

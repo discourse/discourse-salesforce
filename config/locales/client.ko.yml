@@ -7,6 +7,9 @@
 ko:
   js:
     salesforce:
+      case_unlink_allowed_groups:
+        admins: "관리자"
+        moderators: "관리자"
       poster_icon:
         contact:
           text: "연락처"

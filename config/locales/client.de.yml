@@ -17,6 +17,9 @@ de:
         title: "Mit Salesforce anmelden"
     salesforce:
       title: Salesforce
+      case_unlink_allowed_groups:
+        admins: "Administratoren"
+        moderators: "Moderatoren"
       lead:
         create: "Lead erstellen"
       contact:

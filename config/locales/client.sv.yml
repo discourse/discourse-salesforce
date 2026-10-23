@@ -12,6 +12,9 @@ sv:
         title: "Logga in med Salesforce"
     salesforce:
       title: Salesforce
+      case_unlink_allowed_groups:
+        admins: "Administratörer"
+        moderators: "Moderatorer"
       lead:
         create: "Skapa Lead"
       contact:

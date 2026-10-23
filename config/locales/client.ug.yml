@@ -5,3 +5,8 @@
 # https://translate.discourse.org/
 
 ug:
+  js:
+    salesforce:
+      case_unlink_allowed_groups:
+        admins: "باشقۇرغۇچى"
+        moderators: "رىياسەتچى"

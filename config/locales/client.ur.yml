@@ -7,6 +7,9 @@
 ur:
   js:
     salesforce:
+      case_unlink_allowed_groups:
+        admins: "منتظمین"
+        moderators: "نگران"
       poster_icon:
         contact:
           text: "رابطہ"

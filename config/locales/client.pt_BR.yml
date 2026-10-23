@@ -17,6 +17,9 @@ pt_BR:
         title: "Entrar com Salesforce"
     salesforce:
       title: Salesforce
+      case_unlink_allowed_groups:
+        admins: "Administradores(as):"
+        moderators: "Moderadores(as)"
       lead:
         create: "Criar Lead"
       contact:

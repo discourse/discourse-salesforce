@@ -17,6 +17,9 @@ zh_CN:
         title: "使用 Salesforce 登录"
     salesforce:
       title: Salesforce
+      case_unlink_allowed_groups:
+        admins: "管理员"
+        moderators: "版主"
       lead:
         create: "创建潜在客户"
       contact:

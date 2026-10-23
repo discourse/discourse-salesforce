@@ -17,6 +17,9 @@ he:
         title: "כניסה עם Salesforce"
     salesforce:
       title: Salesforce
+      case_unlink_allowed_groups:
+        admins: "מנהלים ראשיים"
+        moderators: "מפקחים"
       lead:
         create: "יצירת ליד"
       contact:

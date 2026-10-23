@@ -17,6 +17,9 @@ fi:
         title: "Kirjaudu sisään Salesforce-tilillä"
     salesforce:
       title: Salesforce
+      case_unlink_allowed_groups:
+        admins: "Ylläpitäjät"
+        moderators: "Valvojat"
       lead:
         create: "Luo liidi"
       contact:

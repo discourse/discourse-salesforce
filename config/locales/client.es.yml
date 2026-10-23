@@ -17,6 +17,9 @@ es:
         title: "Iniciar sesión con Salesforce"
     salesforce:
       title: Salesforce
+      case_unlink_allowed_groups:
+        admins: "Administradores"
+        moderators: "Moderadores"
       lead:
         create: "Crear cliente potencial"
       contact:

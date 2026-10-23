@@ -17,6 +17,9 @@ ja:
         title: "Salesforce でログイン"
     salesforce:
       title: Salesforce
+      case_unlink_allowed_groups:
+        admins: "管理者"
+        moderators: "モデレーター"
       lead:
         create: "リードを作成"
       contact:

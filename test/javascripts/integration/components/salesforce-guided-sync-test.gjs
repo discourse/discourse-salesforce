@@ -43,7 +43,12 @@ module("Integration | Component | SalesforceGuidedSync", function (hooks) {
     );
     await formKit().field("group").select("customers");
     await click('[data-test-step="mapping"]');
+    assert
+      .dom('[data-name="mappings.4.source"]')
+      .doesNotExist("does not add static text by default");
+    await click("[data-test-add-mapping]");
     await formKit().field("mappings.4.source").select("static");
+    await formKit().field("mappings.4.destination").select("LeadSource");
     await formKit().field("mappings.4.value").fillIn("");
     assert.dom("[data-test-continue]").isDisabled("requires a static value");
     await formKit().field("mappings.4.value").fillIn("Discourse");
@@ -228,9 +233,9 @@ module("Integration | Component | SalesforceGuidedSync", function (hooks) {
 
     assert
       .dom(
-        '[data-name="mappings.3.destination"] .form-kit__control-menu-trigger'
+        '[data-name="mappings.2.destination"] .form-kit__control-menu-trigger'
       )
-      .includesText("LeadSource", "shows the returned API field name");
+      .includesText("Description", "shows the returned API field name");
     await click("[data-test-continue]");
     await formKit().field("schedule").select("weekly");
     await click("[data-test-continue]");

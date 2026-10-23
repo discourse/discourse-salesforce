@@ -85,13 +85,6 @@ export function createDemoConfiguration() {
       { id: 2, source: "last", destination: "LastName", policy: "keep" },
       { id: 3, source: "profile", destination: "Description", policy: "keep" },
       { id: 6, source: "company", destination: "Company", policy: "overwrite" },
-      {
-        id: 7,
-        source: "static",
-        value: "Community",
-        destination: "LeadSource",
-        policy: "keep",
-      },
     ],
   };
 }

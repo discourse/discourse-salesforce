@@ -31,22 +31,6 @@ register_svg_icon "address-card"
 %w[database shuffle user-pen wand-magic-sparkles].each { |icon| register_svg_icon icon }
 
 after_initialize do
-  register_modifier(:workflow_managed_by) do |owner, workflow|
-    configuration =
-      Salesforce::GuidedSyncConfiguration.all.find do |record|
-        record.fetch("workflows", []).any? { |generated| generated["id"].to_s == workflow.id.to_s }
-      end
-    if configuration
-      {
-        name: "Salesforce",
-        configuration_name: configuration["name"],
-        url: "/admin/plugins/discourse-salesforce/guided-sync?configuration=#{configuration["id"]}",
-      }
-    else
-      owner
-    end
-  end
-
   SeedFu.fixture_paths << Rails.root.join("plugins", "discourse-salesforce", "db", "fixtures").to_s
   register_problem_check Salesforce::ProblemCheck::SalesforceInvalidCredentials
   register_problem_check Salesforce::ProblemCheck::SalesforceAppNotApproved
@@ -62,10 +46,35 @@ after_initialize do
   end
 
   add_model_callback(User, :after_commit, on: :update) do
+    if saved_change_to_active?(from: false, to: true)
+      Salesforce::GuidedSyncConfiguration.enqueue_user(self, reason: "join")
+      Salesforce::GuidedSyncConfiguration.enqueue_user(self, reason: "change")
+    end
     if saved_change_to_active?(from: false, to: true) &&
          SiteSetting.salesforce_contact_auto_create_on_signup && ::Salesforce::Api.has_credentials?
       Jobs.enqueue(:sync_salesforce_user, user_id: self.id)
     end
+  end
+
+  on(:user_added_to_group) do |user, group, **opts|
+    Salesforce::GuidedSyncConfiguration.enqueue_user(user, reason: "join", group_id: group.id)
+    Salesforce::GuidedSyncConfiguration.enqueue_user(
+      user,
+      reason: "change",
+      excluding_group_id: group.id,
+    )
+  end
+
+  on(:user_updated) do |user, *args|
+    Salesforce::GuidedSyncConfiguration.enqueue_user(user, reason: "change")
+  end
+
+  on(:user_removed_from_group) do |user, group, *args|
+    Salesforce::GuidedSyncConfiguration.enqueue_user(user, reason: "change")
+  end
+
+  on(:user_first_logged_in) do |user|
+    Salesforce::GuidedSyncConfiguration.enqueue_user(user, reason: "change")
   end
 
   on(:post_created) do |post, opts|

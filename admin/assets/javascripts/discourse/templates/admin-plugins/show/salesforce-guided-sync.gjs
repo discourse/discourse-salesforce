@@ -4,7 +4,8 @@ import SalesforceSyncConfigurations from "discourse/plugins/discourse-salesforce
 export default <template>
   {{#each (array @model) as |model|}}
     <SalesforceSyncConfigurations
-      @connection={{model.connection}}
+      @credentialsConfigured={{model.credentials_configured}}
+      @groups={{model.groups}}
       @onClose={{@controller.clearConfiguration}}
       @onSelect={{@controller.selectConfiguration}}
       @records={{model.configurations}}

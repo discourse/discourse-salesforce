@@ -15,6 +15,17 @@ module ::Salesforce
     ID_FIELD = ""
     FIELD_NAME_PATTERN = /\A[A-Za-z][A-Za-z0-9_]*\z/
 
+    def self.eligible_users
+      users = User.activated.human_users.not_staged.not_suspended
+      if SiteSetting.allow_anonymous_mode
+        users =
+          users.where.not(
+            id: User.joins(:anonymous_user_master).where("trust_level >= 1").select(:id),
+          )
+      end
+      users
+    end
+
     def self.auto_create_eligible?(user)
       user.active? && user.human? && !user.anonymous? && !user.staged? && !user.suspended?
     end
@@ -90,7 +101,7 @@ module ::Salesforce
       []
     end
 
-    def self.find_by_email(email, fields: [], require_unique: false)
+    def self.find_by_email(email, fields: [], require_unique: false, api: Salesforce.api)
       # Keep the default lookup ID-only because create/link callers do not need record data.
       fields = ["Id", *fields.map(&:to_s)].uniq
       invalid_field = fields.find { |field| !FIELD_NAME_PATTERN.match?(field) }
@@ -98,7 +109,7 @@ module ::Salesforce
 
       escaped_email = escape_soql_string(email)
       result =
-        Salesforce.api.query(
+        api.query(
           "SELECT #{fields.join(",")} FROM #{self::OBJECT_NAME} WHERE Email = '#{escaped_email}'",
         )
       return if result["totalSize"] == 0

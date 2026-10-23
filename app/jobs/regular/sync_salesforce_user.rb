@@ -7,6 +7,24 @@ module ::Jobs
     def execute(args)
       return unless SiteSetting.salesforce_enabled
 
+      if args[:configuration_id]
+        begin
+          ::Salesforce::ConfiguredUserSync.sync(
+            args[:configuration_id],
+            args[:user_id],
+            reason: args[:reason],
+          )
+        rescue => error
+          ::Salesforce::GuidedSyncConfiguration.record_result(
+            args[:configuration_id],
+            args[:user_id],
+            error: error,
+          )
+          raise
+        end
+        return
+      end
+
       user = User.find(args[:user_id])
       begin
         unless ::Salesforce::Contact.sync(user)

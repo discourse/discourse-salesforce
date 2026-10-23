@@ -2,7 +2,7 @@ import { click, fillIn, focus, render } from "@ember/test-helpers";
 import { module, test } from "qunit";
 import DialogHolder from "discourse/dialog-holder/components/dialog-holder";
 import { setupRenderingTest } from "discourse/tests/helpers/component-test";
-import pretender, { response } from "discourse/tests/helpers/create-pretender";
+import pretender from "discourse/tests/helpers/create-pretender";
 import formKit from "discourse/tests/helpers/form-kit-helper";
 import SalesforceSyncConfigurations from "discourse/plugins/discourse-salesforce/discourse/components/salesforce-sync-configurations";
 import { createDemoConfiguration } from "discourse/plugins/discourse-salesforce/discourse/lib/guided-sync-demo";
@@ -11,15 +11,102 @@ module(
   "Integration | Component | SalesforceSyncConfigurations",
   function (hooks) {
     setupRenderingTest(hooks);
+    hooks.beforeEach(function () {
+      pretender.get("/salesforce/admin/guided-sync/fields.json", () => [
+        200,
+        { "Content-Type": "application/json" },
+        JSON.stringify({
+          fields: [
+            "FirstName",
+            "LastName",
+            "Description",
+            "Company",
+            "LeadSource",
+          ].map((name) => ({ name, type: "string" })),
+        }),
+      ]);
+      this.groups = [
+        { name: "community-members", user_count: 248 },
+        { name: "customers", user_count: 86 },
+        { name: "partners", user_count: 32 },
+      ];
+    });
 
-    test("opens independent saved Lead and Contact configurations with workflow editor links", async function (assert) {
+    test("post sync deep links cannot open the removed wizard", async function (assert) {
+      await render(
+        <template>
+          <SalesforceSyncConfigurations
+            @credentialsConfigured={{true}}
+            @selectedId="new-posts"
+          />
+        </template>
+      );
+      assert
+        .dom("[data-test-sync-posts]")
+        .isDisabled("shows the disabled choice");
+      assert
+        .dom(".salesforce-guided-sync")
+        .doesNotExist("does not open a wizard");
+    });
+
+    test("returns to the configuration list after creating and editing a configuration", async function (assert) {
+      let closes = 0;
+      this.close = () => closes++;
+      const saveResponse = (request) => [
+        200,
+        { "Content-Type": "application/json" },
+        JSON.stringify({
+          configuration: {
+            ...JSON.parse(request.requestBody).configuration,
+            id: "saved",
+          },
+        }),
+      ];
+      pretender.post(
+        "/salesforce/admin/guided-sync/configurations.json",
+        saveResponse
+      );
+      pretender.put(
+        "/salesforce/admin/guided-sync/configurations/saved.json",
+        saveResponse
+      );
+      await render(
+        <template>
+          <SalesforceSyncConfigurations
+            @credentialsConfigured={{true}}
+            @groups={{this.groups}}
+            @onClose={{this.close}}
+          />
+        </template>
+      );
+      await click("[data-test-sync-users]");
+      await formKit().field("group").select("customers");
+      await click('[data-test-step="review"]');
+      await click("[data-test-continue]");
+      assert
+        .dom('[data-test-configuration="saved"]')
+        .exists("shows the saved configuration in the list");
+      assert
+        .dom(".salesforce-guided-sync")
+        .doesNotExist("closes the wizard after creation");
+      assert.strictEqual(closes, 1, "clears the configuration query parameter");
+      await click('[data-test-configuration="saved"] button');
+      await fillIn('[data-name="name"] input', "Updated user sync");
+      await click('[data-test-step="review"]');
+      await click("[data-test-continue]");
+      assert
+        .dom('[data-test-configuration="saved"]')
+        .includesText("Updated user sync", "shows the updated configuration");
+      assert.strictEqual(closes, 2, "returns to the index after editing too");
+    });
+
+    test("opens independent saved Lead and Contact configurations", async function (assert) {
       this.records = [
         {
           ...createDemoConfiguration(),
           id: "lead",
           name: "Lead sync",
           group: "partners",
-          workflows: [{ id: 81, name: "Lead join", purpose: "join" }],
         },
         {
           ...createDemoConfiguration(),
@@ -28,14 +115,13 @@ module(
           object: "Contact",
           group: "customers",
           schedule: "weekly",
-          workflows: [{ id: 82, name: "Contact join", purpose: "join" }],
         },
       ];
-      this.connection = { environment: "sandbox" };
       await render(
         <template>
           <SalesforceSyncConfigurations
-            @connection={{this.connection}}
+            @groups={{this.groups}}
+            @credentialsConfigured={{true}}
             @records={{this.records}}
           />
         </template>
@@ -43,34 +129,8 @@ module(
       await click('[data-test-configuration="lead"] button');
       assert
         .dom('[data-test-step="connect"]')
-        .doesNotExist("reuses the saved site connection");
+        .doesNotExist("starts directly at scope");
       assert.dom("[data-test-connect-demo]").doesNotExist();
-      assert
-        .dom("[data-test-generated-workflow]")
-        .doesNotExist("keeps workflow details collapsed by default");
-      assert
-        .dom("[data-test-advanced-workflows]")
-        .doesNotExist("hides advanced workflows before the review step");
-      await click('[data-test-step="review"]');
-      await click("[data-test-advanced-workflows] button");
-      assert
-        .dom('[data-test-generated-workflow="81"] a')
-        .hasAttribute(
-          "href",
-          "/admin/plugins/discourse-workflows/workflows/81",
-          "links to the real Lead workflow editor"
-        );
-      assert
-        .dom('[data-test-workflow-executions="81"]')
-        .hasAttribute(
-          "href",
-          "/admin/plugins/discourse-workflows/workflows/81/executions",
-          "links to the generated workflow execution history"
-        );
-      await click('[data-test-step="scope"]');
-      assert
-        .dom("[data-test-advanced-workflows]")
-        .doesNotExist("hides advanced workflows when leaving review");
       assert.strictEqual(
         formKit().field("group").value(),
         "partners",
@@ -79,21 +139,6 @@ module(
       await formKit().field("group").select("community-members");
       await click("[data-test-configurations-back]");
       await click('[data-test-configuration="contact"] button');
-      assert
-        .dom("[data-test-advanced-workflows]")
-        .doesNotExist("hides advanced workflows before the review step");
-      await click('[data-test-step="review"]');
-      await click("[data-test-advanced-workflows] button");
-      assert
-        .dom('[data-test-generated-workflow="82"]')
-        .exists("shows the Contact workflow");
-      assert
-        .dom('[data-test-generated-workflow="81"]')
-        .doesNotExist("keeps Lead workflows separate");
-      await click('[data-test-step="scope"]');
-      assert
-        .dom("[data-test-advanced-workflows]")
-        .doesNotExist("hides advanced workflows when leaving review");
       assert.strictEqual(
         formKit().field("object").value(),
         "Contact",
@@ -124,85 +169,66 @@ module(
         "provides a default configuration name"
       );
       await click("[data-test-configurations-back]");
-      await click("[data-test-sync-posts]");
       assert
-        .dom(".salesforce-case-sync")
-        .exists("opens the separate post wizard");
-      assert.strictEqual(
-        formKit().field("category").value(),
-        "support",
-        "starts a category-based configuration"
-      );
+        .dom("[data-test-sync-posts]")
+        .isDisabled("post syncing is not available");
       assert
-        .dom('[data-name="group"]')
-        .doesNotExist("keeps user group settings out of the post wizard");
+        .dom("[data-test-sync-posts]")
+        .includesText("Coming soon", "explains its availability");
     });
 
-    test("connects once and reuses the connection in the next wizard", async function (assert) {
-      let connections = 0;
-      pretender.put("/salesforce/admin/guided-sync/connection.json", () => {
-        connections++;
-        return response(200, { connection: { environment: "sandbox" } });
-      });
-      await render(<template><SalesforceSyncConfigurations /></template>);
-      await click("[data-test-sync-users]");
-      assert.dom('[data-test-step="connect"]').exists();
-      await click("[data-test-connect-demo]");
-      assert.strictEqual(connections, 1);
-      assert
-        .dom('[data-name="group"]')
-        .exists("advances to scope after connecting");
-      assert.dom('[data-test-step="connect"]').doesNotExist();
-      await click("[data-test-configurations-back]");
-      assert.dom("[data-test-connection-status]").hasText("Connected");
-      await click("[data-test-sync-posts]");
-      assert
-        .dom('[data-name="category"]')
-        .exists("starts the next wizard at scope");
-      assert.dom("[data-test-case-connect]").doesNotExist();
-      assert.dom('[data-test-case-step="connect"]').doesNotExist();
-      assert.strictEqual(
-        connections,
-        1,
-        "does not reconnect for a second configuration"
-      );
-    });
-
-    test("keeps the configuration name focused while typing in both wizards", async function (assert) {
-      this.connection = { environment: "sandbox" };
+    test("requires configured plugin credentials before opening setup", async function (assert) {
       await render(
         <template>
-          <SalesforceSyncConfigurations @connection={{this.connection}} />
+          <SalesforceSyncConfigurations
+            @groups={{this.groups}}
+            @credentialsConfigured={{false}}
+          />
         </template>
       );
-      for (const kind of ["users", "posts"]) {
-        await click(`[data-test-sync-${kind}]`);
-        const selector = '[data-name="name"] input';
-        await focus(selector);
-        await fillIn(selector, "New");
-        assert.dom(selector).isFocused();
-        await fillIn(selector, "New configuration name");
-        assert.dom(selector).isFocused();
-        assert.dom(selector).hasValue("New configuration name");
-        await click("[data-test-configurations-back]");
-      }
+      assert
+        .dom("[data-test-credentials-required]")
+        .exists("explains the missing credentials");
+      assert
+        .dom("[data-test-sync-users]")
+        .doesNotExist("hides setup until credentials are configured");
+      assert
+        .dom('a[href="/admin/plugins/discourse-salesforce/settings"]')
+        .exists("links to plugin settings");
     });
 
-    test("opens the configuration identified by a workflow link", async function (assert) {
-      this.connection = { environment: "sandbox" };
+    test("keeps the configuration name focused while typing", async function (assert) {
+      await render(
+        <template>
+          <SalesforceSyncConfigurations
+            @groups={{this.groups}}
+            @credentialsConfigured={{true}}
+          />
+        </template>
+      );
+      await click("[data-test-sync-users]");
+      const selector = '[data-name="name"] input';
+      await focus(selector);
+      await fillIn(selector, "New");
+      assert.dom(selector).isFocused();
+      await fillIn(selector, "New configuration name");
+      assert.dom(selector).isFocused();
+      assert.dom(selector).hasValue("New configuration name");
+      await click("[data-test-configurations-back]");
+    });
+
+    test("opens the configuration identified by a direct link", async function (assert) {
       this.records = [
         {
           ...createDemoConfiguration(),
           id: "lead",
           name: "Lead sync",
-          workflows: [],
         },
         {
           ...createDemoConfiguration(),
           id: "contact",
           name: "Contact sync",
           object: "Contact",
-          workflows: [],
         },
       ];
       let closed = false;
@@ -212,7 +238,8 @@ module(
       await render(
         <template>
           <SalesforceSyncConfigurations
-            @connection={{this.connection}}
+            @groups={{this.groups}}
+            @credentialsConfigured={{true}}
             @records={{this.records}}
             @selectedId="contact"
             @onClose={{this.close}}
@@ -226,7 +253,7 @@ module(
       assert.dom('[data-test-configuration="lead"]').exists();
     });
 
-    test("confirms related workflow deletion and preserves the list when cancelled", async function (assert) {
+    test("confirms configuration deletion and preserves the list when cancelled", async function (assert) {
       let requests = 0;
       pretender.delete(
         "/salesforce/admin/guided-sync/configurations/lead.json",
@@ -240,19 +267,19 @@ module(
           ...createDemoConfiguration(),
           id: "lead",
           name: "<b>Lead sync</b>",
-          workflows: [{ id: 81, name: "Lead join" }],
         },
         {
           ...createDemoConfiguration(),
           id: "contact",
           object: "Contact",
           name: "Contact sync",
-          workflows: [{ id: 82, name: "Contact join" }],
         },
       ];
       await render(
         <template>
           <SalesforceSyncConfigurations
+            @groups={{this.groups}}
+            @credentialsConfigured={{true}}
             @records={{this.records}}
           /><DialogHolder />
         </template>
@@ -267,12 +294,6 @@ module(
       assert
         .dom(".dialog-body b")
         .doesNotExist("treats configuration names as text");
-      assert
-        .dom(".dialog-body")
-        .includesText("Lead join", "lists the related workflow");
-      assert
-        .dom(".dialog-body")
-        .doesNotIncludeText("Contact join", "excludes unrelated workflows");
       await click(".dialog-footer .btn-default");
       assert.strictEqual(requests, 0, "cancelling sends no deletion request");
       assert

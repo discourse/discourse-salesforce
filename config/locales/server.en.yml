@@ -1,5 +1,6 @@
 en:
   site_settings:
+    enable_salesforce_configurations: "Enable experimental group-based Salesforce user sync configurations. Saving a configuration activates real syncing using its mappings, triggers, and schedule."
     salesforce_enabled: 'Enable the discourse-salesforce plugin'
     salesforce_login_enabled: 'Enable Salesforce Social Login'
     salesforce_client_id: "Salesforce connected app's client id"
@@ -20,9 +21,8 @@ en:
     salesforce_default_contact_id_for_case_sync: "Default Salesforce Contact ID to use during Case sync. Useful when 'salesforce_skip_contact_creation_on_case_sync' is enabled."
     salesforce_auth_verbose_logging: "Show verbose Salesforce authentication logs in /logs for troubleshooting"
   salesforce:
-    guided_sync:
-      delete_failed: "Could not delete all related workflows. Check whether another workflow calls one of them. The configuration and its workflows were kept."
     error:
+      fields_unavailable: "Could not load Salesforce fields. Check the connection and permissions, then try again."
       ambiguous_email_match: "Multiple Salesforce %{object_name} records have the same email"
       invalid_response: "Invalid response from Salesforce API"
       invalid_client_credentials: "There was an issue with the Salesforce credentials. Please confirm the validity of the Salesforce client id and client secret settings"

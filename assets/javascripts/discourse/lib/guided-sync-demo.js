@@ -1,9 +1,3 @@
-export const DEMO_GROUPS = [
-  { id: "community-members", count: 248 },
-  { id: "customers", count: 86 },
-  { id: "partners", count: 32 },
-];
-
 export const DEMO_SOURCES = [
   { id: "first", type: "text" },
   { id: "last", type: "text" },
@@ -79,9 +73,8 @@ export const DEMO_USERS = [
 
 export function createDemoConfiguration() {
   return {
-    environment: "sandbox",
     previewUser: "alex",
-    group: "community-members",
+    group: "",
     object: "Lead",
     schedule: "daily",
     onJoin: true,
@@ -91,41 +84,26 @@ export function createDemoConfiguration() {
       { id: 1, source: "first", destination: "FirstName", policy: "keep" },
       { id: 2, source: "last", destination: "LastName", policy: "keep" },
       { id: 3, source: "profile", destination: "Description", policy: "keep" },
-      {
-        id: 4,
-        source: "posts",
-        destination: "Posts_Created__c",
-        policy: "overwrite",
-      },
-      {
-        id: 5,
-        source: "trust",
-        destination: "Community_Trust_Level__c",
-        policy: "overwrite",
-      },
       { id: 6, source: "company", destination: "Company", policy: "overwrite" },
       { id: 7, source: "source", destination: "LeadSource", policy: "keep" },
     ],
   };
 }
 
-export function destinationName(field, object) {
-  if (object === "DiscourseContact__c" && !field.endsWith("__c")) {
-    return `${field}__c`;
-  }
-  if (object === "Contact" && field === "Company") {
-    return "Company_Name__c";
-  }
+export function destinationName(field) {
   return field;
 }
 
-export function mappingError(configuration) {
+export function mappingError(configuration, fields = DEMO_FIELDS) {
   for (const mapping of configuration.mappings) {
     if (!mapping.source || !mapping.destination) {
       return "incomplete";
     }
     const source = DEMO_SOURCES.find((item) => item.id === mapping.source);
-    const field = DEMO_FIELDS.find((item) => item.id === mapping.destination);
+    const field = fields.find((item) => item.id === mapping.destination);
+    if (!field) {
+      return "unavailable";
+    }
     if (source?.type !== field?.type) {
       return "incompatible";
     }
@@ -209,15 +187,4 @@ export function buildPreview(configuration, userId) {
       outcome,
     };
   });
-}
-
-export function buildWorkflows(configuration) {
-  return [
-    ...(configuration.onJoin ? [{ id: "join", icon: "user-plus" }] : []),
-    ...(configuration.onChange ? [{ id: "change", icon: "user-pen" }] : []),
-    ...(configuration.schedule !== "manual"
-      ? [{ id: "refresh", icon: "clock" }]
-      : []),
-    { id: "backfill", icon: "database" },
-  ];
 }

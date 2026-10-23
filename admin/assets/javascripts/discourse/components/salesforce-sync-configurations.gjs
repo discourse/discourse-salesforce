@@ -6,15 +6,12 @@ import { service } from "@ember/service";
 import AdminConfigAreaCard from "discourse/admin/components/admin-config-area-card";
 import { ajax } from "discourse/lib/ajax";
 import { popupAjaxError } from "discourse/lib/ajax-error";
-import { eq } from "discourse/truth-helpers";
+import { eq, not } from "discourse/truth-helpers";
 import DButton from "discourse/ui-kit/d-button";
 import DPageSubheader from "discourse/ui-kit/d-page-subheader";
 import { i18n } from "discourse-i18n";
-import SalesforceCaseSync from "discourse/plugins/discourse-salesforce/discourse/components/salesforce-case-sync";
-import SalesforceConnectionSummary from "discourse/plugins/discourse-salesforce/discourse/components/salesforce-connection-summary";
 import SalesforceDeleteSyncConfirmation from "discourse/plugins/discourse-salesforce/discourse/components/salesforce-delete-sync-confirmation";
 import SalesforceGuidedSync from "discourse/plugins/discourse-salesforce/discourse/components/salesforce-guided-sync";
-import { createCaseDemoConfiguration } from "discourse/plugins/discourse-salesforce/discourse/lib/guided-case-sync-demo";
 import { createDemoConfiguration } from "discourse/plugins/discourse-salesforce/discourse/lib/guided-sync-demo";
 
 export default class SalesforceSyncConfigurations extends Component {
@@ -25,22 +22,17 @@ export default class SalesforceSyncConfigurations extends Component {
   @tracked deletingId;
   @tracked records = this.args.records || [];
   @tracked selected;
-  @tracked _connection;
 
   constructor() {
     super(...arguments);
     const record = this.records.find(
       (configuration) => configuration.id === this.args.selectedId
     );
-    if (record) {
+    if (record && record.kind !== "posts") {
       this.selected = { key: record.id, configuration: record };
-    } else if (["new-users", "new-posts"].includes(this.args.selectedId)) {
-      this.add(this.args.selectedId.slice(4));
+    } else if (this.args.selectedId === "new-users") {
+      this.add();
     }
-  }
-
-  get connection() {
-    return this._connection || this.args.connection;
   }
 
   get editors() {
@@ -50,6 +42,9 @@ export default class SalesforceSyncConfigurations extends Component {
   get displayRecords() {
     return this.records.map((record) => ({
       ...record,
+      statusLabel: i18n(
+        `salesforce.guided_sync.${record.sync_status?.error ? "sync_error" : record.active ? "sync_active" : "sync_inactive"}`
+      ),
       scope: record.kind === "posts" ? record.category : record.group,
       kindLabel: i18n(
         `salesforce.guided_sync.${record.kind === "posts" ? "posts_kind" : "users_kind"}`
@@ -58,29 +53,26 @@ export default class SalesforceSyncConfigurations extends Component {
   }
 
   @action
-  add(kind) {
-    if (this.args.onSelect && this.args.selectedId !== `new-${kind}`) {
-      this.args.onSelect(`new-${kind}`);
+  add() {
+    if (this.args.onSelect && this.args.selectedId !== "new-users") {
+      this.args.onSelect("new-users");
       return;
     }
     this.selected = {
-      key: `new-${kind}`,
-      configuration:
-        kind === "posts"
-          ? {
-              ...createCaseDemoConfiguration(),
-              name: i18n("salesforce.guided_sync.cases.default_name"),
-            }
-          : {
-              ...createDemoConfiguration(),
-              kind: "users",
-              name: i18n("salesforce.guided_sync.default_users_name"),
-            },
+      key: "new-users",
+      configuration: {
+        ...createDemoConfiguration(),
+        kind: "users",
+        name: i18n("salesforce.guided_sync.default_users_name"),
+      },
     };
   }
 
   @action
   edit(record) {
+    if (record.kind === "posts") {
+      return;
+    }
     if (this.args.onSelect) {
       this.args.onSelect(record.id);
       return;
@@ -122,24 +114,6 @@ export default class SalesforceSyncConfigurations extends Component {
   }
 
   @action
-  async connect(environment) {
-    try {
-      const result = await ajax(
-        "/salesforce/admin/guided-sync/connection.json",
-        {
-          type: "PUT",
-          data: { environment },
-        }
-      );
-      this._connection = result.connection;
-      return true;
-    } catch (error) {
-      popupAjaxError(error);
-      return false;
-    }
-  }
-
-  @action
   async save(configuration) {
     try {
       const id = this.selected.configuration.id;
@@ -157,11 +131,11 @@ export default class SalesforceSyncConfigurations extends Component {
         ),
         result.configuration,
       ];
-      this.selected = { ...this.selected, configuration: result.configuration };
       this.toasts.success({
         duration: "short",
         data: { message: i18n("salesforce.guided_sync.save_success") },
       });
+      this.close();
       return true;
     } catch (error) {
       popupAjaxError(error);
@@ -170,25 +144,27 @@ export default class SalesforceSyncConfigurations extends Component {
   }
 
   <template>
-    {{#if this.selected}}
+    {{#if (not @credentialsConfigured)}}
+      <AdminConfigAreaCard @heading="salesforce.guided_sync.credentials_title">
+        <:content>
+          <p data-test-credentials-required>{{i18n
+              "salesforce.guided_sync.credentials_required"
+            }}</p>
+          <DButton
+            class="btn-primary"
+            @href="/admin/plugins/discourse-salesforce/settings"
+            @label="salesforce.guided_sync.open_settings"
+          />
+        </:content>
+      </AdminConfigAreaCard>
+    {{else if this.selected}}
       {{#each this.editors key="key" as |editor|}}
-        {{#if (eq editor.configuration.kind "posts")}}
-          <SalesforceCaseSync
-            @connection={{this.connection}}
-            @onConnect={{this.connect}}
-            @record={{editor.configuration}}
-            @onCancel={{this.close}}
-            @onSave={{this.save}}
-          />
-        {{else}}
-          <SalesforceGuidedSync
-            @connection={{this.connection}}
-            @onConnect={{this.connect}}
-            @record={{editor.configuration}}
-            @onCancel={{this.close}}
-            @onSave={{this.save}}
-          />
-        {{/if}}
+        <SalesforceGuidedSync
+          @groups={{@groups}}
+          @record={{editor.configuration}}
+          @onCancel={{this.close}}
+          @onSave={{this.save}}
+        />
       {{/each}}
     {{else}}
       <div
@@ -202,12 +178,6 @@ export default class SalesforceSyncConfigurations extends Component {
           }}
         />
 
-        {{#if this.connection}}
-          <SalesforceConnectionSummary
-            @connected={{true}}
-            @environment={{this.connection.environment}}
-          />
-        {{/if}}
         <div class="salesforce-sync-configurations__choices">
           <AdminConfigAreaCard
             @heading="salesforce.guided_sync.sync_users"
@@ -216,21 +186,22 @@ export default class SalesforceSyncConfigurations extends Component {
             <:content><DButton
                 class="btn-primary"
                 data-test-sync-users
-                @action={{fn this.add "users"}}
+                @action={{this.add}}
                 @icon="users"
                 @label="salesforce.guided_sync.sync_users"
               /></:content>
           </AdminConfigAreaCard>
           <AdminConfigAreaCard
+            class="salesforce-sync-configurations__coming-soon"
             @heading="salesforce.guided_sync.sync_posts"
             @description="salesforce.guided_sync.posts_description"
           >
             <:content><DButton
                 class="btn-primary"
                 data-test-sync-posts
-                @action={{fn this.add "posts"}}
+                @disabled={{true}}
                 @icon="comments"
-                @label="salesforce.guided_sync.sync_posts"
+                @label="salesforce.guided_sync.posts_coming_soon"
               /></:content>
           </AdminConfigAreaCard>
         </div>
@@ -247,7 +218,9 @@ export default class SalesforceSyncConfigurations extends Component {
               {{#each this.displayRecords key="id" as |record|}}
                 <tr class="d-table__row" data-test-configuration={{record.id}}>
                   <td class="d-table__cell --overview"><strong
-                    >{{record.name}}</strong></td>
+                    >{{record.name}}</strong><div
+                      class="salesforce-sync-configurations__status"
+                    >{{record.statusLabel}}</div></td>
                   <td class="d-table__cell --detail"><div
                       class="d-table__mobile-label"
                     >{{i18n
@@ -268,6 +241,7 @@ export default class SalesforceSyncConfigurations extends Component {
                       <DButton
                         class="btn-default btn-small"
                         @action={{fn this.edit record}}
+                        @disabled={{eq record.kind "posts"}}
                         @label="salesforce.guided_sync.configure"
                       />
                       <DButton

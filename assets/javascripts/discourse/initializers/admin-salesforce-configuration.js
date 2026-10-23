@@ -10,12 +10,18 @@ export default {
 
     withPluginApi((api) => {
       api.setAdminPluginIcon("discourse-salesforce", "fab-salesforce");
+      if (
+        !container.lookup("service:site-settings")
+          .enable_salesforce_configurations
+      ) {
+        return;
+      }
       api.addAdminPluginConfigurationNav("discourse-salesforce", [
         {
           label: "salesforce.guided_sync.title",
           description: "salesforce.guided_sync.description",
-          route: "adminPlugins.show.salesforce-guided-sync",
-          query: { configuration: null },
+          route: "adminPlugins.show.salesforce-configurations",
+          currentWhen: "adminPlugins.show.salesforce-guided-sync",
         },
       ]);
     });

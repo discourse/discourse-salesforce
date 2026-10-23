@@ -1,10 +1,53 @@
 # frozen_string_literal: true
 
+require_relative "../spec_helper"
+
 RSpec.describe Salesforce::GuidedSyncController do
   fab!(:admin)
   fab!(:user)
+  fab!(:sync_group) { Fabricate(:group, name: "community-members") }
 
-  before { SiteSetting.salesforce_enabled = true }
+  before do
+    SiteSetting.salesforce_enabled = true
+    SiteSetting.enable_salesforce_configurations = true
+  end
+
+  describe "disabled experimental feature" do
+    it "hides the page and blocks all configuration endpoints without changing stored data" do
+      sign_in(admin)
+      record = { "id" => "existing", "name" => "Saved configuration" }
+      PluginStore.set(
+        Salesforce::PLUGIN_NAME,
+        Salesforce::GuidedSyncConfiguration::STORE_KEY,
+        [record],
+      )
+      SiteSetting.enable_salesforce_configurations = false
+
+      get "/admin/plugins/discourse-salesforce/guided-sync"
+      expect(response).to have_http_status(:not_found)
+      get "/admin/plugins/discourse-salesforce/configurations"
+      expect(response).to have_http_status(:not_found)
+      get "/salesforce/admin/guided-sync/configurations.json"
+      expect(response).to have_http_status(:not_found)
+      post "/salesforce/admin/guided-sync/configurations.json",
+           params: {
+             configuration: {
+               name: "New",
+             },
+           }
+      expect(response).to have_http_status(:not_found)
+      put "/salesforce/admin/guided-sync/configurations/existing.json",
+          params: {
+            configuration: {
+              name: "Changed",
+            },
+          }
+      expect(response).to have_http_status(:not_found)
+      delete "/salesforce/admin/guided-sync/configurations/existing.json"
+      expect(response).to have_http_status(:not_found)
+      expect(Salesforce::GuidedSyncConfiguration.all).to eq([record])
+    end
+  end
 
   describe "#index" do
     it "renders the admin application when opening the demo directly" do
@@ -12,6 +55,9 @@ RSpec.describe Salesforce::GuidedSyncController do
 
       get "/admin/plugins/discourse-salesforce/guided-sync"
 
+      expect(response).to have_http_status(:ok)
+      expect(response.headers["X-Discourse-Route"]).to eq("salesforce/guided_sync/index")
+      get "/admin/plugins/discourse-salesforce/configurations"
       expect(response).to have_http_status(:ok)
       expect(response.headers["X-Discourse-Route"]).to eq("salesforce/guided_sync/index")
     end
@@ -25,29 +71,131 @@ RSpec.describe Salesforce::GuidedSyncController do
     end
   end
 
-  describe "shared demo connection" do
-    it "persists one connection for subsequent wizard visits" do
+  describe "credential status" do
+    it "reports existing plugin credential presence without exposing secrets or verifying access" do
       sign_in(admin)
-      put "/salesforce/admin/guided-sync/connection.json", params: { environment: "production" }
-      expect(response).to have_http_status(:ok)
+      SiteSetting.salesforce_client_id = ""
       get "/salesforce/admin/guided-sync/configurations.json"
-      expect(response.parsed_body.fetch("connection")).to eq("environment" => "production")
-      put "/salesforce/admin/guided-sync/connection.json", params: { environment: "invalid" }
-      expect(response).to have_http_status(:bad_request)
-      expect(PluginStore.get(Salesforce::PLUGIN_NAME, "guided_sync_connection")).to eq(
-        "environment" => "production",
+      expect(response.parsed_body.fetch("credentials_configured")).to eq(false)
+      SiteSetting.salesforce_client_id = "test-client"
+      SiteSetting.salesforce_username = "test@example.com"
+      SiteSetting.salesforce_rsa_private_key = "test-private-key"
+      SiteSetting.salesforce_authorization_server_url = "https://login.salesforce.com"
+      get "/salesforce/admin/guided-sync/configurations.json"
+      expect(response.parsed_body).to include(
+        "configurations" => [],
+        "credentials_configured" => true,
       )
-    end
-
-    it "rejects connection changes by non-admins" do
-      sign_in(user)
-      put "/salesforce/admin/guided-sync/connection.json", params: { environment: "sandbox" }
-      expect(response).to have_http_status(:forbidden)
-      expect(PluginStore.get(Salesforce::PLUGIN_NAME, "guided_sync_connection")).to be_nil
     end
   end
 
-  describe "configuration generation" do
+  describe "#fields" do
+    include_context "with salesforce spec helper"
+
+    it "loads writable fields for the selected object" do
+      sign_in(admin)
+      %w[Lead Contact].each do |object|
+        field = {
+          name: "#{object}_Detail__c",
+          label: "Detail",
+          type: "string",
+          custom: true,
+          createable: true,
+          updateable: true,
+        }
+        stub_request(:get, "#{api_path}/#{object}/describe").to_return(
+          body: {
+            fields: [
+              field,
+              { name: "Id", createable: false, updateable: false },
+              { name: "Formula__c", calculated: true, createable: true },
+            ],
+          }.to_json,
+        )
+        get "/salesforce/admin/guided-sync/fields.json", params: { object: object }
+        expect(response).to have_http_status(:ok)
+        expect(response.parsed_body.fetch("fields")).to eq([field.stringify_keys])
+      end
+    end
+
+    it "returns a safe error when Salesforce is unavailable" do
+      sign_in(admin)
+      stub_request(:get, "#{api_path}/Lead/describe").to_return(
+        status: 503,
+        body: "private upstream details",
+      )
+      get "/salesforce/admin/guided-sync/fields.json", params: { object: "Lead" }
+      expect(response).to have_http_status(:bad_gateway)
+      expect(response.parsed_body.fetch("errors")).to eq(
+        [I18n.t("salesforce.error.fields_unavailable")],
+      )
+    end
+
+    it "restricts metadata requests to admins, the feature flag, and supported objects" do
+      sign_in(admin)
+      get "/salesforce/admin/guided-sync/fields.json", params: { object: "Account" }
+      expect(response).to have_http_status(:bad_request)
+      SiteSetting.enable_salesforce_configurations = false
+      get "/salesforce/admin/guided-sync/fields.json", params: { object: "Lead" }
+      expect(response).to have_http_status(:not_found)
+      SiteSetting.enable_salesforce_configurations = true
+      sign_in(user)
+      get "/salesforce/admin/guided-sync/fields.json", params: { object: "Lead" }
+      expect(response).to have_http_status(:forbidden)
+      expect(a_request(:get, %r{/sobjects/})).not_to have_been_made
+    end
+  end
+
+  describe "available groups" do
+    it "returns groups with only eligible members counted" do
+      SiteSetting.allow_anonymous_mode = true
+      anonymous_user = Fabricate(:user, trust_level: 1)
+      AnonymousUser.create!(user: anonymous_user, master_user: user, active: true)
+      members = [
+        user,
+        Fabricate(:user, suspended_till: 1.day.ago),
+        Fabricate(:user, active: false),
+        Fabricate(:user, staged: true),
+        Fabricate(:user, suspended_till: 1.day.from_now),
+        anonymous_user,
+        Discourse.system_user,
+      ]
+      members.each { |member| sync_group.add(member) }
+      bot_group = Fabricate(:group)
+      bot_group.add(Discourse.system_user)
+      sign_in(admin)
+
+      get "/salesforce/admin/guided-sync/configurations.json"
+
+      expect(response.parsed_body.fetch("groups")).to include(
+        "name" => sync_group.name,
+        "user_count" => 2,
+      )
+      expect(response.parsed_body.fetch("groups")).to include(
+        "name" => bot_group.name,
+        "user_count" => 0,
+      )
+      expect(
+        response.parsed_body.fetch("groups").map { |group| group.fetch("name") },
+      ).not_to include("everyone")
+    end
+  end
+
+  describe "configuration persistence" do
+    include_context "with salesforce spec helper"
+
+    before do
+      %w[Lead Contact].each do |object|
+        stub_request(:get, "#{api_path}/#{object}/describe").to_return(
+          body: {
+            fields:
+              %w[Email FirstName LastName Company].map do |name|
+                { name: name, type: "string", createable: true, updateable: true }
+              end,
+          }.to_json,
+        )
+      end
+    end
     let(:configuration) do
       {
         name: "Lead sync",
@@ -57,421 +205,156 @@ RSpec.describe Salesforce::GuidedSyncController do
         onJoin: true,
         onChange: false,
         backfill: true,
-        mappings: [{ id: 1, source: "first", destination: "FirstName", policy: "keep" }],
-      }
-    end
-
-    before { SiteSetting.enable_discourse_workflows = true }
-
-    it "saves independent Lead and Contact configurations with their own published workflows" do
-      sign_in(admin)
-      post "/salesforce/admin/guided-sync/configurations.json",
-           params: {
-             configuration: configuration,
-           }
-      expect(response).to have_http_status(:created)
-      lead = response.parsed_body.fetch("configuration")
-      lead_ids = lead.fetch("workflows").map { |workflow| workflow.fetch("id") }
-      expect(
-        lead.fetch("workflows").map { |workflow| workflow.fetch("purpose") },
-      ).to contain_exactly("join", "refresh", "backfill")
-      drafts = DiscourseWorkflows::Workflow.where(id: lead_ids)
-      expect(drafts.count).to eq(3)
-      expect(drafts.pluck(:active_version_id)).to all(be_present)
-      expect(drafts.map { |workflow| workflow.nodes.map { |node| node["type"] } }).to all(
-        eq(%w[trigger:user_created action:http_request]),
-      )
-
-      contact_configuration =
-        configuration.merge(
-          name: "Contact sync",
-          object: "Contact",
-          group: "customers",
-          schedule: "manual",
-          backfill: false,
-        )
-      post "/salesforce/admin/guided-sync/configurations.json",
-           params: {
-             configuration: contact_configuration,
-           }
-      expect(response).to have_http_status(:created)
-      contact = response.parsed_body.fetch("configuration")
-      expect(
-        contact.fetch("workflows").map { |workflow| workflow.fetch("id") } & lead_ids,
-      ).to be_empty
-      expect(contact.fetch("workflows").map { |workflow| workflow.fetch("purpose") }).to eq(
-        ["join"],
-      )
-
-      execution =
-        Fabricate(
-          :discourse_workflows_execution,
-          workflow: DiscourseWorkflows::Workflow.find(lead_ids.first),
-        )
-      put "/salesforce/admin/guided-sync/configurations/#{lead.fetch("id")}.json",
-          params: {
-            configuration: configuration.merge(name: "Partner sync", group: "partners"),
-          }
-      expect(response).to have_http_status(:ok)
-      expect(
-        response
-          .parsed_body
-          .dig("configuration", "workflows")
-          .map { |workflow| workflow.fetch("id") },
-      ).to match_array(lead_ids)
-      renamed = response.parsed_body.dig("configuration", "workflows")
-      renamed.each do |workflow|
-        expected_name = "Partner sync · Lead · #{workflow.fetch("purpose")}"
-        expect(workflow.fetch("name")).to eq(expected_name)
-        expect(DiscourseWorkflows::Workflow.find(workflow.fetch("id")).name).to eq(expected_name)
-      end
-      expect(execution.reload.workflow_id).to eq(lead_ids.first)
-      contact
-        .fetch("workflows")
-        .each do |workflow|
-          expect(DiscourseWorkflows::Workflow.find(workflow.fetch("id")).name).to eq(
-            workflow.fetch("name"),
-          )
-        end
-
-      get "/salesforce/admin/guided-sync/configurations.json"
-      expect(
-        response
-          .parsed_body
-          .fetch("configurations")
-          .map { |record| record.slice("object", "group", "schedule") },
-      ).to contain_exactly(
-        { "object" => "Lead", "group" => "partners", "schedule" => "daily" },
-        { "object" => "Contact", "group" => "customers", "schedule" => "manual" },
-      )
-    end
-
-    it "persists category-based Cases and creates only the selected response workflows" do
-      sign_in(admin)
-      case_configuration = {
-        name: "Support case sync",
-        kind: "posts",
-        object: "Case",
-        category: "support",
-        schedule: "manual",
-        onCreate: true,
-        onEdit: true,
-        outboundReplies: true,
-        inboundReplies: false,
-        backfill: true,
         mappings: [
-          { id: 1, source: "title", destination: "Subject", policy: "overwrite" },
-          { id: 2, source: "version", destination: "Product_Version__c", policy: "overwrite" },
-          { id: 3, source: "attachments", destination: "files", policy: "overwrite" },
+          { id: 1, source: "last", destination: "LastName", policy: "keep" },
+          { id: 2, source: "company", destination: "Company", policy: "keep" },
         ],
       }
-      post "/salesforce/admin/guided-sync/configurations.json",
-           params: {
-             configuration: case_configuration,
-           },
-           as: :json
-      expect(response).to have_http_status(:created)
-      record = response.parsed_body.fetch("configuration")
-      workflows = record.fetch("workflows")
-      expect(workflows.map { |workflow| workflow.fetch("purpose") }).to contain_exactly(
-        "case_create",
-        "case_update",
-        "topic_to_case",
-        "backfill",
-      )
-      expect(
-        DiscourseWorkflows::Workflow.where(
-          id: workflows.map { |workflow| workflow.fetch("id") },
-        ).pluck(:active_version_id),
-      ).to all(be_present)
-
-      put "/salesforce/admin/guided-sync/configurations/#{record.fetch("id")}.json",
-          params: {
-            configuration:
-              case_configuration.merge(category: "enterprise-support", inboundReplies: true),
-          },
-          as: :json
-      expect(response).to have_http_status(:ok)
-      updated_workflows = response.parsed_body.dig("configuration", "workflows")
-      expect(updated_workflows.map { |workflow| workflow.fetch("purpose") }).to contain_exactly(
-        "case_create",
-        "case_update",
-        "topic_to_case",
-        "case_to_topic",
-        "backfill",
-      )
-      expect(
-        updated_workflows.select { |workflow| workflow.fetch("purpose") != "case_to_topic" },
-      ).to match_array(workflows)
-
-      get "/salesforce/admin/guided-sync/configurations.json"
-      saved = response.parsed_body.fetch("configurations").first
-      expect(saved.slice("kind", "object", "category", "inboundReplies", "mappings")).to eq(
-        "kind" => "posts",
-        "object" => "Case",
-        "category" => "enterprise-support",
-        "inboundReplies" => true,
-        "mappings" => record.fetch("mappings"),
-      )
-      put "/salesforce/admin/guided-sync/configurations/#{record.fetch("id")}.json",
-          params: {
-            configuration:
-              case_configuration.merge(onEdit: false, outboundReplies: false, backfill: false),
-          },
-          as: :json
-      expect(response).to have_http_status(:ok)
-      remaining = response.parsed_body.dig("configuration", "workflows")
-      expect(remaining.map { |workflow| workflow["purpose"] }).to eq(["case_create"])
-      removed_ids =
-        updated_workflows.map { |workflow| workflow["id"] } -
-          remaining.map { |workflow| workflow["id"] }
-      expect(DiscourseWorkflows::Workflow.where(id: removed_ids)).to be_empty
     end
 
-    it "removes disabled workflows and recreates them only when re-enabled" do
+    it "validates mappings before activating and does not requeue backfill on ordinary edits" do
       sign_in(admin)
+      post "/salesforce/admin/guided-sync/configurations.json",
+           params: {
+             configuration:
+               configuration.merge(
+                 mappings: [{ source: "last", destination: "Bogus__c", policy: "overwrite" }],
+               ),
+           },
+           as: :json
+      expect(response).to have_http_status(:bad_request)
+      expect(Salesforce::GuidedSyncConfiguration.active).to be_empty
       post "/salesforce/admin/guided-sync/configurations.json",
            params: {
              configuration: configuration,
            },
            as: :json
-      record = response.parsed_body.fetch("configuration")
-      original = record.fetch("workflows").index_by { |workflow| workflow.fetch("purpose") }
-      backfill_id = original.fetch("backfill").fetch("id")
-      Fabricate(
-        :discourse_workflows_execution,
-        workflow: DiscourseWorkflows::Workflow.find(backfill_id),
-      )
-      put "/salesforce/admin/guided-sync/configurations/#{record.fetch("id")}.json",
+      expect(response).to have_http_status(:created)
+      id = response.parsed_body.fetch("configuration").fetch("id")
+      Jobs::SyncSalesforceConfiguration.clear
+      put "/salesforce/admin/guided-sync/configurations/#{id}.json",
           params: {
-            configuration: configuration.merge(backfill: false, schedule: "manual"),
+            configuration: configuration.merge(name: "Renamed"),
           },
           as: :json
       expect(response).to have_http_status(:ok)
-      expect(response.parsed_body.dig("configuration", "workflows")).to eq([original.fetch("join")])
-      expect(DiscourseWorkflows::Workflow.exists?(backfill_id)).to eq(false)
-      expect(DiscourseWorkflows::Workflow.exists?(original.fetch("refresh").fetch("id"))).to eq(
-        false,
-      )
-      expect(DiscourseWorkflows::Execution.exists?(workflow_id: backfill_id)).to eq(false)
-      put "/salesforce/admin/guided-sync/configurations/#{record.fetch("id")}.json",
+      expect(Jobs::SyncSalesforceConfiguration.jobs).to be_empty
+      put "/salesforce/admin/guided-sync/configurations/#{id}.json",
+          params: {
+            configuration: configuration.merge(backfill: false),
+          },
+          as: :json
+      expect(response).to have_http_status(:ok)
+      put "/salesforce/admin/guided-sync/configurations/#{id}.json",
           params: {
             configuration: configuration,
           },
           as: :json
       expect(response).to have_http_status(:ok)
-      updated =
-        response
-          .parsed_body
-          .dig("configuration", "workflows")
-          .index_by { |workflow| workflow.fetch("purpose") }
-      expect(updated.fetch("join")).to eq(original.fetch("join"))
-      expect(updated.fetch("backfill").fetch("id")).not_to eq(backfill_id)
+      expect(Jobs::SyncSalesforceConfiguration.jobs.size).to eq(1)
     end
 
-    it "rolls back configuration changes if a disabled workflow is used elsewhere" do
+    it "rejects custom objects and nonexistent groups" do
       sign_in(admin)
-      post "/salesforce/admin/guided-sync/configurations.json",
-           params: {
-             configuration: configuration,
-           },
-           as: :json
-      record = response.parsed_body.fetch("configuration")
-      backfill_id =
-        record.fetch("workflows").find { |workflow| workflow["purpose"] == "backfill" }.fetch("id")
-      graph =
-        build_workflow_graph do |workflow_graph|
-          workflow_graph.node "trigger-1", "trigger:manual"
-          workflow_graph.node "call-1",
-                              "action:workflow_call",
-                              configuration: {
-                                "workflow_id" => backfill_id,
-                              }
-        end
-      Fabricate(:discourse_workflows_workflow, created_by: admin, published: true, **graph)
-      put "/salesforce/admin/guided-sync/configurations/#{record.fetch("id")}.json",
-          params: {
-            configuration: configuration.merge(backfill: false, group: "partners"),
-          },
-          as: :json
-      expect(response).to have_http_status(:unprocessable_entity)
-      expect(Salesforce::GuidedSyncConfiguration.all).to eq([record])
-      expect(DiscourseWorkflows::Workflow.exists?(backfill_id)).to eq(true)
-    end
-
-    it "protects managed workflow definitions while allowing execution inspection and editable duplication" do
-      sign_in(admin)
-      post "/salesforce/admin/guided-sync/configurations.json",
-           params: {
-             configuration: configuration,
-           },
-           as: :json
-      record = response.parsed_body.fetch("configuration")
-      workflow_id = record.fetch("workflows").first.fetch("id")
-      workflow = DiscourseWorkflows::Workflow.find(workflow_id)
-      expect(workflow.published?).to eq(true)
-
-      get "/admin/plugins/discourse-workflows/workflows/#{workflow_id}.json"
-      expect(response).to have_http_status(:ok)
-      expect(response.parsed_body.dig("workflow", "managed_by", "name")).to eq("Salesforce")
-      expect(response.parsed_body.dig("workflow", "managed_by", "url")).to eq(
-        "/admin/plugins/discourse-salesforce/guided-sync?configuration=#{record.fetch("id")}",
-      )
-      get "/admin/plugins/discourse-workflows/workflows/#{workflow_id}/executions.json"
-      expect(response).to have_http_status(:ok)
-
-      put "/admin/plugins/discourse-workflows/workflows/#{workflow_id}.json",
-          params: {
-            workflow: {
-              name: "Changed directly",
-            },
-          },
-          as: :json
-      expect(response).to have_http_status(:forbidden)
-      put "/admin/plugins/discourse-workflows/workflows/#{workflow_id}.json",
-          params: {
-            workflow: {
-              published: false,
-            },
-          },
-          as: :json
-      expect(response).to have_http_status(:forbidden)
-      delete "/admin/plugins/discourse-workflows/workflows/#{workflow_id}.json"
-      expect(response).to have_http_status(:forbidden)
-      post "/admin/plugins/discourse-workflows/workflows/#{workflow_id}/versions/#{workflow.version_id}/restore.json"
-      expect(response).to have_http_status(:forbidden)
-      post "/admin/plugins/discourse-workflows/workflows/#{workflow_id}/variables.json",
-           params: {
-             key: "example",
-           }
-      expect(response).to have_http_status(:forbidden)
-
-      post "/admin/plugins/discourse-workflows/workflows/#{workflow_id}/duplicate.json"
-      expect(response).to have_http_status(:created)
-      copy = response.parsed_body.fetch("workflow")
-      expect(copy.fetch("managed_by")).to be_nil
-      expect(copy.fetch("nodes")).to eq(workflow.nodes)
-      expect(copy.fetch("connections")).to eq(workflow.connections)
-      expect(copy.fetch("active_version_id")).to be_nil
-      put "/admin/plugins/discourse-workflows/workflows/#{copy.fetch("id")}.json",
-          params: {
-            workflow: {
-              name: "My independent copy",
-            },
-          },
-          as: :json
-      expect(response).to have_http_status(:ok)
-      expect(workflow.reload.name).to eq(record.fetch("workflows").first.fetch("name"))
-    end
-
-    it "requires Workflows to be enabled before saving" do
-      sign_in(admin)
-      SiteSetting.enable_discourse_workflows = false
-
-      post "/salesforce/admin/guided-sync/configurations.json",
-           params: {
-             configuration: configuration,
-           }
-
-      expect(response).to have_http_status(:forbidden)
+      [
+        configuration.merge(object: "DiscourseContact__c"),
+        configuration.merge(group: "missing-group"),
+      ].each do |invalid|
+        post "/salesforce/admin/guided-sync/configurations.json",
+             params: {
+               configuration: invalid,
+             },
+             as: :json
+        expect(response).to have_http_status(:bad_request)
+      end
       expect(Salesforce::GuidedSyncConfiguration.all).to be_empty
     end
 
-    it "rejects non-admin configuration access and generation" do
-      sign_in(user)
-      get "/salesforce/admin/guided-sync/configurations.json"
-      expect(response).to have_http_status(:forbidden)
-
-      post "/salesforce/admin/guided-sync/configurations.json",
-           params: {
-             configuration: configuration,
-           }
-      expect(response).to have_http_status(:forbidden)
-    end
-  end
-
-  describe "#destroy_configuration" do
-    let(:configuration) do
-      {
-        name: "Lead sync",
-        object: "Lead",
-        group: "community-members",
-        schedule: "daily",
-        onJoin: true,
-        onChange: false,
-        backfill: true,
-        mappings: [{ id: 1, source: "first", destination: "FirstName", policy: "keep" }],
-      }
-    end
-
-    before { SiteSetting.enable_discourse_workflows = true }
-
-    it "deletes only the chosen configuration and its remaining workflows" do
+    it "saves independent user configurations without requiring Workflows" do
       sign_in(admin)
       post "/salesforce/admin/guided-sync/configurations.json",
            params: {
              configuration: configuration,
            },
            as: :json
+      expect(response).to have_http_status(:created)
       lead = response.parsed_body.fetch("configuration")
-      workflow_ids = lead.fetch("workflows").map { |workflow| workflow.fetch("id") }
-      DiscourseWorkflows::Workflow.find(workflow_ids.first).destroy!
+      expect(lead).not_to have_key("workflows")
+      expect(lead.fetch("active")).to eq(true)
+      expect(lead.fetch("group_id")).to eq(sync_group.id)
+      expect(
+        Jobs::SyncSalesforceConfiguration.jobs.any? do |job|
+          job["args"].first["configuration_id"] == lead["id"]
+        end,
+      ).to eq(true)
       post "/salesforce/admin/guided-sync/configurations.json",
            params: {
              configuration: configuration.merge(name: "Contact sync", object: "Contact"),
            },
            as: :json
+      expect(response).to have_http_status(:created)
       contact = response.parsed_body.fetch("configuration")
-      contact_workflow_ids = contact.fetch("workflows").map { |workflow| workflow.fetch("id") }
+
+      put "/salesforce/admin/guided-sync/configurations/#{lead.fetch("id")}.json",
+          params: {
+            configuration: configuration.merge(name: "Partner sync", backfill: false),
+          },
+          as: :json
+      expect(response).to have_http_status(:ok)
+      updated = response.parsed_body.fetch("configuration")
+      expect(updated.slice("id", "name", "backfill")).to eq(
+        "id" => lead.fetch("id"),
+        "name" => "Partner sync",
+        "backfill" => false,
+      )
+      get "/salesforce/admin/guided-sync/configurations.json"
+      expect(
+        response.parsed_body.fetch("configurations").map { |record| record.except("sync_status") },
+      ).to contain_exactly(updated, contact)
 
       delete "/salesforce/admin/guided-sync/configurations/#{lead.fetch("id")}.json"
-
       expect(response).to have_http_status(:no_content)
-      expect(DiscourseWorkflows::Workflow.where(id: workflow_ids)).to be_empty
-      expect(
-        DiscourseWorkflows::Workflow.where(id: contact_workflow_ids).pluck(:id),
-      ).to match_array(contact_workflow_ids)
-      get "/salesforce/admin/guided-sync/configurations.json"
-      expect(response.parsed_body.fetch("configurations")).to eq([contact])
-
+      expect(Salesforce::GuidedSyncConfiguration.all).to eq([contact])
       delete "/salesforce/admin/guided-sync/configurations/#{lead.fetch("id")}.json"
       expect(response).to have_http_status(:not_found)
     end
 
-    it "keeps the whole configuration when a related workflow is called elsewhere" do
+    it "rejects post sync configurations while unavailable" do
       sign_in(admin)
+      post "/salesforce/admin/guided-sync/configurations.json",
+           params: {
+             configuration: configuration.merge(kind: "posts", object: "Case"),
+           },
+           as: :json
+      expect(response).to have_http_status(:bad_request)
+      expect(Salesforce::GuidedSyncConfiguration.all).to be_empty
+    end
+
+    it "rejects invalid configurations and changes to the target object" do
+      sign_in(admin)
+      post "/salesforce/admin/guided-sync/configurations.json",
+           params: {
+             configuration: configuration.merge(name: ""),
+           },
+           as: :json
+      expect(response).to have_http_status(:bad_request)
+      expect(Salesforce::GuidedSyncConfiguration.all).to be_empty
       post "/salesforce/admin/guided-sync/configurations.json",
            params: {
              configuration: configuration,
            },
            as: :json
       record = response.parsed_body.fetch("configuration")
-      workflow_ids = record.fetch("workflows").map { |workflow| workflow.fetch("id") }
-      graph =
-        build_workflow_graph do |workflow_graph|
-          workflow_graph.node "trigger-1", "trigger:manual"
-          workflow_graph.node "call-1",
-                              "action:workflow_call",
-                              configuration: {
-                                "workflow_id" => workflow_ids.last,
-                              }
-        end
-      Fabricate(:discourse_workflows_workflow, created_by: admin, published: true, **graph)
-
-      delete "/salesforce/admin/guided-sync/configurations/#{record.fetch("id")}.json"
-
-      expect(response).to have_http_status(:unprocessable_entity)
-      expect(response.parsed_body.fetch("errors")).to eq(
-        [I18n.t("salesforce.guided_sync.delete_failed")],
-      )
-      expect(DiscourseWorkflows::Workflow.where(id: workflow_ids).pluck(:id)).to match_array(
-        workflow_ids,
-      )
-      get "/salesforce/admin/guided-sync/configurations.json"
-      expect(response.parsed_body.fetch("configurations")).to eq([record])
+      put "/salesforce/admin/guided-sync/configurations/#{record.fetch("id")}.json",
+          params: {
+            configuration: configuration.merge(object: "Contact"),
+          },
+          as: :json
+      expect(response).to have_http_status(:bad_request)
+      expect(Salesforce::GuidedSyncConfiguration.all).to eq([record])
     end
 
-    it "rejects non-admin deletion" do
+    it "rejects non-admin configuration reads and writes" do
       sign_in(admin)
       post "/salesforce/admin/guided-sync/configurations.json",
            params: {
@@ -480,11 +363,38 @@ RSpec.describe Salesforce::GuidedSyncController do
            as: :json
       record = response.parsed_body.fetch("configuration")
       sign_in(user)
-
+      get "/salesforce/admin/guided-sync/configurations.json"
+      expect(response).to have_http_status(:forbidden)
+      post "/salesforce/admin/guided-sync/configurations.json",
+           params: {
+             configuration: configuration,
+           },
+           as: :json
+      expect(response).to have_http_status(:forbidden)
+      put "/salesforce/admin/guided-sync/configurations/#{record.fetch("id")}.json",
+          params: {
+            configuration: configuration.merge(name: "Changed"),
+          },
+          as: :json
+      expect(response).to have_http_status(:forbidden)
       delete "/salesforce/admin/guided-sync/configurations/#{record.fetch("id")}.json"
-
       expect(response).to have_http_status(:forbidden)
       expect(Salesforce::GuidedSyncConfiguration.all).to eq([record])
+    end
+
+    it "keeps legacy configurations readable without returning workflow metadata" do
+      record =
+        configuration.deep_stringify_keys.merge("id" => "legacy", "workflows" => [{ "id" => 42 }])
+      PluginStore.set(
+        Salesforce::PLUGIN_NAME,
+        Salesforce::GuidedSyncConfiguration::STORE_KEY,
+        [record],
+      )
+      sign_in(admin)
+      get "/salesforce/admin/guided-sync/configurations.json"
+      expect(
+        response.parsed_body.fetch("configurations").map { |item| item.except("sync_status") },
+      ).to eq([record.except("workflows")])
     end
   end
 end

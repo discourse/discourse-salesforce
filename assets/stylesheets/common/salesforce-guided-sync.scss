@@ -3,10 +3,6 @@
 .salesforce-guided-sync {
   min-width: 0;
 
-  &__advanced {
-    margin-block-start: var(--space-6);
-  }
-
   &__demo-notice {
     display: flex;
     align-items: baseline;
@@ -19,7 +15,7 @@
 
   &__steps {
     display: grid;
-    grid-template-columns: repeat(5, minmax(0, 1fr));
+    grid-template-columns: repeat(4, minmax(0, 1fr));
     gap: 0.5em;
     margin-block: 1em 1.5em;
   }
@@ -58,24 +54,6 @@
     color: var(--secondary);
     background: var(--tertiary);
     border-color: var(--tertiary);
-  }
-
-  &__connection {
-    display: flex;
-    flex-wrap: wrap;
-    align-items: center;
-    gap: 1em;
-    margin-block-end: 1.5em;
-
-    > .d-icon {
-      font-size: 2.5em;
-      color: var(--tertiary);
-    }
-
-    h4,
-    p {
-      margin: 0;
-    }
   }
 
   &__status {
@@ -226,36 +204,6 @@
     margin-block: 1.5em;
   }
 
-  &__workflow-list {
-    display: grid;
-    gap: 0.75em;
-    margin-block: 1.5em;
-  }
-
-  &__workflow-summary {
-    display: flex;
-    flex-wrap: wrap;
-    align-items: center;
-    gap: 1em;
-    padding: 1em;
-    border: 1px solid var(--primary-low);
-    border-radius: var(--d-border-radius);
-
-    > .d-icon {
-      color: var(--tertiary);
-    }
-
-    h4,
-    p {
-      margin: 0;
-    }
-
-    p {
-      color: var(--primary-high);
-      font-size: var(--font-down-1);
-    }
-  }
-
   &__canvas {
     display: flex;
     flex-direction: column;
@@ -383,9 +331,13 @@
   }
 
   &__search {
-    width: min(26em, calc(100vw - 4em));
+    width: 100%;
+    min-width: 0;
     box-sizing: border-box;
-    padding: 0.5em;
+
+    .filter-input {
+      min-width: 0;
+    }
   }
 
   &__option {
@@ -472,20 +424,37 @@
   }
 }
 
-.salesforce-guided-sync__workflow-actions {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 0.5em;
+.form-kit__control-menu-content
+  .dropdown-menu:has(.salesforce-field-menu__search) {
+  width: min(26em, calc(100vw - 2em));
+  min-width: 0;
+  max-height: min(24rem, 60dvh);
+  overflow-y: auto;
+  overflow-x: hidden;
+  overscroll-behavior: contain;
+
+  .form-kit__control-menu-container:has(.salesforce-field-menu__search) {
+    position: sticky;
+    top: 0;
+    z-index: 1;
+    padding: 0.5em;
+    background: var(--secondary);
+  }
+
+  .salesforce-field-menu__option-label code {
+    overflow-wrap: anywhere;
+    min-width: 0;
+  }
 }
 
-.salesforce-guided-sync__connection-heading {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 0.75em;
+.salesforce-guided-sync__retry-fields {
+  margin-block-start: 1em;
+}
 
-  .salesforce-guided-sync__status {
-    margin-inline-start: 0;
+.salesforce-sync-configurations__coming-soon {
+  color: var(--primary-medium);
+
+  .admin-config-area-card__title {
+    color: inherit;
   }
 }

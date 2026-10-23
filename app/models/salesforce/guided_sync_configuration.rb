@@ -2,202 +2,148 @@
 
 module Salesforce
   class GuidedSyncConfiguration
-    class DeletionError < StandardError
-    end
-
     STORE_KEY = "guided_sync_configurations"
 
     def self.all
-      PluginStore.get(PLUGIN_NAME, STORE_KEY) || []
+      (PluginStore.get(PLUGIN_NAME, STORE_KEY) || []).map { |record| record.except("workflows") }
+    end
+
+    def self.available_groups
+      counts = GroupUser.where(user_id: Person.eligible_users.select(:id)).group(:group_id).count
+      Group
+        .where.not(id: Group::AUTO_GROUPS[:everyone])
+        .order(:name)
+        .pluck(:id, :name)
+        .map { |id, name| { name: name, user_count: counts.fetch(id, 0) } }
+    end
+
+    def self.enabled?
+      SiteSetting.salesforce_enabled && SiteSetting.enable_salesforce_configurations
+    end
+
+    def self.active
+      return [] unless enabled?
+      all.select { |record| record["active"] && record["kind"] == "users" }
+    end
+
+    def self.reason_enabled?(record, reason)
+      case reason
+      when "join"
+        record["onJoin"]
+      when "change"
+        record["onChange"]
+      when "backfill"
+        record["backfill"]
+      when "scheduled"
+        record["schedule"] != "manual"
+      else
+        false
+      end
+    end
+
+    def self.enqueue_user(user, reason:, group_id: nil, excluding_group_id: nil)
+      active.each do |record|
+        next unless reason_enabled?(record, reason)
+        next if group_id && record["group_id"] != group_id
+        next if excluding_group_id && record["group_id"] == excluding_group_id
+        next unless GroupUser.exists?(group_id: record["group_id"], user_id: user.id)
+        Jobs.enqueue(
+          :sync_salesforce_user,
+          user_id: user.id,
+          configuration_id: record["id"],
+          reason: reason,
+        )
+      end
+    end
+
+    def self.record_result(id, user_id, error: nil)
+      DistributedMutex.synchronize("salesforce_configuration_status_#{id}") do
+        key = "configuration_status:#{id}"
+        status = PluginStore.get(PLUGIN_NAME, key) || {}
+        if error
+          status.merge!(
+            "last_error_at" => Time.now.utc.iso8601,
+            "error" => error.class.name,
+            "user_id" => user_id,
+          )
+        else
+          status["last_synced_at"] = Time.now.utc.iso8601
+          status.except!("last_error_at", "error", "user_id") if status["user_id"] == user_id
+        end
+        PluginStore.set(PLUGIN_NAME, key, status)
+      end
     end
 
     def self.destroy!(id:, guardian:)
-      unless defined?(DiscourseWorkflows::Workflow::Destroy) && guardian.can_manage_workflows?
-        raise Discourse::InvalidAccess
-      end
+      raise Discourse::InvalidAccess unless guardian.is_admin?
 
       DistributedMutex.synchronize("salesforce_guided_sync_configurations") do
-        PluginStoreRow.transaction do
-          records = all
-          record = records.find { |configuration| configuration["id"] == id }
-          raise Discourse::NotFound unless record
-          workflow_ids = record.fetch("workflows", []).map { |workflow| workflow["id"] }
-          DiscourseWorkflows::Workflow
-            .where(id: workflow_ids)
-            .order(:id)
-            .each do |workflow|
-              result =
-                DiscourseWorkflows::Workflow::Destroy.call(
-                  guardian: guardian,
-                  params: {
-                    workflow_id: workflow.id,
-                  },
-                )
-              raise DeletionError, I18n.t("salesforce.guided_sync.delete_failed") if result.failure?
-            end
-          PluginStore.set(
-            PLUGIN_NAME,
-            STORE_KEY,
-            records.reject { |configuration| configuration["id"] == id },
-          )
-        end
+        records = all
+        raise Discourse::NotFound unless records.any? { |record| record["id"] == id }
+        PluginStore.set(PLUGIN_NAME, STORE_KEY, records.reject { |record| record["id"] == id })
       end
     end
 
     def self.save!(configuration, id:, guardian:)
-      unless defined?(DiscourseWorkflows::Workflow::Create) &&
-               SiteSetting.enable_discourse_workflows && guardian.can_manage_workflows?
-        raise Discourse::InvalidAccess
-      end
+      raise Discourse::InvalidAccess unless guardian.is_admin?
+
       configuration = configuration.deep_stringify_keys
       configuration["kind"] ||= "users"
-      posts = configuration["kind"] == "posts"
-      valid_scope = posts ? configuration["category"].present? : configuration["group"].present?
-      valid_object =
-        (
-          if posts
-            configuration["object"] == "Case"
-          else
-            %w[Lead Contact DiscourseContact__c].include?(configuration["object"])
-          end
-        )
+      valid_scope =
+        Group.where.not(id: Group::AUTO_GROUPS[:everyone]).exists?(name: configuration["group"])
+      valid_object = %w[Lead Contact].include?(configuration["object"])
       unless configuration["name"].present? && configuration["name"].length <= 60 &&
-               %w[users posts].include?(configuration["kind"]) && valid_object &&
+               configuration["kind"] == "users" && valid_object &&
                %w[daily hourly weekly manual].include?(configuration["schedule"]) && valid_scope &&
                configuration["mappings"].is_a?(Array) && configuration["mappings"].size <= 50
         raise Discourse::InvalidParameters.new(:configuration)
       end
 
-      %w[onJoin onChange backfill onCreate onEdit outboundReplies inboundReplies].each do |key|
+      ConfiguredUserSync.validate_mappings!(
+        configuration,
+        Api.new.writable_fields(configuration["object"]),
+      )
+      configuration["group_id"] = Group.find_by!(name: configuration["group"]).id
+
+      %w[onJoin onChange backfill].each do |key|
         configuration[key] = ActiveModel::Type::Boolean.new.cast(configuration[key])
       end
 
       DistributedMutex.synchronize("salesforce_guided_sync_configurations") do
-        PluginStoreRow.transaction do
-          records = all
-          previous = id ? records.find { |record| record["id"] == id } : nil
-          raise Discourse::NotFound if id && !previous
-          if previous && previous["object"] != configuration["object"]
-            raise Discourse::InvalidParameters.new(:object)
-          end
-          record_id = previous&.dig("id") || SecureRandom.uuid
-          workflows = previous&.dig("workflows") || []
-          purposes = []
-          if posts
-            purposes << "case_create" if configuration["onCreate"]
-            purposes << "case_update" if configuration["onEdit"]
-            purposes << "topic_to_case" if configuration["outboundReplies"]
-            purposes << "case_to_topic" if configuration["inboundReplies"]
-          else
-            purposes << "join" if configuration["onJoin"]
-            purposes << "change" if configuration["onChange"]
-            purposes << "refresh" if configuration["schedule"] != "manual"
-          end
-          purposes << "backfill" if configuration["backfill"]
-          generated =
-            purposes.map do |purpose|
-              existing = workflows.find { |workflow| workflow["purpose"] == purpose }
-              name = "#{configuration["name"]} · #{configuration["object"]} · #{purpose}"
-              graph = graph_for(configuration, purpose).merge(name: name)
-              result =
-                if existing && DiscourseWorkflows::Workflow.exists?(id: existing["id"])
-                  DiscourseWorkflows::Workflow::Update.call(
-                    guardian: guardian,
-                    params: graph.merge(workflow_id: existing["id"]),
-                  )
-                else
-                  DiscourseWorkflows::Workflow::Create.call(guardian: guardian, params: graph)
-                end
-              raise Discourse::InvalidParameters.new(:workflow) if result.failure?
-              published =
-                DiscourseWorkflows::Workflow::Publish.call(
-                  guardian: guardian,
-                  params: {
-                    workflow_id: result.workflow.id,
-                  },
-                )
-              raise Discourse::InvalidParameters.new(:workflow) if published.failure?
-              {
-                "id" => result.workflow.id,
-                "name" => result.workflow.name,
-                "purpose" => purpose,
-                "status" => "published",
-              }
-            end
-          workflows
-            .reject { |workflow| purposes.include?(workflow["purpose"]) }
-            .each do |workflow|
-              next unless DiscourseWorkflows::Workflow.exists?(id: workflow["id"])
-              result =
-                DiscourseWorkflows::Workflow::Destroy.call(
-                  guardian: guardian,
-                  params: {
-                    workflow_id: workflow["id"],
-                  },
-                )
-              raise DeletionError, I18n.t("salesforce.guided_sync.delete_failed") if result.failure?
-            end
-          record = configuration.merge("id" => record_id, "workflows" => generated)
-          records = records.reject { |entry| entry["id"] == record_id } + [record]
-          PluginStore.set(PLUGIN_NAME, STORE_KEY, records)
-          record
+        records = all
+        previous = id ? records.find { |record| record["id"] == id } : nil
+        raise Discourse::NotFound if id && !previous
+        if previous && previous["object"] != configuration["object"]
+          raise Discourse::InvalidParameters.new(:object)
         end
+        record_id = previous&.dig("id") || SecureRandom.uuid
+        record =
+          configuration.except("workflows").merge(
+            "id" => record_id,
+            "active" => true,
+            "instance_url" => SiteSetting.salesforce_instance_url,
+          )
+        PluginStore.set(
+          PLUGIN_NAME,
+          STORE_KEY,
+          records.reject { |entry| entry["id"] == record_id } + [record],
+        )
+        if !previous || !previous["active"] || previous["schedule"] != record["schedule"]
+          PluginStore.set(PLUGIN_NAME, "configuration_scheduled_at:#{record_id}", Time.now.to_i)
+        end
+        if record["backfill"] &&
+             (
+               !previous || !previous["active"] || !previous["backfill"] ||
+                 previous["group_id"] != record["group_id"]
+             )
+          Jobs.enqueue(
+            :sync_salesforce_configuration,
+            configuration_id: record_id,
+            reason: "backfill",
+          )
+        end
+        record
       end
     end
-
-    def self.graph_for(configuration, purpose)
-      posts = configuration["kind"] == "posts"
-      trigger_name = posts ? "Post created" : "User created"
-      request_name = "HTTP request"
-      {
-        nodes: [
-          {
-            id: "trigger",
-            name: trigger_name,
-            type: posts ? "trigger:post_created" : "trigger:user_created",
-            typeVersion: "1.0",
-            parameters: {
-            },
-            credentials: {
-            },
-            position: {
-              x: 0,
-              y: 0,
-            },
-          },
-          {
-            id: "http-request",
-            name: request_name,
-            type: "action:http_request",
-            typeVersion: "1.0",
-            parameters: {
-              method: "POST",
-              url: "https://example.invalid/salesforce-demo",
-              authentication: "none",
-              dry_run: true,
-              content_type: "json",
-              body_json: {
-                object: configuration["object"],
-                scope: configuration["category"] || configuration["group"],
-                operation: purpose,
-                mappings: configuration["mappings"],
-              }.to_json,
-            },
-            credentials: {
-            },
-            position: {
-              x: 320,
-              y: 0,
-            },
-          },
-        ],
-        connections: {
-          trigger_name => {
-            "main" => [[{ "node" => request_name, "type" => "main", "index" => 0 }]],
-          },
-        },
-      }
-    end
-    private_class_method :graph_for
   end
 end

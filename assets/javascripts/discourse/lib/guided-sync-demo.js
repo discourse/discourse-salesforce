@@ -8,7 +8,7 @@ export const DEMO_SOURCES = [
   { id: "trust", type: "number" },
   { id: "groups", type: "text" },
   { id: "seen", type: "date" },
-  { id: "source", type: "text" },
+  { id: "static", type: "text" },
 ];
 
 export const DEMO_FIELDS = [
@@ -85,9 +85,25 @@ export function createDemoConfiguration() {
       { id: 2, source: "last", destination: "LastName", policy: "keep" },
       { id: 3, source: "profile", destination: "Description", policy: "keep" },
       { id: 6, source: "company", destination: "Company", policy: "overwrite" },
-      { id: 7, source: "source", destination: "LeadSource", policy: "keep" },
+      {
+        id: 7,
+        source: "static",
+        value: "Community",
+        destination: "LeadSource",
+        policy: "keep",
+      },
     ],
   };
+}
+
+export function normalizeConfiguration(configuration) {
+  const normalized = structuredClone(configuration);
+  normalized.mappings = normalized.mappings.map((mapping) =>
+    mapping.source === "source"
+      ? { ...mapping, source: "static", value: "Community" }
+      : mapping
+  );
+  return normalized;
 }
 
 export function destinationName(field) {
@@ -98,6 +114,14 @@ export function mappingError(configuration, fields = DEMO_FIELDS) {
   for (const mapping of configuration.mappings) {
     if (!mapping.source || !mapping.destination) {
       return "incomplete";
+    }
+    if (
+      mapping.source === "static" &&
+      (typeof mapping.value !== "string" ||
+        !mapping.value.trim() ||
+        mapping.value.length > 1000)
+    ) {
+      return "static_value";
     }
     const source = DEMO_SOURCES.find((item) => item.id === mapping.source);
     const field = fields.find((item) => item.id === mapping.destination);
@@ -164,7 +188,9 @@ export function buildPreview(configuration, userId) {
     const incoming =
       mapping.source === "email"
         ? user.email
-        : sourceValue(mapping.source, user, configuration);
+        : mapping.source === "static"
+          ? mapping.value
+          : sourceValue(mapping.source, user, configuration);
     const keep =
       mapping.policy === "keep" &&
       current !== undefined &&

@@ -77,3 +77,13 @@ queued jobs always use the latest saved mappings.
 
 The Configurations tab clears selection and returns to the list. Successful saves
 return there with a toast. Wizard forms keep stable FormKit data to preserve focus.
+
+Use **Static text** as a mapping source to send a constant string, such as `Discourse`
+to `LeadSource`. Static values must contain 1–1,000 characters and use the same
+keep/overwrite rules as other mappings. Choose Discourse under **Keep value from**
+to replace an existing Salesforce value.
+Existing fixed Community mappings open as editable static text with their value preserved.
+
+When Salesforce confirms a linked Lead was deleted (and not converted), sync matches
+by email again and creates a replacement if no active match exists. Missing or
+inaccessible records without confirmed deletion remain errors.

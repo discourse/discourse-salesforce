@@ -37,6 +37,53 @@ module("Integration | Component | SalesforceGuidedSync", function (hooks) {
     ];
   });
 
+  test("static text can be entered and previewed with ownership rules", async function (assert) {
+    await render(
+      <template><SalesforceGuidedSync @groups={{this.groups}} /></template>
+    );
+    await formKit().field("group").select("customers");
+    await click('[data-test-step="mapping"]');
+    await formKit().field("mappings.4.source").select("static");
+    await formKit().field("mappings.4.value").fillIn("");
+    assert.dom("[data-test-continue]").isDisabled("requires a static value");
+    await formKit().field("mappings.4.value").fillIn("Discourse");
+    await formKit().field("mappings.4.policy").select("overwrite");
+    await click('[data-test-step="review"]');
+    assert
+      .dom('[data-test-preview-field="LeadSource"]')
+      .includesText("Discourse", "previews the entered value");
+    await click('[data-test-step="mapping"]');
+    assert
+      .dom('[data-name="mappings.4.value"] input')
+      .hasValue("Discourse", "retains the text when returning to mappings");
+  });
+
+  test("legacy fixed values open as editable static text", async function (assert) {
+    this.record = createDemoConfiguration();
+    this.record.mappings[4] = {
+      id: 7,
+      source: "source",
+      destination: "LeadSource",
+      policy: "keep",
+    };
+    await render(
+      <template>
+        <SalesforceGuidedSync @groups={{this.groups}} @record={{this.record}} />
+      </template>
+    );
+    await click('[data-test-step="mapping"]');
+    assert
+      .dom('[data-name="mappings.4.value"] input')
+      .hasValue("Community", "preserves the legacy value");
+    assert
+      .dom('[data-name="mappings.4.source"] option[value="source"]')
+      .doesNotExist("removes the redundant fixed-value option");
+    await formKit().field("mappings.4.value").fillIn("Discourse");
+    assert
+      .dom('[data-name="mappings.4.value"] input')
+      .hasValue("Discourse", "allows editing the old fixed value");
+  });
+
   test("backfill label handles missing counts and uses the selected group's real count", async function (assert) {
     this.groups = [
       { name: "customers", user_count: 86 },

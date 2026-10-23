@@ -20,6 +20,7 @@ import {
   createDemoConfiguration,
   DEMO_SOURCES,
   mappingError,
+  normalizeConfiguration,
   updateMapping,
 } from "discourse/plugins/discourse-salesforce/discourse/lib/guided-sync-demo";
 
@@ -28,7 +29,7 @@ const PREFIX = "salesforce.guided_sync";
 export default class SalesforceGuidedSync extends Component {
   @service a11y;
 
-  @tracked configuration = structuredClone(
+  @tracked configuration = normalizeConfiguration(
     this.args.record || createDemoConfiguration()
   );
   @tracked enabled = false;
@@ -514,33 +515,57 @@ export default class SalesforceGuidedSync extends Component {
                     class="salesforce-guided-sync__mapping-row"
                     data-test-mapping={{mapping.id}}
                   >
-                    <collection.Field
-                      @format="full"
-                      @name="source"
-                      @showTitle={{false}}
-                      @onSet={{fn this.setMapping "source"}}
-                      @title={{i18n "salesforce.guided_sync.discourse_field"}}
-                      @type="select"
-                      @validation="required"
-                      as |field|
-                    >
-                      <field.Control
-                        aria-label={{i18n
-                          "salesforce.guided_sync.discourse_field"
-                        }}
-                        @includeNone={{false}}
-                        as |select|
+                    <div class="salesforce-guided-sync__mapping-source">
+                      <collection.Field
+                        @format="full"
+                        @name="source"
+                        @showTitle={{false}}
+                        @onSet={{fn this.setMapping "source"}}
+                        @title={{i18n "salesforce.guided_sync.discourse_field"}}
+                        @type="select"
+                        @validation="required"
+                        as |field|
                       >
-                        <select.Option @value="">{{i18n
-                            "salesforce.guided_sync.choose_source"
-                          }}</select.Option>
-                        {{#each this.sources as |source|}}
-                          <select.Option
-                            @value={{source.id}}
-                          >{{source.label}}</select.Option>
-                        {{/each}}
-                      </field.Control>
-                    </collection.Field>
+                        <field.Control
+                          aria-label={{i18n
+                            "salesforce.guided_sync.discourse_field"
+                          }}
+                          @includeNone={{false}}
+                          as |select|
+                        >
+                          <select.Option @value="">{{i18n
+                              "salesforce.guided_sync.choose_source"
+                            }}</select.Option>
+                          {{#each this.sources as |source|}}
+                            <select.Option
+                              @value={{source.id}}
+                            >{{source.label}}</select.Option>
+                          {{/each}}
+                        </field.Control>
+                      </collection.Field>
+                      {{#if (eq mapping.source "static")}}
+                        <collection.Field
+                          @format="full"
+                          @name="value"
+                          @showTitle={{false}}
+                          @onSet={{fn this.setMapping "value"}}
+                          @title={{i18n "salesforce.guided_sync.static_value"}}
+                          @type="input"
+                          @validation="required"
+                          as |field|
+                        >
+                          <field.Control
+                            aria-label={{i18n
+                              "salesforce.guided_sync.static_value"
+                            }}
+                            maxlength="1000"
+                            placeholder={{i18n
+                              "salesforce.guided_sync.static_value"
+                            }}
+                          />
+                        </collection.Field>
+                      {{/if}}
+                    </div>
                     <span class="salesforce-guided-sync__mapping-arrow">{{dIcon
                         "arrow-right"
                       }}</span>

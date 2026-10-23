@@ -13,6 +13,7 @@ module Salesforce
       "groups" => "text",
       "seen" => "date",
       "source" => "text",
+      "static" => "text",
     }.freeze
 
     def self.field_type(type)
@@ -47,7 +48,13 @@ module Salesforce
       valid &&=
         mappings.all? do |mapping|
           field = fields.find { |item| item["name"] == mapping["destination"] }
-          field && SOURCE_TYPES[mapping["source"]].present? &&
+          static_value_valid =
+            mapping["source"] != "static" ||
+              (
+                mapping["value"].is_a?(String) && mapping["value"].present? &&
+                  mapping["value"].length <= 1000
+              )
+          static_value_valid && field && SOURCE_TYPES[mapping["source"]].present? &&
             SOURCE_TYPES[mapping["source"]] == field_type(field["type"]) &&
             %w[keep overwrite].include?(mapping["policy"])
         end
@@ -87,17 +94,14 @@ module Salesforce
       if link && link["instance"] != SiteSetting.salesforce_instance_url
         raise Discourse::InvalidParameters.new(:salesforce_instance_url)
       end
-      record =
-        if link
-          @api.get("sobjects/#{@configuration["object"]}/#{link.fetch("id")}")
-        else
-          @person.find_by_email(
-            @user.email,
-            fields: @configuration["mappings"].map { |mapping| mapping["destination"] },
-            require_unique: true,
-            api: @api,
-          )
-        end
+      record = linked_record(link) if link
+      record ||=
+        @person.find_by_email(
+          @user.email,
+          fields: @configuration["mappings"].map { |mapping| mapping["destination"] },
+          require_unique: true,
+          api: @api,
+        )
       values = payload(fields, record)
       if record
         id = record.fetch("Id")
@@ -126,6 +130,19 @@ module Salesforce
 
     private
 
+    def linked_record(link)
+      @api.get("sobjects/#{@configuration["object"]}/#{link.fetch("id")}")
+    rescue Salesforce::InvalidApiResponse => error
+      raise unless error.status == 404 && @configuration["object"] == "Lead"
+      id = link.fetch("id")
+      raise unless id.match?(/\A[a-zA-Z0-9]{15}(?:[a-zA-Z0-9]{3})?\z/)
+      query = "SELECT Id, IsDeleted, IsConverted FROM Lead WHERE Id = '#{id}'"
+      records = @api.get("queryAll/?q=#{CGI.escape(query)}").fetch("records")
+      deleted = records.find { |record| record["Id"] == id }
+      raise error unless deleted && deleted["IsDeleted"] == true && deleted["IsConverted"] == false
+      nil
+    end
+
     def payload(fields, record)
       @configuration["mappings"].each_with_object({}) do |mapping, result|
         destination = mapping["destination"]
@@ -133,7 +150,7 @@ module Salesforce
         next unless field[record ? "updateable" : "createable"]
         existing = record && record[destination]
         next if record && mapping["policy"] == "keep" && !existing.nil? && existing != ""
-        value = source_value(mapping["source"])
+        value = mapping["source"] == "static" ? mapping["value"] : source_value(mapping["source"])
         next if value.nil? || value == ""
         value = value.to_date.iso8601 if field["type"] == "date"
         value = value.utc.iso8601 if field["type"] == "datetime"

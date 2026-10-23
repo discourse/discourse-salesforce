@@ -133,10 +133,28 @@
     }
   }
 
+  &__mapping-row > &__mapping-arrow {
+    align-self: start;
+    align-items: center;
+    min-height: 2.5rem;
+  }
+
+  &__mapping-source {
+    display: grid;
+    gap: 0.5em;
+    min-width: 0;
+
+    .form-kit__field {
+      margin: 0;
+      min-width: 0;
+    }
+  }
+
   &__remove {
     grid-column: 2;
     grid-row: 1;
-    align-self: center;
+    align-self: start;
+    min-height: 2.5rem;
   }
 
   &__actions {

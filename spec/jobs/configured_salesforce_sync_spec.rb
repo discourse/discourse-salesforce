@@ -85,6 +85,123 @@ RSpec.describe Jobs::SyncSalesforceUser do
     expect(a_request(:patch, %r{/sobjects/})).not_to have_been_made
   end
 
+  it "sends static text on creation and respects ownership on updates" do
+    configuration["mappings"] << {
+      "source" => "static",
+      "destination" => "LeadSource",
+      "policy" => "overwrite",
+      "value" => "Discourse",
+    }
+    fields << { name: "LeadSource", type: "picklist", createable: true, updateable: true }
+    PluginStore.set(
+      Salesforce::PLUGIN_NAME,
+      Salesforce::GuidedSyncConfiguration::STORE_KEY,
+      [configuration],
+    )
+    stub_request(:get, "#{api_path}/Lead/describe").to_return(body: { fields: fields }.to_json)
+    stub_salesforce_person_lookup(
+      "Lead",
+      user.email,
+      records: [],
+      fields: %w[LastName Company Trust__c LeadSource],
+    )
+    create =
+      stub_request(:post, "#{api_path}/Lead").with(
+        body: {
+          Email: user.email,
+          LastName: "Morgan",
+          Company: "None",
+          Trust__c: user.trust_level,
+          LeadSource: "Discourse",
+        },
+      ).to_return(status: 201, body: { id: "lead123" }.to_json)
+    run_sync
+    expect(create).to have_been_requested.once
+    stub_request(:get, "#{api_path}/Lead/lead123").to_return(
+      body: {
+        Id: "lead123",
+        LastName: "Morgan",
+        Company: "None",
+        Trust__c: user.trust_level,
+        LeadSource: "Web",
+      }.to_json,
+    )
+    update =
+      stub_request(:patch, "#{api_path}/Lead/lead123").with(
+        body: {
+          LeadSource: "Discourse",
+        },
+      ).to_return(status: 204)
+    run_sync
+    configuration["mappings"].last["policy"] = "keep"
+    PluginStore.set(
+      Salesforce::PLUGIN_NAME,
+      Salesforce::GuidedSyncConfiguration::STORE_KEY,
+      [configuration],
+    )
+    run_sync
+    expect(update).to have_been_requested.once
+  end
+
+  it "recreates a confirmed deleted Lead and relinks subsequent retries" do
+    old_id = "00Qbm00000v6wJpEAI"
+    PluginStore.set(
+      Salesforce::PLUGIN_NAME,
+      "configured_user_link:Lead:#{user.id}",
+      { id: old_id, instance: instance_url },
+    )
+    stub_request(:get, "#{api_path}/Lead/#{old_id}").to_return(status: 404, body: "[]")
+    query = "SELECT Id, IsDeleted, IsConverted FROM Lead WHERE Id = '#{old_id}'"
+    stub_request(:get, "#{instance_url}services/data/v49.0/queryAll/").with(
+      query: {
+        q: query,
+      },
+    ).to_return(body: { records: [{ Id: old_id, IsDeleted: true, IsConverted: false }] }.to_json)
+    stub_salesforce_person_lookup(
+      "Lead",
+      user.email,
+      records: [],
+      fields: %w[LastName Company Trust__c],
+    )
+    create =
+      stub_request(:post, "#{api_path}/Lead").to_return(
+        status: 201,
+        body: { id: "newlead" }.to_json,
+      )
+    run_sync
+    expect(user.reload.salesforce_lead_id).to eq("newlead")
+    stub_request(:get, "#{api_path}/Lead/newlead").to_return(
+      body: {
+        Id: "newlead",
+        LastName: "Morgan",
+        Company: "None",
+        Trust__c: user.trust_level,
+      }.to_json,
+    )
+    run_sync
+    expect(create).to have_been_requested.once
+  end
+
+  it "does not recreate inaccessible or converted Leads" do
+    old_id = "00Qbm00000v6wJpEAI"
+    PluginStore.set(
+      Salesforce::PLUGIN_NAME,
+      "configured_user_link:Lead:#{user.id}",
+      { id: old_id, instance: instance_url },
+    )
+    stub_request(:get, "#{api_path}/Lead/#{old_id}").to_return(status: 404, body: "[]")
+    query = "SELECT Id, IsDeleted, IsConverted FROM Lead WHERE Id = '#{old_id}'"
+    [[], [{ Id: old_id, IsDeleted: true, IsConverted: true }]].each do |records|
+      stub_request(:get, "#{instance_url}services/data/v49.0/queryAll/").with(
+        query: {
+          q: query,
+        },
+      ).to_return(body: { records: records }.to_json)
+      expect { run_sync }.to raise_error(Salesforce::InvalidApiResponse)
+    end
+    expect(a_request(:post, "#{api_path}/Lead")).not_to have_been_made
+  end
+
   it "creates Contacts independently from Leads" do
     configuration["object"] = "Contact"
     configuration["mappings"] = [

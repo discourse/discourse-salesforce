@@ -46,7 +46,7 @@ module Salesforce
             :onJoin,
             :onChange,
             :backfill,
-            mappings: %i[id source destination policy],
+            mappings: %i[id source destination policy value],
           )
           .to_h
       record = GuidedSyncConfiguration.save!(configuration, id: params[:id], guardian: guardian)

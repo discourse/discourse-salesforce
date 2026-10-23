@@ -212,6 +212,32 @@ RSpec.describe Salesforce::GuidedSyncController do
       }
     end
 
+    it "persists static text and rejects blank or oversized values" do
+      sign_in(admin)
+      configuration[:mappings][1] = {
+        source: "static",
+        destination: "Company",
+        policy: "overwrite",
+        value: "Discourse",
+      }
+      post "/salesforce/admin/guided-sync/configurations.json",
+           params: {
+             configuration: configuration,
+           },
+           as: :json
+      expect(response).to have_http_status(:created)
+      expect(response.parsed_body.dig("configuration", "mappings", 1, "value")).to eq("Discourse")
+      [nil, "  ", "a" * 1001].each do |value|
+        configuration[:mappings][1][:value] = value
+        post "/salesforce/admin/guided-sync/configurations.json",
+             params: {
+               configuration: configuration,
+             },
+             as: :json
+        expect(response).to have_http_status(:bad_request)
+      end
+    end
+
     it "validates mappings before activating and does not requeue backfill on ordinary edits" do
       sign_in(admin)
       post "/salesforce/admin/guided-sync/configurations.json",

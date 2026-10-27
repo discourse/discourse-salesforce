@@ -9,6 +9,7 @@ RSpec.describe Auth::SalesforceAuthenticator do
   end
 
   it "requires the login toggle independently of API integration" do
+    SiteSetting.salesforce_enabled = false
     expect(authenticator.enabled?).to eq(false)
 
     SiteSetting.salesforce_login_enabled = true

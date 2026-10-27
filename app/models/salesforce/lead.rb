@@ -5,6 +5,7 @@ module ::Salesforce
     ID_FIELD = "salesforce_lead_id"
     DEFAULT_COMPANY_NAME = "None"
     OBJECT_NAME = "Lead"
+    REQUIRED_MAPPING_FIELDS = %w[LastName Company].freeze
 
     def self.create!(user)
       return unless Salesforce.leads_enabled?

@@ -60,3 +60,138 @@ user full record-level read access to Contact, Lead, and Case records before run
 When `salesforce_leads_enabled` is disabled, the task skips Lead reporting and cleanup, retaining
 existing Lead links. Pruning stale Lead links preserves Leads group membership. Contact group
 memberships are still removed when their Contact links are pruned.
+
+### Experimental user sync configurations
+
+Enable `salesforce_enabled` and opt into `enable_guided_sync_configuration` under
+Admin → Upcoming changes. Configure the existing JWT API credentials, then open
+`/admin/plugins/discourse-salesforce/configurations`.
+
+Saving a user configuration validates its fields against Salesforce and activates
+real Lead or Contact sync for members of any selected group. Previously saved demo configurations
+remain inactive until saved again. The confirmation preview compares real Discourse member values with sample Salesforce values without reading or writing Salesforce records.
+
+- Backfill queues existing group members on first activation, when enabled again, or
+  when changing the selected groups. It queues one batch job per 100 eligible users. Scheduled refreshes use the same path.
+- Group joins and profile changes always enqueue sync for active configurations. Jobs re-read the configuration and membership before executing. Inactive,
+  staged, anonymous, suspended, and system users are excluded. Group counters and
+  backfill batches use the same eligibility rules; groups with no eligible members show zero.
+- Scheduled refreshes run hourly, daily at 02:00 UTC, or Mondays at 02:00 UTC through
+  the hourly scheduler. Manual disables scheduled refresh. Sidekiq must be running.
+- Disabling the experimental flag or deleting a configuration stops pending/future
+  configuration jobs. An already-running HTTP request may finish. Salesforce records
+  and stable record links are never deleted.
+
+`Jobs::SyncSalesforceUser` dispatches configuration jobs to
+`Salesforce::ConfiguredUserSync`, reusing the API client, Person email lookup, and
+Lead/Contact definitions. It does not change legacy global sync settings or case jobs.
+No Workflows dependency or core changes are required. Sync posts is Coming soon.
+
+Email is matched within the selected object. Multiple matches fail without writing.
+Successful matching/creation retains an object/user link in PluginStore, pinned to the
+Salesforce instance, so email changes do not create a second record. Email is sent only
+on creation. Confirmed deleted, unconverted Leads can be recreated; missing or
+inaccessible records without confirmed deletion remain errors. A local distributed mutex serializes writes per user.
+A remote create followed by a local failure is reconciled by email on retry; exact
+once-only creation cannot be guaranteed against concurrent external writers.
+
+Each mapping preserves nonempty Salesforce values or overwrites them as selected.
+Empty Discourse values never clear a Salesforce field. New records use Discourse values.
+Names use the existing plugin splitting rules, including a last-name fallback for
+single-word names. Company reads the custom profile field named Company (case-insensitive),
+falling back to `None`. LeadSource can be mapped to optional static text. Administrators must
+map values accepted by their org's picklists and validation rules; Salesforce rejects
+invalid payloads and the job records the failure. No implicit AccountId lookup occurs.
+Configured custom user fields are available as mapping sources; internal custom-field keys are not exposed.
+
+All-time posts use UserStat; 30-day posts count nondeleted regular posts on regular
+topics; group membership includes the user's group names. Last seen uses last_seen_at.
+Custom field mappings target real Salesforce field API names and are validated on save
+and execution. Unsupported types and duplicate destinations are rejected server-side.
+
+Configuration jobs retry failures five times. The list shows Active, Inactive, or a
+sync failure indicator on reload. Error class, affected user ID, and timestamps are
+stored in `configuration_status:<id>`; background job failures are inspectable in
+Sidekiq. This is a last-error summary, not a full per-user run history. A successful
+retry for that user clears the error. Mapping changes require saving the configuration;
+queued jobs always use the latest saved mappings.
+
+The Configurations tab clears selection and returns to the list. Successful saves
+return there with a toast. Wizard forms keep stable FormKit data to preserve focus.
+
+Use **Add field**, then choose **Static text** as a mapping source to send a constant string, such as `Discourse`
+to `LeadSource`. Static values must contain 1–1,000 characters and use the same
+keep/overwrite rules as other mappings. Choose Discourse under **Keep value from**
+to replace an existing Salesforce value.
+Existing fixed Community mappings open as editable static text with their value preserved.
+
+When Salesforce confirms a linked Lead was deleted (and not converted), sync matches
+by email again and creates a replacement if no active match exists. Missing or
+inaccessible records without confirmed deletion remain errors.
+
+### Batch syncing
+
+`Jobs::SyncSalesforceUserBatch` uses `Salesforce::ConfiguredUserBatchSync` for backfills
+and scheduled refreshes. Each batch fetches Describe metadata once, queries records
+in groups of 25 (following Salesforce query pagination), and sends separate create
+and update requests to the sObject Collections endpoint with `allOrNone: false`.
+Unchanged records require no write. Each successful result saves its stable record link.
+
+Per-user creation locks are acquired in ID order and shared with individual sync jobs.
+Ambiguous matches, missing links, and failed collection entries fall back to individual
+jobs, preserving deleted-Lead recovery and the existing retry limit. An uncertain HTTP
+write response also falls back to email/ID reconciliation before retrying. Group joins
+and profile changes continue to use individual REST requests. This uses synchronous
+sObject Collections, not the asynchronous Bulk API 2.0.
+
+### Member previews
+
+Review automatically previews the first eligible member (ordered by username). Administrators
+can search eligible members of the selected groups and preview unsaved mappings for another
+member. Discourse values come from the selected member; Salesforce values are examples,
+clearly labeled in the UI. Preview loads Salesforce field metadata to validate mappings and
+format values, but does not look up Salesforce records or stored record links. It applies
+the same mapping conversions and ownership rules as sync without writing records or sync
+status. A selection with no eligible members shows an empty state. Sample values illustrate field ownership and
+are not a prediction of the member's actual Salesforce record.
+
+
+### Stored activity and custom user fields
+
+Mapping sources include all-time read time (minutes, rounded to two decimal places),
+posts read, topics entered, likes given/received, and days visited from UserStat.
+These are stored totals; this does not add 30-day versions of these metrics.
+
+Configured UserField definitions are discovered when loading or refreshing the field list.
+Mappings use stable user_field_ID identifiers so renaming a field preserves the mapping;
+deleting a field makes it invalid on the next validation. Text and dropdown fields map to
+text, confirmation fields to Salesforce booleans, and date fields to date/datetime destinations.
+Multi-select values are joined with semicolons for Salesforce multipicklists and commas for
+other text fields. Missing values do not clear Salesforce fields. False and zero are preserved.
+
+Batch jobs load only selected UserStat columns and configured custom-field values for all users
+together. Preview and single-user jobs use the same value conversion.
+
+Bio and Website are optional text sources from UserProfile. Bio uses the stored raw text
+(including Markdown), not rendered HTML. Blank profile values do not clear Salesforce fields.
+Selected profile columns are loaded once per batch. The Discourse source picker supports
+search by label and groups sources into User details, Activity, and Custom fields.
+
+Sync configurations can select multiple groups. Membership uses the union of those groups;
+backfill and scheduled batches deduplicate users before paging. A user remains eligible until
+they leave every selected group. Existing single-group configurations remain supported and
+are stored with group arrays when next saved. The group picker reloads available groups when
+searching. A small creation modal uses the core group endpoint and selects the new group
+without leaving the wizard. Groups are created immediately with the standard public visibility
+and remain available if the sync setup is canceled; membership is managed from Groups.
+
+When selected groups have no eligible users, Review shows a clearly labeled sample user
+using generated Discourse values and sample Salesforce values. Static mapping values still
+come from the configuration, and the normal mapping and ownership rules apply. No user is
+created or saved. Errors fetching preview data remain errors rather than using sample data.
+
+Group joins and profile changes always trigger syncing for active configurations; the old
+onJoin/onChange options are ignored. Backfill and the activity refresh schedule remain optional.
+After a successful individual sync, a digest of mapped values and mapping settings lets
+unchanged profile-change jobs return before contacting Salesforce. Scheduled and group-join
+syncs still check Salesforce. Failed attempts never advance the digest, so retries remain valid.

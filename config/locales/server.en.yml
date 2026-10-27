@@ -1,6 +1,7 @@
 en:
   site_settings:
     salesforce_leads_enabled: "Enable Salesforce Lead lookups, creation, conversion sync, feed items, and association cleanup. Disable for Salesforce organizations where the integration user cannot access Leads. Contact operations continue and existing Lead links are retained."
+    enable_guided_sync_configuration: "Configure how Discourse data syncs with external services using a guided setup. Saving a configuration activates syncing using its mappings, triggers, and schedule."
     salesforce_enabled: 'Enable the discourse-salesforce plugin'
     salesforce_login_enabled: 'Enable Salesforce Social Login'
     salesforce_client_id: "Salesforce connected app's client id"
@@ -25,7 +26,11 @@ en:
     salesforce_default_contact_id_for_case_sync: "Default Salesforce Contact ID to use during Case sync. Useful when 'salesforce_skip_contact_creation_on_case_sync' is enabled."
     salesforce_auth_verbose_logging: "Show verbose Salesforce authentication logs in /logs for troubleshooting"
   salesforce:
+    preview:
+      sample_value: "Example value"
     error:
+      preview_unavailable: "Could not load the preview. Check the Salesforce connection and field permissions, then try again."
+      fields_unavailable: "Could not load Salesforce fields. Check the connection and permissions, then try again."
       ambiguous_email_match: "Multiple Salesforce %{object_name} records have the same email"
       invalid_response: "Invalid response from Salesforce API"
       invalid_client_credentials: "There was an issue with the Salesforce credentials. Please confirm the validity of the Salesforce client id and client secret settings"

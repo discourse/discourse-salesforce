@@ -4,6 +4,7 @@ module ::Salesforce
   class Contact < Person
     ID_FIELD = "salesforce_contact_id"
     OBJECT_NAME = "Contact"
+    REQUIRED_MAPPING_FIELDS = %w[LastName].freeze
 
     def self.group
       Salesforce.contacts_group

@@ -22,10 +22,14 @@ end
 require_relative "lib/salesforce/engine"
 
 register_asset "stylesheets/salesforce.scss"
+register_asset "stylesheets/common/salesforce-guided-sync.scss", :admin
+
+add_admin_route "salesforce.title", "discourse-salesforce", use_new_show_route: true
 
 register_svg_icon "fab-salesforce"
 register_svg_icon "address-card"
 register_svg_icon "link-slash"
+%w[database shuffle user-pen wand-magic-sparkles].each { |icon| register_svg_icon icon }
 
 after_initialize do
   add_to_class(:guardian, :can_sync_salesforce_cases?) do
@@ -69,9 +73,33 @@ after_initialize do
   end
 
   add_model_callback(User, :after_commit, on: :update) do
+    if saved_change_to_active?(from: false, to: true)
+      Salesforce::GuidedSyncConfiguration.enqueue_user(self, reason: "join")
+    end
     if saved_change_to_active?(from: false, to: true) && ::Salesforce::Api.has_credentials?
       Jobs.enqueue(:sync_salesforce_user, user_id: self.id)
     end
+  end
+
+  on(:user_added_to_group) do |user, group, **opts|
+    Salesforce::GuidedSyncConfiguration.enqueue_user(user, reason: "join", group_id: group.id)
+    Salesforce::GuidedSyncConfiguration.enqueue_user(
+      user,
+      reason: "change",
+      excluding_group_id: group.id,
+    )
+  end
+
+  on(:user_updated) do |user, *args|
+    Salesforce::GuidedSyncConfiguration.enqueue_user(user, reason: "change")
+  end
+
+  on(:user_removed_from_group) do |user, group, *args|
+    Salesforce::GuidedSyncConfiguration.enqueue_user(user, reason: "change")
+  end
+
+  on(:user_first_logged_in) do |user|
+    Salesforce::GuidedSyncConfiguration.enqueue_user(user, reason: "change")
   end
 
   on(:post_created) do |post, opts|

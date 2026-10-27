@@ -41,6 +41,19 @@ module ::Salesforce
       @prefix = "/services/data/v#{VERSION}"
     end
 
+    def writable_fields(object)
+      raise Discourse::InvalidParameters.new(:object) if %w[Lead Contact].exclude?(object)
+
+      get("sobjects/#{object}/describe")
+        .fetch("fields")
+        .filter_map do |field|
+          next unless field["createable"] || field["updateable"]
+          next if field["calculated"] || field["autoNumber"]
+
+          field.slice("name", "label", "type", "custom", "createable", "updateable")
+        end
+    end
+
     def query(soql)
       get("query/?q=#{CGI.escape(soql)}")
     end

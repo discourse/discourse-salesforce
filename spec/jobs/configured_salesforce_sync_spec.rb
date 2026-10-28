@@ -449,6 +449,24 @@ RSpec.describe Jobs::SyncSalesforceUser do
     ).to contain_exactly(user.id, newcomer.id)
   end
 
+  it "limits scheduled refreshes to members with a linked Salesforce record" do
+    existing = Fabricate(:user)
+    group.add(existing)
+    Salesforce::RecordLink.new(
+      provider: "salesforce",
+      account: instance_url,
+      object: "Lead",
+      user_id: existing.id,
+    ).write("lead-existing")
+    Jobs::SyncSalesforceUserBatch.clear
+
+    Jobs::SyncSalesforceConfiguration.new.execute(configuration_id: "sync", reason: "scheduled")
+
+    expect(
+      Jobs::SyncSalesforceUserBatch.jobs.flat_map { |job| job["args"].first["user_ids"] },
+    ).to contain_exactly(existing.id)
+  end
+
   it "syncs the union of groups once and continues syncing members of another selected group" do
     second_group = Fabricate(:group)
     newcomer = Fabricate(:user)

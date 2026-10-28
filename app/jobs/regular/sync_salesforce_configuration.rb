@@ -20,11 +20,25 @@ module Jobs
           .order(:id)
           .limit(Salesforce::ConfiguredUserBatchSync::BATCH_SIZE)
           .pluck(:id)
-      if ids.present?
+      sync_ids = ids
+      if args[:reason] == "scheduled"
+        sync_ids =
+          ids.select do |user_id|
+            link =
+              Salesforce::RecordLink.new(
+                provider: configuration.fetch("provider", "salesforce"),
+                account: configuration.fetch("instance_url"),
+                object: configuration.fetch("object"),
+                user_id: user_id,
+              ).read
+            link && link["account"] == configuration["instance_url"]
+          end
+      end
+      if sync_ids.present?
         Jobs.enqueue(
           :sync_salesforce_user_batch,
           configuration_id: configuration["id"],
-          user_ids: ids,
+          user_ids: sync_ids,
           reason: args[:reason],
         )
       end

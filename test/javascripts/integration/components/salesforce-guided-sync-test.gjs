@@ -1,4 +1,10 @@
-import { click, fillIn as fillInput, render } from "@ember/test-helpers";
+import {
+  click,
+  fillIn as fillInput,
+  find,
+  render,
+  triggerKeyEvent,
+} from "@ember/test-helpers";
 import { module, test } from "qunit";
 import ModalContainer from "discourse/components/modal-container";
 import DialogHolder from "discourse/dialog-holder/components/dialog-holder";
@@ -88,6 +94,14 @@ module("Integration | Component | SalesforceGuidedSync", function (hooks) {
       .doesNotExist("keeps naming out of Choose users");
 
     await click("[data-test-edit-name]");
+    assert
+      .dom(
+        ".salesforce-guided-sync__heading .salesforce-guided-sync__name-form"
+      )
+      .exists("edits the name in the heading");
+    assert
+      .dom(".d-page-subheader__title")
+      .doesNotExist("replaces the title while editing");
     await fillInput(
       ".salesforce-guided-sync__name-form input",
       "Customer contacts"
@@ -109,6 +123,19 @@ module("Integration | Component | SalesforceGuidedSync", function (hooks) {
     assert
       .dom(".d-page-subheader__title")
       .hasText("Customer contacts", "cancel preserves the name");
+    await click("[data-test-edit-name]");
+    await fillInput(
+      ".salesforce-guided-sync__name-form input",
+      "Discard with Escape"
+    );
+    await triggerKeyEvent(
+      ".salesforce-guided-sync__name-form input",
+      "keydown",
+      "Escape"
+    );
+    assert
+      .dom(".d-page-subheader__title")
+      .hasText("Customer contacts", "Escape discards the inline edit");
   });
 
   test("creates a group in a modal and adds it to the selected groups", async function (assert) {
@@ -117,6 +144,23 @@ module("Integration | Component | SalesforceGuidedSync", function (hooks) {
         new URLSearchParams(request.requestBody).get("group[name]"),
         "new_customers",
         "submits the group name to core"
+      );
+      const params = new URLSearchParams(request.requestBody);
+      assert.deepEqual(
+        Object.fromEntries(
+          [...params].filter(([key]) => key !== "group[name]")
+        ),
+        {
+          "group[visibility_level]": "4",
+          "group[members_visibility_level]": "4",
+          "group[public_admission]": "false",
+          "group[public_exit]": "false",
+          "group[allow_membership_requests]": "false",
+          "group[mentionable_level]": "0",
+          "group[messageable_level]": "0",
+          "group[assignable_level]": "0",
+        },
+        "creates an invite-only group with owner visibility and no posting or assignment access"
       );
       return [
         200,
@@ -130,6 +174,9 @@ module("Integration | Component | SalesforceGuidedSync", function (hooks) {
       </template>
     );
     await selectSyncGroups("customers", "partners");
+    if (!find("[data-test-create-group]")) {
+      await click('[data-name="groups"] .d-multi-select-trigger');
+    }
     await click("[data-test-create-group]");
     await fillInput(
       '.salesforce-create-group-modal [data-name="name"] input',
@@ -146,8 +193,8 @@ module("Integration | Component | SalesforceGuidedSync", function (hooks) {
       .dom('[data-name="groups"]')
       .includesText("new_customers", "selects the created group");
     assert
-      .dom("[data-test-continue]")
-      .isEnabled("keeps the wizard ready to continue");
+      .dom("[data-test-save]")
+      .isEnabled("keeps the configuration ready to save");
   });
 
   test("group creation errors keep the modal open and cancel preserves the selection", async function (assert) {
@@ -162,6 +209,9 @@ module("Integration | Component | SalesforceGuidedSync", function (hooks) {
       </template>
     );
     await selectSyncGroups("customers");
+    if (!find("[data-test-create-group]")) {
+      await click('[data-name="groups"] .d-multi-select-trigger');
+    }
     await click("[data-test-create-group]");
     await fillInput(
       '.salesforce-create-group-modal [data-name="name"] input',
@@ -205,20 +255,17 @@ module("Integration | Component | SalesforceGuidedSync", function (hooks) {
       <template><SalesforceGuidedSync @groups={{this.groups}} /></template>
     );
     await selectSyncGroups("customers");
-    await click("[data-test-continue]");
-    await click("[data-test-continue]");
-    await click("[data-test-continue]");
     assert
       .dom("[data-test-sample-preview]")
-      .includesText("No eligible users yet", "explains the sample fallback");
+      .includesText("Sample user", "labels the sample fallback");
     assert
       .dom('[data-name="previewMember"]')
       .doesNotExist("does not offer a nonexistent user");
     assert
       .dom('[data-test-preview-field="LastName"]')
-      .includesText("Morgan", "renders the sample mapping");
+      .includesText("Taylor", "renders the sample mapping outcome");
     assert
-      .dom("[data-test-continue]")
+      .dom("[data-test-save]")
       .isEnabled("allows saving an empty group's configuration");
 
     pretender.post("/salesforce/admin/guided-sync/preview.json", () => [
@@ -226,8 +273,7 @@ module("Integration | Component | SalesforceGuidedSync", function (hooks) {
       { "Content-Type": "application/json" },
       JSON.stringify({ errors: ["Preview unavailable"] }),
     ]);
-    await click('[data-test-step="behavior"]');
-    await click("[data-test-continue]");
+    await click("[data-test-refresh-fields]");
     assert
       .dom("[data-test-sample-preview]")
       .doesNotExist("does not mask errors as sample data");
@@ -257,7 +303,7 @@ module("Integration | Component | SalesforceGuidedSync", function (hooks) {
         "explains what will be discarded"
       );
     await click(".dialog-footer .btn-default");
-    assert.strictEqual(canceled, 0, "Keep editing preserves the wizard");
+    assert.strictEqual(canceled, 0, "Keep editing preserves the configuration");
     assert
       .dom('[data-name="groups"]')
       .includesText("customers", "retains edited values");
@@ -266,39 +312,44 @@ module("Integration | Component | SalesforceGuidedSync", function (hooks) {
     assert.strictEqual(canceled, 1, "only discards after confirmation");
   });
 
-  test("progress header only allows returning to previous steps", async function (assert) {
+  test("shows the entire configuration and saves only valid mappings", async function (assert) {
+    let saved;
+    this.save = (configuration) => {
+      saved = configuration;
+      return true;
+    };
     await render(
-      <template><SalesforceGuidedSync @groups={{this.groups}} /></template>
+      <template>
+        <SalesforceGuidedSync @groups={{this.groups}} @onSave={{this.save}} />
+      </template>
     );
-
-    assert.dom("[data-test-continue]").isDisabled("requires a group");
-    assert.dom("[data-test-step]:enabled").doesNotExist("cannot skip ahead");
+    assert.dom("[data-test-step]").doesNotExist("has no wizard navigation");
     assert
-      .dom(".salesforce-guided-sync__step.--completed")
-      .doesNotExist("no steps are complete");
-
+      .dom(".salesforce-guided-sync__section")
+      .exists(
+        { count: 4 },
+        "shows scope, behavior, mappings and preview together"
+      );
+    assert.dom("[data-test-save]").isDisabled("requires a group");
+    assert
+      .dom(
+        ".salesforce-guided-sync__mapping-headings [data-name='previewMember']"
+      )
+      .doesNotExist("keeps the mapping table focused on field controls");
     await selectSyncGroups("customers");
+    await formKit().field("schedule").select("weekly");
+    await click("[data-test-add-mapping]");
     assert
-      .dom('[data-test-step="mapping"]')
-      .isDisabled("Continue is required even when valid");
-    await click("[data-test-continue]");
-
-    assert.dom('[data-test-step="scope"]').isEnabled("can return to scope");
-    assert
-      .dom('[data-test-step="behavior"]')
-      .isDisabled("cannot skip mapping validation");
-    assert.dom('[data-test-step="review"]').isDisabled("cannot jump to review");
-    assert
-      .dom(".salesforce-guided-sync__step.--completed")
-      .exists({ count: 1 }, "only scope is complete");
-
-    await click('[data-test-step="scope"]');
-    assert
-      .dom('[data-test-step="mapping"]')
-      .isDisabled("must validate scope again");
-    assert
-      .dom(".salesforce-guided-sync__step.--completed")
-      .doesNotExist("going back clears later completion");
+      .dom("[data-test-save]")
+      .isDisabled("unfinished mappings block saving");
+    await click("[data-test-remove-mapping='7']");
+    await click("[data-test-save]");
+    assert.deepEqual(saved.groups, ["customers"], "saves selected groups");
+    assert.strictEqual(
+      saved.schedule,
+      "weekly",
+      "saves behavior with mappings"
+    );
   });
 
   test("review switches members, searches the group, and supports empty and failed previews", async function (assert) {
@@ -307,12 +358,12 @@ module("Integration | Component | SalesforceGuidedSync", function (hooks) {
     );
     await selectSyncGroups("customers");
     await formKit().field("object").select("Contact");
-    await click("[data-test-continue]");
-    await click("[data-test-continue]");
-    await click("[data-test-continue]");
     assert
       .dom('[data-name="previewMember"]')
       .includesText("alex", "selects the first member");
+    assert
+      .dom("[data-test-preview-section] [data-name='previewMember']")
+      .exists("places user selection in the separate preview section");
 
     let searchedGroup;
     pretender.get(
@@ -329,7 +380,7 @@ module("Integration | Component | SalesforceGuidedSync", function (hooks) {
     await click('[data-name="previewMember"] .form-kit__control-menu-trigger');
     await fillInput(".dropdown-menu .filter-input", "maya");
     assert.strictEqual(
-      searchedGroup.group,
+      searchedGroup["groups[]"],
       "customers",
       "search stays scoped to the group"
     );
@@ -353,13 +404,12 @@ module("Integration | Component | SalesforceGuidedSync", function (hooks) {
       { "Content-Type": "application/json" },
       JSON.stringify({ errors: ["Preview unavailable"] }),
     ]);
-    await click('[data-test-step="behavior"]');
-    await click("[data-test-continue]");
+    await click("[data-test-refresh-fields]");
     assert
       .dom(".alert-error")
       .includesText("Preview unavailable", "shows failure");
     assert
-      .dom("[data-test-preview-field]")
+      .dom('[data-test-preview-field="LastName"]')
       .doesNotExist("clears stale values on failure");
     pretender.post("/salesforce/admin/guided-sync/preview.json", () => [
       200,
@@ -368,8 +418,8 @@ module("Integration | Component | SalesforceGuidedSync", function (hooks) {
     ]);
     await click("[data-test-retry-preview]");
     assert
-      .dom("[data-test-preview-empty]")
-      .exists("shows an empty state instead of sample data");
+      .dom('[data-test-preview-field="LastName"]')
+      .doesNotExist("shows no preview rows instead of sample data");
   });
 
   test("source picker filters grouped fields and highlights the selected source", async function (assert) {
@@ -380,7 +430,6 @@ module("Integration | Component | SalesforceGuidedSync", function (hooks) {
       <template><SalesforceGuidedSync @groups={{this.groups}} /></template>
     );
     await selectSyncGroups("customers");
-    await click("[data-test-continue]");
     await click(
       '[data-name="mappings.0.source"] .form-kit__control-menu-trigger'
     );
@@ -444,22 +493,21 @@ module("Integration | Component | SalesforceGuidedSync", function (hooks) {
       <template><SalesforceGuidedSync @groups={{this.groups}} /></template>
     );
     await selectSyncGroups("customers");
-    await click("[data-test-continue]");
     await click("[data-test-add-mapping]");
     await formKit().field("mappings.4.source").select("read_time");
     await formKit().field("mappings.4.destination").select("Read_Minutes__c");
     assert
-      .dom("[data-test-continue]")
+      .dom("[data-test-save]")
       .isEnabled("accepts numeric activity metrics");
     await formKit().field("mappings.4.source").select("user_field_42");
     assert
       .dom('[data-name="mappings.4.source"]')
       .includesText("Job title", "labels configured fields");
     assert
-      .dom("[data-test-continue]")
+      .dom("[data-test-save]")
       .isDisabled("rejects incompatible custom field types");
     await formKit().field("mappings.4.destination").select("Role__c");
-    assert.dom("[data-test-continue]").isEnabled("accepts text custom fields");
+    assert.dom("[data-test-save]").isEnabled("accepts text custom fields");
   });
 
   test("static text can be entered and previewed with ownership rules", async function (assert) {
@@ -467,7 +515,6 @@ module("Integration | Component | SalesforceGuidedSync", function (hooks) {
       <template><SalesforceGuidedSync @groups={{this.groups}} /></template>
     );
     await selectSyncGroups("customers");
-    await click("[data-test-continue]");
     assert
       .dom('[data-name="mappings.4.source"]')
       .doesNotExist("does not add static text by default");
@@ -475,18 +522,61 @@ module("Integration | Component | SalesforceGuidedSync", function (hooks) {
     await formKit().field("mappings.4.source").select("static");
     await formKit().field("mappings.4.destination").select("LeadSource");
     await formKit().field("mappings.4.value").fillIn("");
-    assert.dom("[data-test-continue]").isDisabled("requires a static value");
+    assert.dom("[data-test-save]").isDisabled("requires a static value");
     await formKit().field("mappings.4.value").fillIn("Discourse");
     await formKit().field("mappings.4.policy").select("overwrite");
-    await click("[data-test-continue]");
-    await click("[data-test-continue]");
     assert
       .dom('[data-test-preview-field="LeadSource"]')
       .includesText("Discourse", "previews the entered value");
-    await click('[data-test-step="mapping"]');
     assert
       .dom('[data-name="mappings.4.value"] input')
       .hasValue("Discourse", "retains the text when returning to mappings");
+  });
+
+  test("Lead company defaults to editable static text and can use a custom field", async function (assert) {
+    this.customSources = [
+      { id: "user_field_42", name: "Company", type: "text" },
+    ];
+    await render(
+      <template><SalesforceGuidedSync @groups={{this.groups}} /></template>
+    );
+    await selectSyncGroups("customers");
+    assert
+      .dom('[data-name="mappings.3.source"]')
+      .includesText("Static text", "makes the default explicit");
+    assert
+      .dom('[data-name="mappings.3.value"] input')
+      .hasValue("Unknown", "uses the PM default");
+    await formKit().field("mappings.3.value").fillIn("None");
+    assert
+      .dom('[data-test-preview-field="Company"]')
+      .includesText("None", "previews the edited static value");
+    await click(
+      '[data-name="mappings.3.source"] .form-kit__control-menu-trigger'
+    );
+    assert
+      .dom('.form-kit__control-menu-item[data-value="company"]')
+      .doesNotExist("does not offer an invented built-in Company field");
+    await click(
+      '.form-kit__control-menu-item[data-value="user_field_42"] button'
+    );
+    assert
+      .dom('[data-name="mappings.3.source"]')
+      .includesText("Company", "supports the discovered custom field");
+    assert
+      .dom('[data-name="mappings.3.value"]')
+      .doesNotExist("hides static text when remapped");
+    assert
+      .dom("[data-test-save]")
+      .isEnabled("accepts the custom field mapping");
+    await formKit().field("object").select("Contact");
+    assert
+      .dom('[data-name="mappings.3.source"]')
+      .doesNotExist("Contacts do not require Company");
+    await formKit().field("object").select("Lead");
+    assert
+      .dom('[data-name="mappings.3.value"] input')
+      .hasValue("Unknown", "restores the explicit Lead default");
   });
 
   test("legacy fixed values open as editable static text", async function (assert) {
@@ -503,7 +593,6 @@ module("Integration | Component | SalesforceGuidedSync", function (hooks) {
       </template>
     );
     await selectSyncGroups("customers");
-    await click("[data-test-continue]");
     assert
       .dom('[data-name="mappings.4.value"] input')
       .hasValue("Community", "preserves the legacy value");
@@ -526,28 +615,20 @@ module("Integration | Component | SalesforceGuidedSync", function (hooks) {
       <template><SalesforceGuidedSync @groups={{this.groups}} /></template>
     );
     await selectSyncGroups("unknown");
-    await click("[data-test-continue]");
-    await click("[data-test-continue]");
     assert
       .dom('[data-name="backfill"]')
       .includesText(
         "Sync existing group members on activation",
         "does not interpolate a missing count"
       );
-    await click('[data-test-step="scope"]');
     await selectSyncGroups("customers");
-    await click("[data-test-continue]");
-    await click("[data-test-continue]");
     assert
       .dom('[data-name="backfill"]')
       .includesText(
         "Sync 86 existing group members",
         "uses the selected group's count"
       );
-    await click('[data-test-step="scope"]');
     await selectSyncGroups("empty");
-    await click("[data-test-continue]");
-    await click("[data-test-continue]");
     assert
       .dom('[data-name="backfill"]')
       .includesText(
@@ -571,9 +652,8 @@ module("Integration | Component | SalesforceGuidedSync", function (hooks) {
     );
     await selectSyncGroups("customers");
     await formKit().field("object").select("Contact");
-    await click("[data-test-continue]");
     assert
-      .dom("[data-test-continue]")
+      .dom("[data-test-save]")
       .isEnabled("new Contact defaults do not assume custom or Company fields");
     this.record = {
       ...createDemoConfiguration(),
@@ -592,7 +672,6 @@ module("Integration | Component | SalesforceGuidedSync", function (hooks) {
         <SalesforceGuidedSync @groups={{this.groups}} @record={{this.record}} />
       </template>
     );
-    await click("[data-test-continue]");
     assert
       .dom(".salesforce-guided-sync")
       .includesText(
@@ -600,7 +679,7 @@ module("Integration | Component | SalesforceGuidedSync", function (hooks) {
         "names missing saved destinations without removing them"
       );
     assert
-      .dom("[data-test-continue]")
+      .dom("[data-test-save]")
       .isDisabled("saved unavailable mappings must be repaired");
   });
 
@@ -609,20 +688,17 @@ module("Integration | Component | SalesforceGuidedSync", function (hooks) {
       <template><SalesforceGuidedSync @groups={{this.groups}} /></template>
     );
     await selectSyncGroups("customers");
-    await click("[data-test-continue]");
     assert.strictEqual(this.requestedObject, "Lead");
-    await click('[data-test-step="scope"]');
-    await formKit().field("object").select("Contact");
     pretender.get("/salesforce/admin/guided-sync/fields.json", () => [
       502,
       {},
       "",
     ]);
-    await click("[data-test-continue]");
+    await formKit().field("object").select("Contact");
     assert
       .dom(".salesforce-guided-sync")
       .includesText("Could not load Salesforce fields");
-    assert.dom("[data-test-continue]").isDisabled();
+    assert.dom("[data-test-save]").isDisabled();
     pretender.get("/salesforce/admin/guided-sync/fields.json", (request) => {
       this.requestedObject = request.queryParams.object;
       return [
@@ -639,62 +715,8 @@ module("Integration | Component | SalesforceGuidedSync", function (hooks) {
       .dom(".salesforce-guided-sync")
       .doesNotIncludeText("Could not load Salesforce fields");
     assert
-      .dom("[data-test-continue]")
+      .dom("[data-test-save]")
       .isDisabled("missing mapped fields must be repaired");
-  });
-
-  test("guided setup previews ownership rules and enables a simulated sync", async function (assert) {
-    await render(
-      <template><SalesforceGuidedSync @groups={{this.groups}} /></template>
-    );
-
-    assert.dom('[data-test-step="connect"]').doesNotExist();
-    assert.dom("[data-test-step]").exists({ count: 4 }, "shows four steps");
-    assert.dom(".salesforce-guided-sync__footer").includesText("Step 1 of 4");
-    assert
-      .dom("[data-test-continue]")
-      .isDisabled("requires a real group selection");
-    await selectSyncGroups("customers");
-    await formKit().field("object").select("Contact");
-    await click("[data-test-continue]");
-    assert.strictEqual(
-      this.requestedObject,
-      "Contact",
-      "requests Contact metadata"
-    );
-
-    assert
-      .dom(
-        '[data-name="mappings.2.destination"] .form-kit__control-menu-trigger'
-      )
-      .includesText("Description", "shows the returned API field name");
-    await click("[data-test-continue]");
-    await formKit().field("schedule").select("weekly");
-    await click("[data-test-continue]");
-
-    assert
-      .dom('[data-test-preview-field="FirstName"]')
-      .includesText("Alexander");
-    assert
-      .dom('[data-test-preview-field="FirstName"]')
-      .includesText("Kept Salesforce");
-
-    assert
-      .dom('[data-name="previewMember"]')
-      .includesText("alex", "selects the first eligible member");
-
-    await click("[data-test-continue]");
-    assert.dom(".salesforce-guided-sync__stats").doesNotExist();
-    assert.dom("[data-test-retry-failure]").doesNotExist();
-    await click('[data-test-step="mapping"]');
-    await formKit().field("mappings.2.policy").select("keep");
-    await click("[data-test-continue]");
-    await click("[data-test-continue]");
-    await click("[data-test-continue]");
-    assert
-      .dom("[data-test-demo-message]")
-      .includesText("Demo configuration saved");
-    assert.dom("[data-test-retry-failure]").doesNotExist();
   });
 
   test("moving a destination requires repairing its previous mapping", async function (assert) {
@@ -702,7 +724,6 @@ module("Integration | Component | SalesforceGuidedSync", function (hooks) {
       <template><SalesforceGuidedSync @groups={{this.groups}} /></template>
     );
     await selectSyncGroups("customers");
-    await click("[data-test-continue]");
 
     await formKit().field("mappings.3.destination").select("Description");
     assert
@@ -713,11 +734,11 @@ module("Integration | Component | SalesforceGuidedSync", function (hooks) {
     assert
       .dom('[data-test-mapping="3"]')
       .includesText("This destination moved");
-    assert.dom("[data-test-continue]").isDisabled();
+    assert.dom("[data-test-save]").isDisabled();
 
     await formKit().field("mappings.3.destination").select("Company");
     await formKit().field("mappings.2.destination").select("Description");
-    assert.dom("[data-test-continue]").isEnabled();
+    assert.dom("[data-test-save]").isEnabled();
 
     await formKit().field("mappings.3.destination").select("Last_Seen__c");
     assert
@@ -725,6 +746,6 @@ module("Integration | Component | SalesforceGuidedSync", function (hooks) {
       .includesText(
         "Company (profile field, or None if empty) (text) cannot map to Last_Seen__c (date)"
       );
-    assert.dom("[data-test-continue]").isDisabled();
+    assert.dom("[data-test-save]").isDisabled();
   });
 });

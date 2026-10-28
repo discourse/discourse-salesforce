@@ -28,7 +28,19 @@ export default class SalesforceCreateGroupModal extends Component {
     try {
       const result = await ajax("/admin/groups", {
         type: "POST",
-        data: { group: { name: name.trim(), visibility_level: 0 } },
+        data: {
+          group: {
+            name: name.trim(),
+            visibility_level: 4,
+            members_visibility_level: 4,
+            public_admission: false,
+            public_exit: false,
+            allow_membership_requests: false,
+            mentionable_level: 0,
+            messageable_level: 0,
+            assignable_level: 0,
+          },
+        },
       });
       const group = { ...result.basic_group, user_count: 0, automatic: false };
       if (!this.site.groups.some((existing) => existing.id === group.id)) {

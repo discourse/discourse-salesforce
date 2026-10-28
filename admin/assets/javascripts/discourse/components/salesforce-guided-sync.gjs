@@ -1,26 +1,27 @@
 import Component from "@glimmer/component";
 import { tracked } from "@glimmer/tracking";
 import { fn } from "@ember/helper";
+import { on } from "@ember/modifier";
 import { action } from "@ember/object";
+import { cancel, debounce, next } from "@ember/runloop";
 import { service } from "@ember/service";
-import AdminConfigAreaCard from "discourse/admin/components/admin-config-area-card";
 import Form from "discourse/components/form";
 import DTooltip from "discourse/float-kit/components/d-tooltip";
 import { ajax } from "discourse/lib/ajax";
 import { extractError } from "discourse/lib/ajax-error";
-import { eq, not, or } from "discourse/truth-helpers";
+import { eq } from "discourse/truth-helpers";
 import DButton from "discourse/ui-kit/d-button";
 import DConditionalLoadingSpinner from "discourse/ui-kit/d-conditional-loading-spinner";
 import DFilterInput from "discourse/ui-kit/d-filter-input";
 import DMultiSelect from "discourse/ui-kit/d-multi-select";
 import DPageSubheader from "discourse/ui-kit/d-page-subheader";
-import dConcatClass from "discourse/ui-kit/helpers/d-concat-class";
 import dIcon from "discourse/ui-kit/helpers/d-icon";
 import { i18n } from "discourse-i18n";
 import SalesforceCreateGroupModal from "discourse/plugins/discourse-salesforce/discourse/components/salesforce-create-group-modal";
 import SalesforceFieldMenu from "discourse/plugins/discourse-salesforce/discourse/components/salesforce-field-menu";
 import SalesforceSourceMenu from "discourse/plugins/discourse-salesforce/discourse/components/salesforce-source-menu";
 import {
+  createCompanyMapping,
   createDemoConfiguration,
   DEMO_SOURCES,
   mappingError,
@@ -40,9 +41,6 @@ export default class SalesforceGuidedSync extends Component {
   );
   @tracked createdGroups = [];
   @tracked nameFormData;
-  @tracked enabled = false;
-  @tracked message;
-  @tracked step = 1;
   @tracked saving = false;
   @tracked salesforceFields = [];
   @tracked customSources = [];
@@ -71,6 +69,16 @@ export default class SalesforceGuidedSync extends Component {
       0,
       ...this.configuration.mappings.map((mapping) => Number(mapping.id))
     ) + 1;
+
+  #previewTimer;
+
+  #initialLoad;
+
+  willDestroy() {
+    super.willDestroy(...arguments);
+    cancel(this.#previewTimer);
+    cancel(this.#initialLoad);
+  }
 
   get title() {
     return this.configuration.name || i18n(`${PREFIX}.default_users_name`);
@@ -112,7 +120,13 @@ export default class SalesforceGuidedSync extends Component {
 
   get sources() {
     return [
-      ...DEMO_SOURCES.map((source) => ({
+      ...DEMO_SOURCES.filter(
+        (source) =>
+          source.id !== "company" ||
+          this.configuration.mappings.some(
+            (mapping) => mapping.source === "company"
+          )
+      ).map((source) => ({
         ...source,
         label: i18n(`${PREFIX}.sources.${source.id}`),
       })),
@@ -122,17 +136,6 @@ export default class SalesforceGuidedSync extends Component {
         label: source.name,
       })),
     ];
-  }
-
-  get steps() {
-    return ["scope", "mapping", "behavior", "review"].map((id, index) => ({
-      id,
-      index: index + 1,
-      number: index + 1,
-      label: i18n(`${PREFIX}.steps.${id}`),
-      current: this.step === index + 1,
-      completed: this.step > index + 1,
-    }));
   }
 
   get error() {
@@ -178,20 +181,18 @@ export default class SalesforceGuidedSync extends Component {
       : null;
   }
 
-  get continueDisabled() {
-    return (
-      this.saving ||
-      !this.configuration.groups.length ||
-      (this.step >= 2 &&
-        (this.loadingFields ||
-          this.fieldsObject !== this.configuration.object ||
-          Boolean(this.fieldsError) ||
-          Boolean(this.error)))
-    );
+  get saveDisabled() {
+    return this.saving || this.previewDisabled;
   }
 
-  get canGoBack() {
-    return this.step > 1;
+  get previewDisabled() {
+    return (
+      !this.configuration.groups.length ||
+      this.loadingFields ||
+      this.fieldsObject !== this.configuration.object ||
+      Boolean(this.fieldsError) ||
+      Boolean(this.error)
+    );
   }
 
   get scheduleTiming() {
@@ -199,24 +200,21 @@ export default class SalesforceGuidedSync extends Component {
   }
 
   get submitLabel() {
-    return this.step === 4
-      ? `${PREFIX}.${this.enabled ? "save_changes" : "enable"}`
-      : `${PREFIX}.continue`;
+    return `${PREFIX}.${this.args.record?.id ? "save_changes" : "enable"}`;
   }
 
   get preview() {
     return this.previewRows.map((row) => ({
       ...row,
-      current: row.current ?? "—",
+      current: row.current === "" ? "—" : (row.current ?? "—"),
       incoming: row.incoming === "" ? "—" : (row.incoming ?? "—"),
       result: row.result === "" ? "—" : (row.result ?? "—"),
-      outcomeLabel: i18n(`${PREFIX}.outcomes.${row.outcome}`),
-      kept: row.outcome === "kept",
     }));
   }
 
   @action
-  createGroup() {
+  async createGroup(menu) {
+    await menu.close();
     this.modal.show(SalesforceCreateGroupModal, {
       model: { onCreated: this.groupCreated },
     });
@@ -252,6 +250,13 @@ export default class SalesforceGuidedSync extends Component {
     this.#form.set("groups", names);
     this.configuration = { ...this.configuration, groups: names };
     this.previewUser = null;
+    this.previewQuery = "";
+    this.#previewUsersRequest++;
+    this.previewUsers = [];
+    if (names.length) {
+      this.searchPreviewUsers();
+    }
+    this.#schedulePreview();
   }
 
   @action
@@ -268,32 +273,17 @@ export default class SalesforceGuidedSync extends Component {
   }
 
   @action
-  async advance() {
-    if (this.continueDisabled) {
+  async save() {
+    if (this.saveDisabled || !this.args.onSave) {
       return;
     }
-    if (this.step < 4) {
-      this.message = null;
-      this.goToStep(this.step + 1);
-      return;
-    }
-    if (this.args.onSave) {
-      this.saving = true;
-      try {
-        if (!(await this.args.onSave(this.configuration))) {
-          return;
-        }
-      } finally {
-        this.saving = false;
+    this.saving = true;
+    try {
+      if (await this.args.onSave(this.configuration)) {
+        this.a11y.announce(i18n(`${PREFIX}.save_success`));
       }
-    }
-    const wasEnabled = this.enabled;
-    this.enabled = true;
-    if (this.args.onSave) {
-      this.message = null;
-      this.a11y.announce(i18n(`${PREFIX}.save_success`));
-    } else {
-      this.#notify(wasEnabled ? "saved_message" : "enabled_message");
+    } finally {
+      this.saving = false;
     }
   }
 
@@ -315,30 +305,10 @@ export default class SalesforceGuidedSync extends Component {
   }
 
   @action
-  goToStep(index) {
-    this.message = null;
-    this.step = index;
-    this.#previewRequest++;
-    this.#previewUsersRequest++;
-    if (index === 4) {
-      this.previewQuery = "";
-      this.searchPreviewUsers();
-      this.loadPreview();
-    }
-    if (index >= 2 && this.fieldsObject !== this.configuration.object) {
-      this.refreshFields();
-    }
-  }
-
-  @action
-  previousStep() {
-    this.goToStep(this.step - 1);
-  }
-
-  @action
   async refreshFields() {
     const object = this.configuration.object;
     const request = ++this.#fieldsRequest;
+    this.#invalidatePreview();
     this.loadingFields = true;
     this.fieldsError = null;
     this.salesforceFields = [];
@@ -397,12 +367,16 @@ export default class SalesforceGuidedSync extends Component {
         request === this.#fieldsRequest
       ) {
         this.loadingFields = false;
+        this.#schedulePreview();
       }
     }
   }
 
   @action
   async loadPreview() {
+    if (this.previewDisabled) {
+      return;
+    }
     const request = ++this.#previewRequest;
     this.loadingPreview = true;
     this.previewError = null;
@@ -508,6 +482,15 @@ export default class SalesforceGuidedSync extends Component {
   }
 
   @action
+  handleNameKeydown(event) {
+    if (event.key === "Escape") {
+      event.preventDefault();
+      event.stopPropagation();
+      this.cancelNameEdit();
+    }
+  }
+
+  @action
   applyName({ name }) {
     const value = name.trim();
     if (!value) {
@@ -521,6 +504,12 @@ export default class SalesforceGuidedSync extends Component {
   @action
   registerForm(form) {
     this.#form = form;
+    this.#initialLoad = next(this, () => {
+      this.refreshFields();
+      if (this.configuration.groups.length) {
+        this.searchPreviewUsers();
+      }
+    });
   }
 
   @action
@@ -546,12 +535,7 @@ export default class SalesforceGuidedSync extends Component {
     ) {
       this.#setMappings([
         ...this.configuration.mappings,
-        {
-          id: this.#nextMappingId++,
-          source: "company",
-          destination: "Company",
-          policy: "overwrite",
-        },
+        createCompanyMapping(this.#nextMappingId++),
       ]);
     }
     if (name === "object" && value === "Contact" && !this.args.record?.id) {
@@ -560,6 +544,9 @@ export default class SalesforceGuidedSync extends Component {
           (mapping) => mapping.destination !== "Company"
         )
       );
+    }
+    if (name === "object") {
+      this.refreshFields();
     }
   }
 
@@ -570,14 +557,27 @@ export default class SalesforceGuidedSync extends Component {
     );
   }
 
-  #notify(key) {
-    this.message = i18n(`${PREFIX}.${key}`);
-    this.a11y.announce(this.message);
+  #invalidatePreview() {
+    cancel(this.#previewTimer);
+    this.#previewRequest++;
+    this.previewRows = [];
+    this.previewError = null;
+    this.samplePreview = false;
+    this.loadingPreview = false;
+  }
+
+  #schedulePreview() {
+    this.#invalidatePreview();
+    if (!this.previewDisabled) {
+      this.loadingPreview = true;
+      this.#previewTimer = debounce(this, this.loadPreview, 300);
+    }
   }
 
   #setMappings(mappings) {
     this.#form?.set("mappings", mappings);
     this.configuration = { ...this.configuration, mappings };
+    this.#schedulePreview();
   }
 
   <template>
@@ -586,523 +586,514 @@ export default class SalesforceGuidedSync extends Component {
       ...attributes
     >
       <div class="salesforce-guided-sync__heading">
-        <DPageSubheader @titleLabel={{this.title}} />
-        {{#if @onSave}}
-          <DButton
-            class="btn-transparent"
-            data-test-edit-name
-            @action={{this.editName}}
-            @icon="pencil"
-            @title="salesforce.guided_sync.edit_name"
-          />
-        {{/if}}
-      </div>
-      {{#if this.nameFormData}}
-        <Form
-          class="salesforce-guided-sync__name-form"
-          @data={{this.nameFormData}}
-          @onSubmit={{this.applyName}}
-          as |nameForm|
-        >
-          <nameForm.Field
-            @name="name"
-            @title={{i18n "salesforce.guided_sync.configuration_name"}}
-            @type="input"
-            @validation="required"
-            as |field|
+        {{#if this.nameFormData}}
+          <Form
+            class="salesforce-guided-sync__name-form"
+            @data={{this.nameFormData}}
+            @onSubmit={{this.applyName}}
+            @onDirtyCheck={{this.allowNavigation}}
+            as |nameForm|
           >
-            <field.Control @autofocus={{true}} @maxlength={{60}} />
-          </nameForm.Field>
-          <div class="salesforce-guided-sync__name-actions">
-            <nameForm.Submit @label="salesforce.guided_sync.apply_name" />
+            <nameForm.Field
+              @format="full"
+              @name="name"
+              @showTitle={{false}}
+              @title={{i18n "salesforce.guided_sync.configuration_name"}}
+              @type="input"
+              @validation="required"
+              as |field|
+            >
+              <field.Control
+                @autofocus={{true}}
+                @maxlength={{60}}
+                {{on "keydown" this.handleNameKeydown}}
+              />
+            </nameForm.Field>
+            <div class="salesforce-guided-sync__name-actions">
+              <DButton
+                class="btn-primary"
+                type="submit"
+                @icon="check"
+                @title="salesforce.guided_sync.apply_name"
+              />
+              <DButton
+                class="btn-transparent"
+                @action={{this.cancelNameEdit}}
+                @icon="xmark"
+                @title="cancel"
+              />
+            </div>
+          </Form>
+        {{else}}
+          <DPageSubheader @titleLabel={{this.title}} />
+          {{#if @onSave}}
             <DButton
               class="btn-transparent"
-              @action={{this.cancelNameEdit}}
-              @label="cancel"
+              data-test-edit-name
+              @action={{this.editName}}
+              @icon="pencil"
+              @title="salesforce.guided_sync.edit_name"
             />
-          </div>
-        </Form>
-      {{/if}}
+          {{/if}}
+        {{/if}}
+      </div>
       <p>{{i18n "salesforce.guided_sync.description"}}</p>
-
-      <nav
-        class="salesforce-guided-sync__steps"
-        aria-label={{i18n "salesforce.guided_sync.steps_label"}}
-      >
-        {{#each this.steps as |step|}}
-          <DButton
-            class={{dConcatClass
-              "btn-transparent salesforce-guided-sync__step"
-              (if step.current "--current")
-              (if step.completed "--completed")
-            }}
-            aria-current={{if step.current "step"}}
-            data-test-step={{step.id}}
-            @action={{fn this.goToStep step.index}}
-            @disabled={{not step.completed}}
-          >
-            <span class="salesforce-guided-sync__step-number">
-              {{#if step.completed}}
-                {{dIcon "check"}}
-              {{else}}
-                {{step.number}}
-              {{/if}}
-            </span>
-            {{step.label}}
-          </DButton>
-        {{/each}}
-      </nav>
 
       <Form
         class="salesforce-guided-sync__form"
         @data={{this.formData}}
         @onDirtyCheck={{this.allowNavigation}}
         @onRegisterApi={{this.registerForm}}
-        @onSubmit={{this.advance}}
+        @onSubmit={{this.save}}
         as |form|
       >
-        {{#if (eq this.step 1)}}
-          <AdminConfigAreaCard
-            class="salesforce-guided-sync__form-card"
-            @description="salesforce.guided_sync.scope_description"
-            @heading="salesforce.guided_sync.scope_title"
+        <section
+          class="salesforce-guided-sync__section"
+          aria-labelledby="salesforce-scope-title"
+        >
+          <h3 id="salesforce-scope-title">{{i18n
+              "salesforce.guided_sync.scope_title"
+            }}</h3>
+          <p class="salesforce-guided-sync__description">{{i18n
+              "salesforce.guided_sync.scope_description"
+            }}</p>
+
+          <div class="salesforce-guided-sync__scope-fields">
+            <form.Field
+              @format="full"
+              @name="groups"
+              @title={{i18n "salesforce.guided_sync.group"}}
+              @type="custom"
+              @validation="required"
+              as |field|
+            >
+              <field.Control>
+                <div class="salesforce-guided-sync__group-controls">
+                  <DMultiSelect
+                    @compareFn={{this.compareGroups}}
+                    @label={{i18n "salesforce.guided_sync.group"}}
+                    @loadFn={{this.findGroups}}
+                    @matchTriggerWidth={{true}}
+                    @onChange={{this.selectGroups}}
+                    @selection={{this.selectedGroups}}
+                  >
+                    <:selection as |group|>{{group.name}}</:selection>
+                    <:result as |group|>{{group.name}}</:result>
+                    <:footer as |menu|>
+                      <DButton
+                        class="btn-flat salesforce-guided-sync__create-group"
+                        data-test-create-group
+                        @action={{fn this.createGroup menu}}
+                        @icon="plus"
+                        @label="salesforce.guided_sync.create_group"
+                      />
+                    </:footer>
+                  </DMultiSelect>
+                </div>
+              </field.Control>
+            </form.Field>
+            <form.Field
+              @disabled={{@record.id}}
+              @name="object"
+              @onSet={{this.setConfiguration}}
+              @title={{i18n "salesforce.guided_sync.target"}}
+              @type="select"
+              @validation="required"
+              as |field|
+            >
+              <field.Control @includeNone={{false}} as |select|>
+                <select.Option @value="Lead">{{i18n
+                    "salesforce.guided_sync.leads"
+                  }}</select.Option>
+                <select.Option @value="Contact">{{i18n
+                    "salesforce.guided_sync.contacts"
+                  }}</select.Option>
+              </field.Control>
+            </form.Field>
+
+          </div>
+        </section>
+        <section
+          class="salesforce-guided-sync__section"
+          aria-labelledby="salesforce-behavior-title"
+        >
+          <h3 id="salesforce-behavior-title">{{i18n
+              "salesforce.guided_sync.behavior_title"
+            }}</h3>
+          <p class="salesforce-guided-sync__description">{{i18n
+              "salesforce.guided_sync.behavior_description"
+            }}</p>
+
+          <div class="salesforce-guided-sync__behavior-fields">
+            <form.Field
+              @format="full"
+              @name="backfill"
+              @onSet={{this.setConfiguration}}
+              @title={{this.backfillLabel}}
+              @type="checkbox"
+              as |field|
+            >
+              <field.Control />
+            </form.Field>
+            <form.Field
+              class="salesforce-guided-sync__schedule"
+              @format="full"
+              @helpText={{this.scheduleTiming}}
+              @name="schedule"
+              @onSet={{this.setConfiguration}}
+              @title={{i18n "salesforce.guided_sync.schedule"}}
+              @tooltip={{i18n "salesforce.guided_sync.schedule_help"}}
+              @type="select"
+              @validation="required"
+              as |field|
+            >
+              <field.Control @includeNone={{false}} as |select|>
+                <select.Option @value="hourly">{{i18n
+                    "salesforce.guided_sync.schedules.hourly"
+                  }}</select.Option>
+                <select.Option @value="daily">{{i18n
+                    "salesforce.guided_sync.schedules.daily"
+                  }}</select.Option>
+                <select.Option @value="weekly">{{i18n
+                    "salesforce.guided_sync.schedules.weekly"
+                  }}</select.Option>
+                <select.Option @value="manual">{{i18n
+                    "salesforce.guided_sync.schedules.manual"
+                  }}</select.Option>
+              </field.Control>
+            </form.Field>
+          </div>
+
+        </section>
+        <section
+          class="salesforce-guided-sync__section"
+          aria-labelledby="salesforce-mapping-title"
+        >
+          <h3 id="salesforce-mapping-title">{{i18n
+              "salesforce.guided_sync.mapping_title"
+            }}</h3>
+          <DConditionalLoadingSpinner
+            data-test-fields-loading
+            aria-busy={{this.loadingFields}}
+            @condition={{this.loadingFields}}
           >
-            <:content>
-              <form.Field
-                @format="full"
-                @name="groups"
-                @title={{i18n "salesforce.guided_sync.group"}}
-                @type="custom"
-                @validation="required"
-                as |field|
-              >
-                <field.Control>
-                  <div class="salesforce-guided-sync__group-controls">
-                    <DMultiSelect
-                      @compareFn={{this.compareGroups}}
-                      @label={{i18n "salesforce.guided_sync.group"}}
-                      @loadFn={{this.findGroups}}
-                      @onChange={{this.selectGroups}}
-                      @selection={{this.selectedGroups}}
-                    >
-                      <:selection as |group|>{{group.name}}</:selection>
-                      <:result as |group|>{{group.name}}</:result>
-                    </DMultiSelect>
-                    <DButton
-                      class="btn-transparent"
-                      data-test-create-group
-                      @action={{this.createGroup}}
-                      @icon="plus"
-                      @label="salesforce.guided_sync.create_group"
-                    />
-                  </div>
-                </field.Control>
-              </form.Field>
-              <form.Field
-                @disabled={{@record.id}}
-                @name="object"
-                @onSet={{this.setConfiguration}}
-                @title={{i18n "salesforce.guided_sync.target"}}
-                @type="select"
-                @validation="required"
-                as |field|
-              >
-                <field.Control @includeNone={{false}} as |select|>
-                  <select.Option @value="Lead">{{i18n
-                      "salesforce.guided_sync.leads"
-                    }}</select.Option>
-                  <select.Option @value="Contact">{{i18n
-                      "salesforce.guided_sync.contacts"
-                    }}</select.Option>
-                </field.Control>
-              </form.Field>
-            </:content>
-          </AdminConfigAreaCard>
-        {{else if (eq this.step 2)}}
-          <AdminConfigAreaCard
-            @description="salesforce.guided_sync.matching_help"
-            @heading="salesforce.guided_sync.mapping_title"
-          >
-            <:content>
-              <DConditionalLoadingSpinner
-                data-test-fields-loading
-                aria-busy={{this.loadingFields}}
-                @condition={{this.loadingFields}}
-              >
-                {{#if this.fieldsError}}
-                  <form.Alert @type="error">{{this.fieldsError}}</form.Alert>
-                  <DButton
-                    class="btn-default salesforce-guided-sync__retry-fields"
-                    data-test-refresh-fields
-                    @action={{this.refreshFields}}
-                    @icon="arrows-rotate"
-                    @label="salesforce.guided_sync.retry_fields"
-                  />
-                {{else}}
-                  <div class="salesforce-guided-sync__mapping-headings">
-                    <span>{{i18n
-                        "salesforce.guided_sync.discourse_field"
-                      }}</span>
-                    <span class="salesforce-guided-sync__arrow-heading"></span>
-                    <span>{{i18n
-                        "salesforce.guided_sync.salesforce_field"
-                      }}</span>
-                    <span>{{i18n "salesforce.guided_sync.existing_value"}}
-                      <DTooltip
-                        aria-label={{i18n
-                          "salesforce.guided_sync.existing_value"
+            {{#if this.fieldsError}}
+              <form.Alert @type="error">{{this.fieldsError}}</form.Alert>
+              <DButton
+                class="btn-default salesforce-guided-sync__retry-fields"
+                data-test-refresh-fields
+                @action={{this.refreshFields}}
+                @icon="arrows-rotate"
+                @label="salesforce.guided_sync.retry_fields"
+              />
+            {{else}}
+              <div class="salesforce-guided-sync__mapping-headings">
+                <span>{{i18n "salesforce.guided_sync.discourse_field"}}</span>
+                <span class="salesforce-guided-sync__arrow-heading"></span>
+                <span>{{i18n "salesforce.guided_sync.salesforce_field"}}</span>
+                <span>{{i18n "salesforce.guided_sync.existing_value"}}
+                  <DTooltip
+                    aria-label={{i18n "salesforce.guided_sync.existing_value"}}
+                    @icon="far-circle-question"
+                    @identifier="salesforce-field-policy"
+                  >
+                    <:content>{{i18n
+                        "salesforce.guided_sync.policy_help"
+                      }}</:content>
+                  </DTooltip>
+                </span>
+              </div>
+              <div class="salesforce-guided-sync__locked-mapping">
+                <span>{{dIcon "lock"}}
+                  {{i18n "salesforce.guided_sync.email"}}</span>
+                <span class="salesforce-guided-sync__mapping-arrow">{{dIcon
+                    "arrow-right"
+                  }}</span>
+                <code>Email</code>
+                <span>{{i18n "salesforce.guided_sync.fixed_mapping"}}</span>
+                <p class="salesforce-guided-sync__email-help">{{i18n
+                    "salesforce.guided_sync.matching_help"
+                  }}</p>
+              </div>
+              <div class="salesforce-guided-sync__mapping-list">
+                <form.Collection @name="mappings" as |collection index mapping|>
+                  <div
+                    class="salesforce-guided-sync__mapping-row"
+                    data-test-mapping={{mapping.id}}
+                  >
+                    <div class="salesforce-guided-sync__mapping-source">
+                      <collection.Field
+                        @format="full"
+                        @helpText={{if
+                          (eq mapping.source "company")
+                          (i18n "salesforce.guided_sync.company_help")
                         }}
-                        @icon="far-circle-question"
-                        @identifier="salesforce-field-policy"
+                        @name="source"
+                        @showTitle={{false}}
+                        @onSet={{fn this.setMapping "source"}}
+                        @title={{i18n "salesforce.guided_sync.discourse_field"}}
+                        @type="menu"
+                        @validation="required"
+                        as |field|
                       >
-                        <:content>{{i18n
-                            "salesforce.guided_sync.policy_help"
-                          }}</:content>
-                      </DTooltip>
-                    </span>
-                  </div>
-                  <div class="salesforce-guided-sync__locked-mapping">
-                    <span>{{dIcon "lock"}}
-                      {{i18n "salesforce.guided_sync.email"}}</span>
-                    <span class="salesforce-guided-sync__mapping-arrow">{{dIcon
-                        "arrow-right"
-                      }}</span>
-                    <code>Email</code>
-                    <span>{{i18n "salesforce.guided_sync.fixed_mapping"}}</span>
-                  </div>
-                  <div class="salesforce-guided-sync__mapping-list">
-                    <form.Collection
-                      @name="mappings"
-                      as |collection index mapping|
-                    >
-                      <div
-                        class="salesforce-guided-sync__mapping-row"
-                        data-test-mapping={{mapping.id}}
-                      >
-                        <div class="salesforce-guided-sync__mapping-source">
-                          <collection.Field
-                            @format="full"
-                            @helpText={{if
-                              (eq mapping.source "company")
-                              (i18n "salesforce.guided_sync.company_help")
-                            }}
-                            @name="source"
-                            @showTitle={{false}}
-                            @onSet={{fn this.setMapping "source"}}
-                            @title={{i18n
-                              "salesforce.guided_sync.discourse_field"
-                            }}
-                            @type="menu"
-                            @validation="required"
-                            as |field|
-                          >
-                            <SalesforceSourceMenu
-                              @control={{field.Control}}
-                              @sources={{this.sources}}
-                              @value={{mapping.source}}
-                            />
-                          </collection.Field>
-                          {{#if (eq mapping.source "static")}}
-                            <collection.Field
-                              @format="full"
-                              @name="value"
-                              @showTitle={{false}}
-                              @onSet={{fn this.setMapping "value"}}
-                              @title={{i18n
-                                "salesforce.guided_sync.static_value"
-                              }}
-                              @type="input"
-                              @validation="required"
-                              as |field|
-                            >
-                              <field.Control
-                                aria-label={{i18n
-                                  "salesforce.guided_sync.static_value"
-                                }}
-                                maxlength="1000"
-                                placeholder={{i18n
-                                  "salesforce.guided_sync.static_value"
-                                }}
-                              />
-                            </collection.Field>
-                          {{/if}}
-                        </div>
-                        <span
-                          class="salesforce-guided-sync__mapping-arrow"
-                        >{{dIcon "arrow-right"}}</span>
-                        <collection.Field
-                          class={{if mapping.moved "--unmapped"}}
-                          @description={{if
-                            mapping.moved
-                            (i18n "salesforce.guided_sync.field_moved")
-                          }}
-                          @format="full"
-                          @name="destination"
-                          @onSet={{fn this.setMapping "destination"}}
-                          @showTitle={{false}}
-                          @title={{i18n
-                            "salesforce.guided_sync.salesforce_field"
-                          }}
-                          @type="menu"
-                          @validation="required"
-                          as |field|
-                        >
-                          <SalesforceFieldMenu
-                            @control={{field.Control}}
-                            @value={{mapping.destination}}
-                            @fields={{this.fields}}
-                            @mappings={{this.configuration.mappings}}
-                            @mappingId={{mapping.id}}
-                            @sources={{this.sources}}
-                          />
-                        </collection.Field>
+                        <SalesforceSourceMenu
+                          @control={{field.Control}}
+                          @sources={{this.sources}}
+                          @value={{mapping.source}}
+                        />
+                      </collection.Field>
+                      {{#if (eq mapping.source "static")}}
                         <collection.Field
                           @format="full"
-                          @name="policy"
+                          @name="value"
                           @showTitle={{false}}
-                          @onSet={{fn this.setMapping "policy"}}
-                          @title={{i18n
-                            "salesforce.guided_sync.existing_value"
-                          }}
-                          @type="select"
+                          @onSet={{fn this.setMapping "value"}}
+                          @title={{i18n "salesforce.guided_sync.static_value"}}
+                          @type="input"
                           @validation="required"
                           as |field|
                         >
                           <field.Control
                             aria-label={{i18n
-                              "salesforce.guided_sync.existing_value"
+                              "salesforce.guided_sync.static_value"
                             }}
-                            @includeNone={{false}}
-                            as |select|
-                          >
-                            <select.Option @value="keep">{{i18n
-                                "salesforce.guided_sync.keep"
-                              }}</select.Option>
-                            <select.Option @value="overwrite">{{i18n
-                                "salesforce.guided_sync.overwrite"
-                              }}</select.Option>
-                          </field.Control>
+                            maxlength="1000"
+                            placeholder={{i18n
+                              "salesforce.guided_sync.static_value"
+                            }}
+                          />
                         </collection.Field>
-                        <DButton
-                          class="btn-transparent salesforce-guided-sync__remove"
-                          data-test-remove-mapping={{mapping.id}}
-                          @action={{fn this.removeMapping index}}
-                          @icon="trash-can"
-                          @title="salesforce.guided_sync.remove_mapping"
-                        />
-                      </div>
-                    </form.Collection>
-                  </div>
-                  <div class="salesforce-guided-sync__actions --spread">
-                    <DButton
-                      class="btn-flat"
-                      data-test-add-mapping
-                      @action={{this.addMapping}}
-                      @icon="plus"
-                      @label="salesforce.guided_sync.add_mapping"
-                    />
-                    <DButton
-                      class="btn-flat"
-                      data-test-refresh-fields
-                      @action={{this.refreshFields}}
-                      @disabled={{this.loadingFields}}
-                      @icon="arrows-rotate"
-                      @label="salesforce.guided_sync.refresh_fields"
-                    />
-                  </div>
-                  {{#if this.error}}
-                    <form.Alert
-                      @type="error"
-                      @icon="triangle-exclamation"
-                    >{{this.error}}</form.Alert>
-                  {{/if}}
-                {{/if}}
-              </DConditionalLoadingSpinner>
-            </:content>
-          </AdminConfigAreaCard>
-        {{else if (eq this.step 3)}}
-          <AdminConfigAreaCard
-            class="salesforce-guided-sync__form-card"
-            @heading="salesforce.guided_sync.behavior_title"
-            @description="salesforce.guided_sync.behavior_description"
-          >
-            <:content>
-              <form.Field
-                @name="backfill"
-                @onSet={{this.setConfiguration}}
-                @title={{this.backfillLabel}}
-                @type="checkbox"
-                as |field|
-              >
-                <field.Control />
-              </form.Field>
-              <form.Field
-                @helpText={{this.scheduleTiming}}
-                @name="schedule"
-                @onSet={{this.setConfiguration}}
-                @title={{i18n "salesforce.guided_sync.schedule"}}
-                @tooltip={{i18n "salesforce.guided_sync.schedule_help"}}
-                @type="select"
-                @validation="required"
-                as |field|
-              >
-                <field.Control @includeNone={{false}} as |select|>
-                  <select.Option @value="daily">{{i18n
-                      "salesforce.guided_sync.schedules.daily"
-                    }}</select.Option>
-                  <select.Option @value="hourly">{{i18n
-                      "salesforce.guided_sync.schedules.hourly"
-                    }}</select.Option>
-                  <select.Option @value="weekly">{{i18n
-                      "salesforce.guided_sync.schedules.weekly"
-                    }}</select.Option>
-                  <select.Option @value="manual">{{i18n
-                      "salesforce.guided_sync.schedules.manual"
-                    }}</select.Option>
-                </field.Control>
-              </form.Field>
-            </:content>
-          </AdminConfigAreaCard>
-        {{else if (eq this.step 4)}}
-          <AdminConfigAreaCard
-            @description="salesforce.guided_sync.review_description"
-            @heading="salesforce.guided_sync.review_title"
-          >
-            <:content>
-              <DConditionalLoadingSpinner
-                data-test-preview-loading
-                @condition={{this.loadingPreview}}
-              >
-                {{#if this.samplePreview}}
-                  <p data-test-sample-preview>
-                    <strong>{{i18n
-                        "salesforce.guided_sync.sample_user"
-                      }}</strong>
-                    —
-                    {{i18n "salesforce.guided_sync.sample_preview_help"}}
-                  </p>
-                {{else}}
-                  <form.Field
-                    @name="previewMember"
-                    @showOptional={{false}}
-                    @title={{i18n "salesforce.guided_sync.preview_user"}}
-                    @type="menu"
-                    as |field|
-                  >
-                    <field.Control
-                      @selection={{this.previewUser.username}}
-                      as |menu|
-                    >
-                      <menu.Container>
-                        <DFilterInput
-                          aria-label={{i18n
-                            "salesforce.guided_sync.search_members"
-                          }}
-                          placeholder={{i18n
-                            "salesforce.guided_sync.search_members"
-                          }}
-                          @value={{this.previewQuery}}
-                          @filterAction={{this.filterPreviewUsers}}
-                        />
-                      </menu.Container>
-                      {{#if this.loadingPreviewUsers}}
-                        <menu.Container><DConditionalLoadingSpinner
-                            @condition={{true}}
-                          /></menu.Container>
-                      {{else if this.previewUsersError}}
-                        <menu.Container><p
-                          >{{this.previewUsersError}}</p></menu.Container>
-                      {{else}}
-                        {{#each this.previewUsers as |user|}}
-                          <menu.Item
-                            @action={{fn this.selectPreviewUser user}}
-                            @value={{user.id}}
-                          >
-                            {{user.username}}{{#if user.name}}
-                              ·
-                              {{user.name}}{{/if}}
-                          </menu.Item>
-                        {{else}}
-                          <menu.Container><p>{{i18n
-                                "salesforce.guided_sync.no_matching_members"
-                              }}</p></menu.Container>
-                        {{/each}}
                       {{/if}}
-                    </field.Control>
-                  </form.Field>
-                {{/if}}
-                {{#if this.previewError}}
-                  <form.Alert @type="error">{{this.previewError}}</form.Alert>
-                  <DButton
-                    class="btn-default"
-                    data-test-retry-preview
-                    @action={{this.loadPreview}}
-                    @label="salesforce.guided_sync.retry_fields"
-                    @icon="arrows-rotate"
-                  />
-                {{else if (or this.previewUser this.samplePreview)}}
-
-                  <div class="salesforce-guided-sync__preview-table">
-                    <table class="d-table">
-                      <thead class="d-table__header"><tr>
-                          <th>{{i18n
-                              "salesforce.guided_sync.salesforce_field"
-                            }}</th>
-                          <th>{{i18n
-                              "salesforce.guided_sync.current_value"
-                            }}</th>
-                          <th>{{i18n
-                              "salesforce.guided_sync.discourse_value"
-                            }}</th>
-                          <th>{{i18n "salesforce.guided_sync.after_sync"}}</th>
-                        </tr></thead>
-                      <tbody class="d-table__body">
-                        {{#each this.preview as |row|}}
-                          <tr
-                            class="d-table__row"
-                            data-test-preview-field={{row.field}}
-                          >
-                            <td class="d-table__cell --overview"><code
-                              >{{row.field}}</code></td>
-                            <td class="d-table__cell --detail"><div
-                                class="d-table__mobile-label"
-                              >{{i18n
-                                  "salesforce.guided_sync.current_value"
-                                }}</div>{{row.current}}</td>
-                            <td class="d-table__cell --detail"><div
-                                class="d-table__mobile-label"
-                              >{{i18n
-                                  "salesforce.guided_sync.discourse_value"
-                                }}</div>{{row.incoming}}</td>
-                            <td class="d-table__cell --detail"><div
-                                class="d-table__mobile-label"
-                              >{{i18n
-                                  "salesforce.guided_sync.after_sync"
-                                }}</div>
-                              <strong>{{row.result}}</strong>
-                              <span
-                                class={{dConcatClass
-                                  "salesforce-guided-sync__outcome"
-                                  (if row.kept "--kept")
-                                }}
-                              >{{row.outcomeLabel}}</span>
-                            </td>
-                          </tr>
-                        {{/each}}
-                      </tbody>
-                    </table>
+                    </div>
+                    <span class="salesforce-guided-sync__mapping-arrow">{{dIcon
+                        "arrow-right"
+                      }}</span>
+                    <collection.Field
+                      class={{if mapping.moved "--unmapped"}}
+                      @description={{if
+                        mapping.moved
+                        (i18n "salesforce.guided_sync.field_moved")
+                      }}
+                      @format="full"
+                      @name="destination"
+                      @onSet={{fn this.setMapping "destination"}}
+                      @showTitle={{false}}
+                      @title={{i18n "salesforce.guided_sync.salesforce_field"}}
+                      @type="menu"
+                      @validation="required"
+                      as |field|
+                    >
+                      <SalesforceFieldMenu
+                        @control={{field.Control}}
+                        @value={{mapping.destination}}
+                        @fields={{this.fields}}
+                        @mappings={{this.configuration.mappings}}
+                        @mappingId={{mapping.id}}
+                        @sources={{this.sources}}
+                      />
+                    </collection.Field>
+                    <collection.Field
+                      @format="full"
+                      @name="policy"
+                      @showTitle={{false}}
+                      @onSet={{fn this.setMapping "policy"}}
+                      @title={{i18n "salesforce.guided_sync.existing_value"}}
+                      @type="select"
+                      @validation="required"
+                      as |field|
+                    >
+                      <field.Control
+                        aria-label={{i18n
+                          "salesforce.guided_sync.existing_value"
+                        }}
+                        @includeNone={{false}}
+                        as |select|
+                      >
+                        <select.Option @value="keep">{{i18n
+                            "salesforce.guided_sync.keep"
+                          }}</select.Option>
+                        <select.Option @value="overwrite">{{i18n
+                            "salesforce.guided_sync.overwrite"
+                          }}</select.Option>
+                      </field.Control>
+                    </collection.Field>
+                    <DButton
+                      class="btn-transparent salesforce-guided-sync__remove"
+                      data-test-remove-mapping={{mapping.id}}
+                      @action={{fn this.removeMapping index}}
+                      @icon="trash-can"
+                      @title="salesforce.guided_sync.remove_mapping"
+                    />
                   </div>
-                {{else}}
-                  <p data-test-preview-empty>{{i18n
-                      "salesforce.guided_sync.no_eligible_members"
-                    }}</p>
-                {{/if}}
-              </DConditionalLoadingSpinner>
-            </:content>
-          </AdminConfigAreaCard>
-        {{/if}}
+                </form.Collection>
+              </div>
+              <div class="salesforce-guided-sync__actions --spread">
+                <DButton
+                  class="btn-flat"
+                  data-test-add-mapping
+                  @action={{this.addMapping}}
+                  @icon="plus"
+                  @label="salesforce.guided_sync.add_mapping"
+                />
+                <DButton
+                  class="btn-flat"
+                  data-test-refresh-fields
+                  @action={{this.refreshFields}}
+                  @disabled={{this.loadingFields}}
+                  @icon="arrows-rotate"
+                  @label="salesforce.guided_sync.refresh_fields"
+                />
+              </div>
+              {{#if this.error}}
+                <form.Alert
+                  @type="error"
+                  @icon="triangle-exclamation"
+                >{{this.error}}</form.Alert>
+              {{/if}}
+            {{/if}}
+          </DConditionalLoadingSpinner>
 
+        </section>
+        <section
+          class="salesforce-guided-sync__section"
+          data-test-preview-section
+          aria-labelledby="salesforce-preview-title"
+        >
+          <h3 id="salesforce-preview-title">{{i18n
+              "salesforce.guided_sync.preview_title"
+            }}</h3>
+          <p class="salesforce-guided-sync__description">{{i18n
+              "salesforce.guided_sync.review_description"
+            }}</p>
+          {{#if this.previewDisabled}}
+            <p>{{i18n "salesforce.guided_sync.preview_unavailable"}}</p>
+          {{else}}
+            <DConditionalLoadingSpinner
+              data-test-preview-loading
+              @condition={{this.loadingPreview}}
+            >
+              <div class="salesforce-guided-sync__preview-heading">
+
+                {{#if this.configuration.groups.length}}
+                  {{#if this.samplePreview}}<span
+                      data-test-sample-preview
+                    >{{i18n
+                        "salesforce.guided_sync.sample_user"
+                      }}</span>{{else}}
+                    <form.Field
+                      @name="previewMember"
+                      @showOptional={{false}}
+                      @title={{i18n "salesforce.guided_sync.preview_user"}}
+                      @type="menu"
+                      as |field|
+                    >
+                      <field.Control
+                        @selection={{this.previewUser.username}}
+                        as |menu|
+                      >
+                        <menu.Container>
+                          <DFilterInput
+                            aria-label={{i18n
+                              "salesforce.guided_sync.search_members"
+                            }}
+                            placeholder={{i18n
+                              "salesforce.guided_sync.search_members"
+                            }}
+                            @value={{this.previewQuery}}
+                            @filterAction={{this.filterPreviewUsers}}
+                          />
+                        </menu.Container>
+                        {{#if this.loadingPreviewUsers}}
+                          <menu.Container><DConditionalLoadingSpinner
+                              @condition={{true}}
+                            /></menu.Container>
+                        {{else if this.previewUsersError}}
+                          <menu.Container><p
+                            >{{this.previewUsersError}}</p></menu.Container>
+                        {{else}}
+                          {{#each this.previewUsers as |user|}}
+                            <menu.Item
+                              @action={{fn this.selectPreviewUser user}}
+                              @value={{user.id}}
+                            >
+                              {{user.username}}{{#if user.name}}
+                                ·
+                                {{user.name}}{{/if}}
+                            </menu.Item>
+                          {{else}}
+                            <menu.Container><p>{{i18n
+                                  "salesforce.guided_sync.no_matching_members"
+                                }}</p></menu.Container>
+                          {{/each}}
+                        {{/if}}
+                      </field.Control>
+                    </form.Field>{{/if}}{{/if}}
+              </div>
+
+              {{#if this.samplePreview}}<p>{{i18n
+                    "salesforce.guided_sync.sample_preview_help"
+                  }}</p>{{/if}}
+              {{#if this.previewError}}
+                <form.Alert @type="error">{{this.previewError}}</form.Alert>
+                <DButton
+                  class="btn-flat"
+                  data-test-retry-preview
+                  @action={{this.loadPreview}}
+                  @label="salesforce.guided_sync.retry_fields"
+                />
+              {{else}}
+                <div class="salesforce-guided-sync__preview-table">
+                  <table class="d-table">
+                    <thead class="d-table__header"><tr>
+                        <th>{{i18n
+                            "salesforce.guided_sync.salesforce_field"
+                          }}</th>
+                        <th>{{i18n
+                            "salesforce.guided_sync.discourse_value"
+                          }}</th>
+                        <th>{{i18n "salesforce.guided_sync.current_value"}}</th>
+                        <th>{{i18n "salesforce.guided_sync.after_sync"}}</th>
+                      </tr></thead>
+                    <tbody class="d-table__body">
+                      {{#each this.preview as |row|}}
+                        <tr
+                          class="d-table__row"
+                          data-test-preview-field={{row.field}}
+                        >
+                          <td class="d-table__cell --overview"><code
+                            >{{row.field}}</code></td>
+                          <td class="d-table__cell --detail"><div
+                              class="d-table__mobile-label"
+                            >{{i18n
+                                "salesforce.guided_sync.discourse_value"
+                              }}</div>{{row.incoming}}</td>
+                          <td class="d-table__cell --detail"><div
+                              class="d-table__mobile-label"
+                            >{{i18n
+                                "salesforce.guided_sync.current_value"
+                              }}</div>{{row.current}}</td>
+                          <td class="d-table__cell --detail"><div
+                              class="d-table__mobile-label"
+                            >{{i18n
+                                "salesforce.guided_sync.after_sync"
+                              }}</div><strong>{{row.result}}</strong></td>
+                        </tr>
+                      {{/each}}
+                    </tbody>
+                  </table>
+                </div>
+              {{/if}}
+            </DConditionalLoadingSpinner>
+          {{/if}}
+        </section>
         <form.Actions class="salesforce-guided-sync__footer">
+          <span class="salesforce-guided-sync__save-help">{{i18n
+              (if
+                @record.active
+                "salesforce.guided_sync.save_existing_help"
+                "salesforce.guided_sync.save_new_help"
+              )
+            }}</span>
           {{#if @onCancel}}
             <DButton
               class="btn-flat"
@@ -1112,27 +1103,13 @@ export default class SalesforceGuidedSync extends Component {
               @label="salesforce.guided_sync.cancel_setup"
             />
           {{/if}}
-          {{#if this.canGoBack}}
-            <DButton
-              class="btn-default"
-              @action={{this.previousStep}}
-              @label="salesforce.guided_sync.back"
-            />
-          {{/if}}
           <form.Submit
-            data-test-continue
-            @disabled={{this.continueDisabled}}
+            data-test-save
+            @disabled={{this.saveDisabled}}
             @label={{this.submitLabel}}
           />
         </form.Actions>
       </Form>
-
-      {{#if this.message}}
-        <p
-          class="alert alert-success salesforce-guided-sync__message"
-          data-test-demo-message
-        >{{this.message}}</p>
-      {{/if}}
 
     </div>
   </template>

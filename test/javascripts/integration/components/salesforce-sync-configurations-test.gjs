@@ -23,6 +23,7 @@ module(
         { "Content-Type": "application/json" },
         JSON.stringify({
           fields: [
+            "Email",
             "FirstName",
             "LastName",
             "Description",
@@ -30,6 +31,16 @@ module(
             "LeadSource",
           ].map((name) => ({ name, type: "string" })),
         }),
+      ]);
+      pretender.get("/salesforce/admin/guided-sync/preview-users.json", () => [
+        200,
+        { "Content-Type": "application/json" },
+        JSON.stringify({ users: [] }),
+      ]);
+      pretender.post("/salesforce/admin/guided-sync/preview.json", () => [
+        200,
+        { "Content-Type": "application/json" },
+        JSON.stringify({ user: null, sample: true, rows: [] }),
       ]);
       this.groups = [
         { name: "community-members", user_count: 248 },
@@ -87,8 +98,7 @@ module(
       );
       await click("[data-test-sync-users]");
       await selectSyncGroups("customers");
-      await click('[data-test-step="review"]');
-      await click("[data-test-continue]");
+      await click("[data-test-save]");
       assert
         .dom('[data-test-configuration="saved"]')
         .exists("shows the saved configuration in the list");
@@ -97,9 +107,10 @@ module(
         .doesNotExist("closes the wizard after creation");
       assert.strictEqual(closes, 1, "clears the configuration query parameter");
       await click('[data-test-configuration="saved"] button');
+      await click("[data-test-edit-name]");
       await fillIn('[data-name="name"] input', "Updated user sync");
-      await click('[data-test-step="review"]');
-      await click("[data-test-continue]");
+      await click('.salesforce-guided-sync__name-form button[type="submit"]');
+      await click("[data-test-save]");
       assert
         .dom('[data-test-configuration="saved"]')
         .includesText("Updated user sync", "shows the updated configuration");
@@ -153,7 +164,6 @@ module(
       assert
         .dom('[data-name="groups"]')
         .includesText("customers", "preserves the independent Contact group");
-      await click('[data-test-step="behavior"]');
       assert.strictEqual(
         formKit().field("schedule").value(),
         "weekly",
@@ -162,17 +172,14 @@ module(
       await click("[data-test-configurations-back]");
       await click(".dialog-footer .btn-danger");
       await click("[data-test-sync-users]");
-      await click('[data-test-step="scope"]');
       assert.strictEqual(
         formKit().field("object").value(),
         "Lead",
         "starts a new Lead configuration"
       );
-      assert.strictEqual(
-        formKit().field("name").value(),
-        "User sync",
-        "provides a default configuration name"
-      );
+      assert
+        .dom(".salesforce-guided-sync__heading")
+        .includesText("User sync", "provides a default configuration name");
       await click("[data-test-configurations-back]");
       await click(".dialog-footer .btn-danger");
       assert
@@ -209,10 +216,11 @@ module(
           <SalesforceSyncConfigurations
             @groups={{this.groups}}
             @credentialsConfigured={{true}}
-          />
+          /><DialogHolder />
         </template>
       );
       await click("[data-test-sync-users]");
+      await click("[data-test-edit-name]");
       const selector = '[data-name="name"] input';
       await focus(selector);
       await fillIn(selector, "New");
@@ -253,7 +261,9 @@ module(
           />
         </template>
       );
-      assert.strictEqual(formKit().field("name").value(), "Contact sync");
+      assert
+        .dom(".salesforce-guided-sync__heading")
+        .includesText("Contact sync");
       assert.strictEqual(formKit().field("object").value(), "Contact");
       await click("[data-test-configurations-back]");
       await click(".dialog-footer .btn-danger");

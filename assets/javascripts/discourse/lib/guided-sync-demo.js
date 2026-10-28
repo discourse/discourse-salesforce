@@ -19,6 +19,16 @@ export const DEMO_SOURCES = [
   { id: "static", type: "text" },
 ];
 
+export function createCompanyMapping(id) {
+  return {
+    id,
+    source: "static",
+    value: "Unknown",
+    destination: "Company",
+    policy: "keep",
+  };
+}
+
 export function createDemoConfiguration() {
   return {
     previewUser: "alex",
@@ -30,7 +40,7 @@ export function createDemoConfiguration() {
       { id: 1, source: "first", destination: "FirstName", policy: "keep" },
       { id: 2, source: "last", destination: "LastName", policy: "keep" },
       { id: 3, source: "profile", destination: "Description", policy: "keep" },
-      { id: 6, source: "company", destination: "Company", policy: "overwrite" },
+      createCompanyMapping(6),
     ],
   };
 }

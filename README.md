@@ -146,15 +146,14 @@ sObject Collections, not the asynchronous Bulk API 2.0.
 
 ### Member previews
 
-Review automatically previews the first eligible member (ordered by username). Administrators
+The preview section below field mapping automatically previews the first eligible member (ordered by username). Administrators
 can search eligible members of the selected groups and preview unsaved mappings for another
 member. Discourse values come from the selected member; Salesforce values are examples,
 clearly labeled in the UI. Preview loads Salesforce field metadata to validate mappings and
 format values, but does not look up Salesforce records or stored record links. It applies
 the same mapping conversions and ownership rules as sync without writing records or sync
-status. A selection with no eligible members shows an empty state. Sample values illustrate field ownership and
-are not a prediction of the member's actual Salesforce record.
-
+status. A selection with no eligible members shows clearly labeled sample data. Sample values
+illustrate field ownership and are not a prediction of the member's actual Salesforce record.
 
 ### Stored activity and custom user fields
 
@@ -181,11 +180,13 @@ Sync configurations can select multiple groups. Membership uses the union of tho
 backfill and scheduled batches deduplicate users before paging. A user remains eligible until
 they leave every selected group. Existing single-group configurations remain supported and
 are stored with group arrays when next saved. The group picker reloads available groups when
-searching. A small creation modal uses the core group endpoint and selects the new group
-without leaving the wizard. Groups are created immediately with the standard public visibility
-and remain available if the sync setup is canceled; membership is managed from Groups.
+searching. The group picker’s “Create a group” footer action opens a small modal using the core group endpoint and selects the new group
+without leaving the configuration page. Groups are invite-only, with group-owner visibility for both the group and its member list.
+Mentions, messages, and assignment levels are set to nobody. Membership requests and public
+joining/leaving are disabled. Groups remain available if the sync setup is canceled;
+membership is managed from Groups.
 
-When selected groups have no eligible users, Review shows a clearly labeled sample user
+When selected groups have no eligible users, the preview section shows a clearly labeled sample user
 using generated Discourse values and sample Salesforce values. Static mapping values still
 come from the configuration, and the normal mapping and ownership rules apply. No user is
 created or saved. Errors fetching preview data remain errors rather than using sample data.
@@ -195,3 +196,15 @@ onJoin/onChange options are ignored. Backfill and the activity refresh schedule 
 After a successful individual sync, a digest of mapped values and mapping settings lets
 unchanged profile-change jobs return before contacting Salesforce. Scheduled and group-join
 syncs still check Salesforce. Failed attempts never advance the digest, so retries remain valid.
+
+The configuration editor is a single page: group/object selection, sync behavior, and field
+mapping, followed by a separate preview section with a user selector and comparison table. Salesforce metadata loads on entry and when the target object
+changes. Group and mapping edits invalidate old preview results and debounce a new preview;
+request counters discard late responses. Invalid mappings block saving and preview requests.
+Preview failures offer a retry without blocking an otherwise valid configuration from saving.
+
+New Lead configurations explicitly map static text `Unknown` to Salesforce `Company`,
+preserving non-empty Salesforce values by default. Admins can edit the text or select any
+compatible source, including a configured custom user field named Company. Contacts do not
+receive this default mapping. The legacy Company source remains supported only for existing
+mappings, preserving their custom-field lookup and `None` fallback until an admin remaps them.

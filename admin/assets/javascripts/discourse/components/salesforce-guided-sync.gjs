@@ -22,12 +22,12 @@ import SalesforceFieldMenu from "discourse/plugins/discourse-salesforce/discours
 import SalesforceSourceMenu from "discourse/plugins/discourse-salesforce/discourse/components/salesforce-source-menu";
 import {
   createCompanyMapping,
-  createDemoConfiguration,
-  DEMO_SOURCES,
+  createSyncConfiguration,
   mappingError,
   normalizeConfiguration,
   updateMapping,
-} from "discourse/plugins/discourse-salesforce/discourse/lib/guided-sync-demo";
+  USER_SYNC_SOURCES,
+} from "discourse/plugins/discourse-salesforce/discourse/lib/sync-configuration";
 
 const PREFIX = "salesforce.guided_sync";
 
@@ -37,7 +37,7 @@ export default class SalesforceGuidedSync extends Component {
   @service modal;
 
   @tracked configuration = normalizeConfiguration(
-    this.args.record || createDemoConfiguration()
+    this.args.record || createSyncConfiguration()
   );
   @tracked createdGroups = [];
   @tracked nameFormData;
@@ -120,7 +120,7 @@ export default class SalesforceGuidedSync extends Component {
 
   get sources() {
     return [
-      ...DEMO_SOURCES.filter(
+      ...USER_SYNC_SOURCES.filter(
         (source) =>
           source.id !== "company" ||
           this.configuration.mappings.some(

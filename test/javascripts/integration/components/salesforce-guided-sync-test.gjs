@@ -12,7 +12,7 @@ import { setupRenderingTest } from "discourse/tests/helpers/component-test";
 import pretender from "discourse/tests/helpers/create-pretender";
 import formKit from "discourse/tests/helpers/form-kit-helper";
 import SalesforceGuidedSync from "discourse/plugins/discourse-salesforce/discourse/components/salesforce-guided-sync";
-import { createDemoConfiguration } from "discourse/plugins/discourse-salesforce/discourse/lib/guided-sync-demo";
+import { createSyncConfiguration } from "discourse/plugins/discourse-salesforce/discourse/lib/sync-configuration";
 import selectSyncGroups from "../../helpers/select-sync-groups";
 import { buildPreview, DEMO_FIELDS } from "../../helpers/sync-preview-fixtures";
 
@@ -580,7 +580,7 @@ module("Integration | Component | SalesforceGuidedSync", function (hooks) {
   });
 
   test("legacy fixed values open as editable static text", async function (assert) {
-    this.record = createDemoConfiguration();
+    this.record = createSyncConfiguration();
     this.record.mappings[4] = {
       id: 7,
       source: "source",
@@ -656,7 +656,7 @@ module("Integration | Component | SalesforceGuidedSync", function (hooks) {
       .dom("[data-test-save]")
       .isEnabled("new Contact defaults do not assume custom or Company fields");
     this.record = {
-      ...createDemoConfiguration(),
+      ...createSyncConfiguration(),
       id: "saved",
       group: "customers",
       object: "Contact",

@@ -5,7 +5,7 @@ import { setupRenderingTest } from "discourse/tests/helpers/component-test";
 import pretender from "discourse/tests/helpers/create-pretender";
 import formKit from "discourse/tests/helpers/form-kit-helper";
 import SalesforceSyncConfigurations from "discourse/plugins/discourse-salesforce/discourse/components/salesforce-sync-configurations";
-import { createDemoConfiguration } from "discourse/plugins/discourse-salesforce/discourse/lib/guided-sync-demo";
+import { createSyncConfiguration } from "discourse/plugins/discourse-salesforce/discourse/lib/sync-configuration";
 import selectSyncGroups from "../../helpers/select-sync-groups";
 
 module(
@@ -49,7 +49,7 @@ module(
       ];
     });
 
-    test("post sync deep links cannot open the removed wizard", async function (assert) {
+    test("post sync deep links cannot open the disabled post configuration", async function (assert) {
       await render(
         <template>
           <SalesforceSyncConfigurations
@@ -63,7 +63,7 @@ module(
         .isDisabled("shows the disabled choice");
       assert
         .dom(".salesforce-guided-sync")
-        .doesNotExist("does not open a wizard");
+        .doesNotExist("does not open an editor");
     });
 
     test("returns to the configuration list after creating and editing a configuration", async function (assert) {
@@ -104,7 +104,7 @@ module(
         .exists("shows the saved configuration in the list");
       assert
         .dom(".salesforce-guided-sync")
-        .doesNotExist("closes the wizard after creation");
+        .doesNotExist("closes the editor after creation");
       assert.strictEqual(closes, 1, "clears the configuration query parameter");
       await click('[data-test-configuration="saved"] button');
       await click("[data-test-edit-name]");
@@ -120,13 +120,13 @@ module(
     test("opens independent saved Lead and Contact configurations", async function (assert) {
       this.records = [
         {
-          ...createDemoConfiguration(),
+          ...createSyncConfiguration(),
           id: "lead",
           name: "Lead sync",
           groups: ["partners"],
         },
         {
-          ...createDemoConfiguration(),
+          ...createSyncConfiguration(),
           id: "contact",
           name: "Contact sync",
           object: "Contact",
@@ -145,10 +145,6 @@ module(
         </template>
       );
       await click('[data-test-configuration="lead"] button');
-      assert
-        .dom('[data-test-step="connect"]')
-        .doesNotExist("starts directly at scope");
-      assert.dom("[data-test-connect-demo]").doesNotExist();
       assert
         .dom('[data-name="groups"]')
         .includesText("partners", "loads the Lead group");
@@ -235,12 +231,12 @@ module(
     test("opens the configuration identified by a direct link", async function (assert) {
       this.records = [
         {
-          ...createDemoConfiguration(),
+          ...createSyncConfiguration(),
           id: "lead",
           name: "Lead sync",
         },
         {
-          ...createDemoConfiguration(),
+          ...createSyncConfiguration(),
           id: "contact",
           name: "Contact sync",
           object: "Contact",
@@ -282,12 +278,12 @@ module(
       );
       this.records = [
         {
-          ...createDemoConfiguration(),
+          ...createSyncConfiguration(),
           id: "lead",
           name: "<b>Lead sync</b>",
         },
         {
-          ...createDemoConfiguration(),
+          ...createSyncConfiguration(),
           id: "contact",
           object: "Contact",
           name: "Contact sync",

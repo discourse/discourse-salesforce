@@ -1,4 +1,4 @@
-export const DEMO_SOURCES = [
+export const USER_SYNC_SOURCES = [
   { id: "first", type: "text" },
   { id: "last", type: "text" },
   { id: "profile", type: "text" },
@@ -29,9 +29,8 @@ export function createCompanyMapping(id) {
   };
 }
 
-export function createDemoConfiguration() {
+export function createSyncConfiguration() {
   return {
-    previewUser: "alex",
     groups: [],
     object: "Lead",
     schedule: "daily",
@@ -55,6 +54,7 @@ export function normalizeConfiguration(configuration) {
   delete normalized.group;
   delete normalized.onJoin;
   delete normalized.onChange;
+  delete normalized.previewUser;
   normalized.mappings = normalized.mappings.map((mapping) =>
     mapping.source === "source"
       ? { ...mapping, source: "static", value: "Community" }
@@ -63,7 +63,11 @@ export function normalizeConfiguration(configuration) {
   return normalized;
 }
 
-export function mappingError(configuration, fields, sources = DEMO_SOURCES) {
+export function mappingError(
+  configuration,
+  fields,
+  sources = USER_SYNC_SOURCES
+) {
   for (const mapping of configuration.mappings) {
     if (!mapping.source || !mapping.destination) {
       return "incomplete";

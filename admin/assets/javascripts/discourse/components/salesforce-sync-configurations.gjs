@@ -12,7 +12,7 @@ import DPageSubheader from "discourse/ui-kit/d-page-subheader";
 import { i18n } from "discourse-i18n";
 import SalesforceDeleteSyncConfirmation from "discourse/plugins/discourse-salesforce/discourse/components/salesforce-delete-sync-confirmation";
 import SalesforceGuidedSync from "discourse/plugins/discourse-salesforce/discourse/components/salesforce-guided-sync";
-import { createDemoConfiguration } from "discourse/plugins/discourse-salesforce/discourse/lib/guided-sync-demo";
+import { createSyncConfiguration } from "discourse/plugins/discourse-salesforce/discourse/lib/sync-configuration";
 
 export default class SalesforceSyncConfigurations extends Component {
   @service a11y;
@@ -64,7 +64,7 @@ export default class SalesforceSyncConfigurations extends Component {
     this.selected = {
       key: "new-users",
       configuration: {
-        ...createDemoConfiguration(),
+        ...createSyncConfiguration(),
         kind: "users",
         name: i18n("salesforce.guided_sync.default_users_name"),
       },

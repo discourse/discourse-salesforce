@@ -69,7 +69,7 @@ Admin → Upcoming changes. Configure the existing JWT API credentials, then ope
 
 Saving a user configuration validates its fields against Salesforce and activates
 real Lead or Contact sync for members of any selected group. Previously saved demo configurations
-remain inactive until saved again. The confirmation preview compares real Discourse member values with sample Salesforce values without reading or writing Salesforce records.
+remain inactive until saved again. The preview section compares real Discourse member values with sample Salesforce values without reading or writing Salesforce records.
 
 - Backfill queues existing group members on first activation, when enabled again, or
   when changing the selected groups. It queues one batch job per 100 eligible users. Scheduled refreshes use the same path.
@@ -85,7 +85,8 @@ remain inactive until saved again. The confirmation preview compares real Discou
 `Jobs::SyncSalesforceUser` dispatches configuration jobs to
 `Salesforce::ConfiguredUserSync`, reusing the API client, Person email lookup, and
 Lead/Contact definitions. It does not change legacy global sync settings or case jobs.
-No Workflows dependency or core changes are required. Sync posts is Coming soon.
+There is no Workflows dependency. The group picker uses the optional core `DMultiSelect`
+footer slot for group creation. Sync posts is Coming soon.
 
 Email is matched within the selected object. Multiple matches fail without writing.
 Successful matching/creation retains an object/user link in PluginStore, pinned to the
@@ -98,8 +99,9 @@ once-only creation cannot be guaranteed against concurrent external writers.
 Each mapping preserves nonempty Salesforce values or overwrites them as selected.
 Empty Discourse values never clear a Salesforce field. New records use Discourse values.
 Names use the existing plugin splitting rules, including a last-name fallback for
-single-word names. Company reads the custom profile field named Company (case-insensitive),
-falling back to `None`. LeadSource can be mapped to optional static text. Administrators must
+single-word names. New Lead configurations map editable static text `Unknown` to Company.
+Legacy Company mappings retain their custom-field lookup and `None` fallback. LeadSource
+can be mapped to optional static text. Administrators must
 map values accepted by their org's picklists and validation rules; Salesforce rejects
 invalid payloads and the job records the failure. No implicit AccountId lookup occurs.
 Configured custom user fields are available as mapping sources; internal custom-field keys are not exposed.
@@ -117,7 +119,7 @@ retry for that user clears the error. Mapping changes require saving the configu
 queued jobs always use the latest saved mappings.
 
 The Configurations tab clears selection and returns to the list. Successful saves
-return there with a toast. Wizard forms keep stable FormKit data to preserve focus.
+return there with a toast. Configuration forms keep stable FormKit data to preserve focus.
 
 Use **Add field**, then choose **Static text** as a mapping source to send a constant string, such as `Discourse`
 to `LeadSource`. Static values must contain 1–1,000 characters and use the same

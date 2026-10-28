@@ -6,7 +6,7 @@ module Salesforce
 
     def self.all
       (PluginStore.get(PLUGIN_NAME, STORE_KEY) || []).map do |record|
-        record.except("workflows", "onJoin", "onChange")
+        record.except("workflows", "onJoin", "onChange").reverse_merge("provider" => "salesforce")
       end
     end
 
@@ -43,7 +43,9 @@ module Salesforce
 
     def self.active
       return [] unless enabled?
-      all.select { |record| record["active"] && record["kind"] == "users" }
+      all.select do |record|
+        record["active"] && record["kind"] == "users" && record["provider"] == "salesforce"
+      end
     end
 
     def self.reason_enabled?(record, reason)
@@ -56,21 +58,6 @@ module Salesforce
         record["schedule"] != "manual"
       else
         false
-      end
-    end
-
-    def self.enqueue_user(user, reason:, group_id: nil, excluding_group_id: nil)
-      active.each do |record|
-        next unless reason_enabled?(record, reason)
-        next if group_id && !group_ids(record).include?(group_id)
-        next if excluding_group_id && group_ids(record).include?(excluding_group_id)
-        next unless GroupUser.exists?(group_id: group_ids(record), user_id: user.id)
-        Jobs.enqueue(
-          :sync_salesforce_user,
-          user_id: user.id,
-          configuration_id: record["id"],
-          reason: reason,
-        )
       end
     end
 
@@ -107,6 +94,10 @@ module Salesforce
 
       configuration = configuration.deep_stringify_keys
       configuration["kind"] ||= "users"
+      configuration["provider"] ||= "salesforce"
+      unless configuration["provider"] == "salesforce"
+        raise Discourse::InvalidParameters.new(:provider)
+      end
       groups = resolve_groups!(group_names(configuration))
       valid_object = %w[Lead Contact].include?(configuration["object"])
       unless configuration["name"].present? && configuration["name"].length <= 60 &&
@@ -146,20 +137,7 @@ module Salesforce
           STORE_KEY,
           records.reject { |entry| entry["id"] == record_id } + [record],
         )
-        if !previous || !previous["active"] || previous["schedule"] != record["schedule"]
-          PluginStore.set(PLUGIN_NAME, "configuration_scheduled_at:#{record_id}", Time.now.to_i)
-        end
-        if record["backfill"] &&
-             (
-               !previous || !previous["active"] || !previous["backfill"] ||
-                 group_ids(previous).sort != group_ids(record).sort
-             )
-          Jobs.enqueue(
-            :sync_salesforce_configuration,
-            configuration_id: record_id,
-            reason: "backfill",
-          )
-        end
+        ConfigurationScheduler.configuration_saved(record, previous: previous)
         record
       end
     end

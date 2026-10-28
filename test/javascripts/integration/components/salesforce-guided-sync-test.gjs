@@ -719,6 +719,23 @@ module("Integration | Component | SalesforceGuidedSync", function (hooks) {
       .isDisabled("missing mapped fields must be repaired");
   });
 
+  test("shows the server connection error when loading fields fails", async function (assert) {
+    const message =
+      "Salesforce denied access. Check the integration user’s object and field permissions, then retry.";
+    pretender.get("/salesforce/admin/guided-sync/fields.json", () => [
+      502,
+      { "Content-Type": "application/json" },
+      JSON.stringify({ errors: [message], error_type: "permissions" }),
+    ]);
+    await render(
+      <template><SalesforceGuidedSync @groups={{this.groups}} /></template>
+    );
+    assert
+      .dom(".salesforce-guided-sync")
+      .includesText(message, "explains how to resolve the connection error");
+    assert.dom("[data-test-save]").isDisabled("blocks saving without metadata");
+  });
+
   test("moving a destination requires repairing its previous mapping", async function (assert) {
     await render(
       <template><SalesforceGuidedSync @groups={{this.groups}} /></template>

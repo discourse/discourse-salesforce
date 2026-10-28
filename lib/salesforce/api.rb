@@ -86,7 +86,7 @@ module ::Salesforce
             status: response.status,
           )
         e.set_backtrace(caller)
-        Discourse.warn_exception(e, message: I18n.t(INVALID_RESPONSE), env: { api_uri: uri })
+        ConnectionError.log(e, operation: "api")
         raise e
       end
     end
@@ -120,9 +120,15 @@ module ::Salesforce
         ProblemCheckTracker[:salesforce_app_not_approved].problem!
       end
       if status >= 300 && SiteSetting.salesforce_api_error_logs
-        Rails.logger.error("Salesforce API error: #{status} #{body}")
+        Rails.logger.error("Salesforce authentication request failed: status=#{status}")
       end
 
+      if status == 429 || status >= 500
+        raise Salesforce::InvalidApiResponse.new(
+                "Authentication service unavailable",
+                status: status,
+              )
+      end
       if status != 200
         ProblemCheckTracker[:salesforce_invalid_credentials].problem!
         raise Salesforce::InvalidCredentials

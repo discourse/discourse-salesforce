@@ -30,6 +30,12 @@ en:
       sample_value: "Example value"
     error:
       preview_unavailable: "Could not load the preview. Check the Salesforce connection and field permissions, then try again."
+      connection:
+        authentication: "Salesforce authentication failed. Check the API credentials and the integration user’s app authorization, then retry."
+        permissions: "Salesforce denied access. Check the integration user’s object and field permissions, then retry."
+        rate_limit: "Salesforce’s API request limit was reached. Try again later."
+        temporary: "Salesforce could not be reached or is temporarily unavailable. Try again shortly."
+        invalid_response: "Salesforce returned an unexpected response. Check the server logs for details, then retry."
       fields_unavailable: "Could not load Salesforce fields. Check the connection and permissions, then try again."
       ambiguous_email_match: "Multiple Salesforce %{object_name} records have the same email"
       invalid_response: "Invalid response from Salesforce API"

@@ -45,7 +45,9 @@ RSpec.describe Salesforce::GuidedSyncController do
       expect(response).to have_http_status(:not_found)
       delete "/salesforce/admin/guided-sync/configurations/existing.json"
       expect(response).to have_http_status(:not_found)
-      expect(Salesforce::GuidedSyncConfiguration.all).to eq([record])
+      expect(Salesforce::GuidedSyncConfiguration.all).to eq(
+        [record.merge("provider" => "salesforce")],
+      )
     end
   end
 
@@ -133,8 +135,30 @@ RSpec.describe Salesforce::GuidedSyncController do
       get "/salesforce/admin/guided-sync/fields.json", params: { object: "Lead" }
       expect(response).to have_http_status(:bad_gateway)
       expect(response.parsed_body.fetch("errors")).to eq(
-        [I18n.t("salesforce.error.fields_unavailable")],
+        [I18n.t("salesforce.error.connection.temporary")],
       )
+    end
+
+    it "distinguishes authentication, permission, rate limit and network failures" do
+      sign_in(admin)
+      {
+        401 => "authentication",
+        403 => "permissions",
+        429 => "rate_limit",
+      }.each do |status, category|
+        stub_request(:get, "#{api_path}/Lead/describe").to_return(
+          status: status,
+          body: "private upstream details",
+        )
+        get "/salesforce/admin/guided-sync/fields.json", params: { object: "Lead" }
+        expect(response.parsed_body).to eq(
+          "error_type" => category,
+          "errors" => [I18n.t("salesforce.error.connection.#{category}")],
+        )
+      end
+      stub_request(:get, "#{api_path}/Lead/describe").to_timeout
+      get "/salesforce/admin/guided-sync/fields.json", params: { object: "Lead" }
+      expect(response.parsed_body["error_type"]).to eq("temporary")
     end
 
     it "restricts metadata requests to admins, the feature flag, and supported objects" do
@@ -410,7 +434,9 @@ RSpec.describe Salesforce::GuidedSyncController do
           },
           as: :json
       expect(response).to have_http_status(:bad_request)
-      expect(Salesforce::GuidedSyncConfiguration.all).to eq([record])
+      expect(Salesforce::GuidedSyncConfiguration.all).to eq(
+        [record.merge("provider" => "salesforce")],
+      )
     end
 
     it "rejects non-admin configuration reads and writes" do
@@ -438,7 +464,9 @@ RSpec.describe Salesforce::GuidedSyncController do
       expect(response).to have_http_status(:forbidden)
       delete "/salesforce/admin/guided-sync/configurations/#{record.fetch("id")}.json"
       expect(response).to have_http_status(:forbidden)
-      expect(Salesforce::GuidedSyncConfiguration.all).to eq([record])
+      expect(Salesforce::GuidedSyncConfiguration.all).to eq(
+        [record.merge("provider" => "salesforce")],
+      )
     end
 
     it "keeps legacy configurations readable without obsolete options" do
@@ -453,7 +481,7 @@ RSpec.describe Salesforce::GuidedSyncController do
       get "/salesforce/admin/guided-sync/configurations.json"
       expect(
         response.parsed_body.fetch("configurations").map { |item| item.except("sync_status") },
-      ).to eq([record.except("workflows", "onJoin", "onChange")])
+      ).to eq([record.except("workflows", "onJoin", "onChange").merge("provider" => "salesforce")])
     end
   end
 end

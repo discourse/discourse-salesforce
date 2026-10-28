@@ -74,7 +74,7 @@ after_initialize do
 
   add_model_callback(User, :after_commit, on: :update) do
     if saved_change_to_active?(from: false, to: true)
-      Salesforce::GuidedSyncConfiguration.enqueue_user(self, reason: "join")
+      Salesforce::ConfigurationScheduler.enqueue_user(self, reason: "join")
     end
     if saved_change_to_active?(from: false, to: true) && ::Salesforce::Api.has_credentials?
       Jobs.enqueue(:sync_salesforce_user, user_id: self.id)
@@ -82,8 +82,8 @@ after_initialize do
   end
 
   on(:user_added_to_group) do |user, group, **opts|
-    Salesforce::GuidedSyncConfiguration.enqueue_user(user, reason: "join", group_id: group.id)
-    Salesforce::GuidedSyncConfiguration.enqueue_user(
+    Salesforce::ConfigurationScheduler.enqueue_user(user, reason: "join", group_id: group.id)
+    Salesforce::ConfigurationScheduler.enqueue_user(
       user,
       reason: "change",
       excluding_group_id: group.id,
@@ -91,15 +91,15 @@ after_initialize do
   end
 
   on(:user_updated) do |user, *args|
-    Salesforce::GuidedSyncConfiguration.enqueue_user(user, reason: "change")
+    Salesforce::ConfigurationScheduler.enqueue_user(user, reason: "change")
   end
 
   on(:user_removed_from_group) do |user, group, *args|
-    Salesforce::GuidedSyncConfiguration.enqueue_user(user, reason: "change")
+    Salesforce::ConfigurationScheduler.enqueue_user(user, reason: "change")
   end
 
   on(:user_first_logged_in) do |user|
-    Salesforce::GuidedSyncConfiguration.enqueue_user(user, reason: "change")
+    Salesforce::ConfigurationScheduler.enqueue_user(user, reason: "change")
   end
 
   on(:post_created) do |post, opts|

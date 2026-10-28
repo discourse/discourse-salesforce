@@ -180,7 +180,7 @@ RSpec.describe Salesforce::GuidedSyncController do
     )
     post "/salesforce/admin/guided-sync/preview.json", params: { configuration: configuration }
     expect(response).to have_http_status(:bad_gateway)
-    expect(response.parsed_body["errors"]).to eq([I18n.t("salesforce.error.preview_unavailable")])
+    expect(response.parsed_body["errors"]).to eq([I18n.t("salesforce.error.connection.temporary")])
   end
 
   it "restricts previews to admins and the feature flag and validates mappings and objects" do

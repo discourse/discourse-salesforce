@@ -257,7 +257,9 @@ RSpec.describe Jobs::SyncSalesforceUser do
 
       logger = track_log_messages { described_class.new.execute(user_id: user.id) }
 
-      expect(logger.warnings.grep(/Invalid response from Salesforce API/).length).to eq(1)
+      expect(logger.warnings).to include(
+        "Salesforce request failed: operation=api category=invalid_response status=400",
+      )
     end
 
     it "links a matching lead instead of creating a contact" do

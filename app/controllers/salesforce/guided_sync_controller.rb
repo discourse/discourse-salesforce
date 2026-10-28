@@ -31,8 +31,8 @@ module Salesforce
     rescue Salesforce::InvalidCredentials,
            Salesforce::InvalidApiResponse,
            Faraday::Error,
-           OpenSSL::PKey::RSAError
-      render json: { errors: [I18n.t("salesforce.error.fields_unavailable")] }, status: :bad_gateway
+           OpenSSL::PKey::RSAError => error
+      render_connection_error(error)
     end
 
     def preview_users
@@ -56,11 +56,8 @@ module Salesforce
     rescue Salesforce::InvalidCredentials,
            Salesforce::InvalidApiResponse,
            Faraday::Error,
-           OpenSSL::PKey::RSAError
-      render json: {
-               errors: [I18n.t("salesforce.error.preview_unavailable")],
-             },
-             status: :bad_gateway
+           OpenSSL::PKey::RSAError => error
+      render_connection_error(error)
     end
 
     def save_configuration
@@ -84,8 +81,8 @@ module Salesforce
     rescue Salesforce::InvalidCredentials,
            Salesforce::InvalidApiResponse,
            Faraday::Error,
-           OpenSSL::PKey::RSAError
-      render json: { errors: [I18n.t("salesforce.error.fields_unavailable")] }, status: :bad_gateway
+           OpenSSL::PKey::RSAError => error
+      render_connection_error(error)
     end
 
     def destroy_configuration
@@ -98,6 +95,15 @@ module Salesforce
     end
 
     private
+
+    def render_connection_error(error)
+      ConnectionError.log(error, operation: action_name)
+      render json: {
+               errors: [I18n.t("salesforce.error.connection.#{ConnectionError.category(error)}")],
+               error_type: ConnectionError.category(error),
+             },
+             status: :bad_gateway
+    end
 
     def ensure_configurations_enabled
       unless current_user&.upcoming_change_enabled?(:enable_guided_sync_configuration)

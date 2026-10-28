@@ -210,3 +210,42 @@ preserving non-empty Salesforce values by default. Admins can edit the text or s
 compatible source, including a configured custom user field named Company. Contacts do not
 receive this default mapping. The legacy Company source remains supported only for existing
 mappings, preserving their custom-field lookup and `None` fallback until an admin remaps them.
+
+### Provider boundaries
+
+Configurations persist a `provider` identity; existing records default to `salesforce`.
+Only Salesforce configurations are handled by the current jobs. Authentication, object
+requirements, field conversion, matching and API batching remain Salesforce-specific.
+
+`UserSyncSources` loads Discourse values independently of destination field names and
+formats. It batches profile, statistics, custom field, group membership and recent post
+queries. Salesforce serialization and legacy Company/LeadSource defaults live in `FieldMapping`,
+which is shared by sync execution and preview rather than the source loader.
+
+`RecordLink` scopes a remote ID by provider, account, object and Discourse user. Salesforce
+currently uses its instance URL as the account identity. Existing configured links remain
+readable, including their original instance guard. New writes use the scoped key. The
+PluginStore namespace remains `discourse-salesforce`; a future plugin rename must preserve
+or migrate that namespace. User custom fields remain compatibility fields for legacy
+Salesforce features, not the provider-independent link store.
+
+Reconciliation updates configured Contact links after merges and establishes Contact links
+for converted Leads with a matching configured link. The original Lead link is retained:
+a Lead configuration is never silently redirected to the Contact object. These boundaries
+prepare for another provider without defining a shared API adapter prematurely.
+
+`ConfigurationScheduler` owns event-triggered enqueueing, activation backfills and periodic
+refresh scheduling. `GuidedSyncConfiguration` retains validation and persistence. Scheduling
+continues to use the existing timestamps and locks, so extracting it does not reset due dates.
+
+`UserSyncPreview` owns sample records and comparison rows. `FieldMapping` evaluates both
+preview and real payloads, including ownership rules, writable fields and type conversion.
+Preview only requests object metadata; it does not read or write Salesforce user records.
+
+Reconciliation reloads user custom fields under the same per-user lock as sync jobs, then
+updates the legacy ID and configured link within one database transaction. A failed link
+write rolls back the legacy update, and stale responses cannot overwrite a newer legacy ID.
+
+Configuration endpoints return translated authentication, permission, request-limit,
+temporary-connection or unexpected-response errors. Diagnostic logs include the operation,
+category and HTTP status, excluding upstream bodies, credentials and request headers.

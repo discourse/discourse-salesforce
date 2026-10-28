@@ -50,7 +50,15 @@ module Salesforce
       ConfiguredUserSync.validate_mappings!(@configuration, fields)
       links =
         @users.to_h do |user|
-          [user.id, PluginStore.get(PLUGIN_NAME, "configured_user_link:#{@object}:#{user.id}")]
+          [
+            user.id,
+            RecordLink.new(
+              provider: @configuration.fetch("provider", "salesforce"),
+              account: @configuration.fetch("instance_url"),
+              object: @object,
+              user_id: user.id,
+            ).read,
+          ]
         end
       records = existing_records(links)
       by_id = records.index_by { |record| record["Id"] }
@@ -61,7 +69,7 @@ module Salesforce
       source_data = UserSyncSources.new(@configuration["mappings"], @users)
       @users.each do |user|
         link = links[user.id]
-        if link && (link["instance"] != SiteSetting.salesforce_instance_url || !by_id[link["id"]])
+        if link && (link["account"] != SiteSetting.salesforce_instance_url || !by_id[link["id"]])
           retry_user(user)
           next
         end

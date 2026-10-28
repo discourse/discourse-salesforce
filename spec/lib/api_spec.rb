@@ -11,6 +11,16 @@ RSpec.describe ::Salesforce::Api do
     expect(api.access_token).to eq(access_token)
   end
 
+  it "preserves temporary authentication server errors for connection diagnostics" do
+    stub_request(:post, "https://login.salesforce.com/services/oauth2/token").to_return(
+      status: 503,
+      body: "private upstream response",
+    )
+    expect { described_class.new }.to raise_error(Salesforce::InvalidApiResponse) { |error|
+      expect(error.status).to eq(503)
+    }
+  end
+
   it "escapes plus signs in SOQL query parameters" do
     soql = "SELECT Id FROM Contact WHERE Email = 'team+salesforce-discourse-dev-ed@example.com'"
 

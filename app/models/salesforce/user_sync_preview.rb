@@ -65,6 +65,55 @@ module Salesforce
       end
     end
 
+    def self.rows(configuration, user)
+      fields = Api.new.writable_fields(configuration.fetch("object"))
+      ConfiguredUserSync.validate_mappings!(configuration, fields)
+      record = sample_record(fields)
+      data = UserSyncSources.new(configuration["mappings"], [user]) if user
+      mapping_values =
+        FieldMapping.new(configuration["mappings"], fields) do |source, field|
+          if user
+            FieldMapping.source_value(data, source, user)
+          else
+            sample_source(source, field, configuration)
+          end
+        end
+      changes = mapping_values.values(record)
+      email = user ? user.email : "alex@example.com"
+      rows = [
+        {
+          field: "Email",
+          current: record && record["Email"],
+          incoming: email,
+          result: record ? record["Email"] : email,
+          outcome: "kept",
+        },
+      ]
+      configuration
+        .fetch("mappings")
+        .each do |mapping|
+          destination = mapping.fetch("destination")
+          current = record && record[destination]
+          kept = mapping_values.kept?(mapping, record)
+          outcome =
+            if kept
+              "kept"
+            elsif changes.key?(destination)
+              record ? "updated" : "set"
+            else
+              "unchanged"
+            end
+          rows << {
+            field: destination,
+            current: current,
+            incoming: mapping_values.value(mapping),
+            result: changes.fetch(destination, current),
+            outcome: outcome,
+          }
+        end
+      rows
+    end
+
     def self.call(configuration, user_id: nil)
       configuration = configuration.deep_stringify_keys
       unless GuidedSyncConfiguration.group_names(configuration).present? &&
@@ -74,15 +123,7 @@ module Salesforce
       end
       members = users(GuidedSyncConfiguration.group_names(configuration))
       user = user_id.present? ? members.find(user_id) : members.first
-      unless user
-        return(
-          {
-            user: nil,
-            sample: true,
-            rows: ConfiguredUserSync.new(configuration, nil).preview(sample: true),
-          }
-        )
-      end
+      return({ user: nil, sample: true, rows: rows(configuration, nil) }) unless user
 
       {
         user: {
@@ -90,7 +131,7 @@ module Salesforce
           username: user.username,
           name: user.name,
         },
-        rows: ConfiguredUserSync.new(configuration, user).preview,
+        rows: rows(configuration, user),
       }
     end
   end

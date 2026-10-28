@@ -351,14 +351,16 @@ export default class SalesforceGuidedSync extends Component {
       if (this.salesforceFields.length === 0) {
         this.fieldsError = i18n(`${PREFIX}.fields_not_writable`);
       }
-    } catch {
+    } catch (error) {
       if (
         !this.isDestroying &&
         !this.isDestroyed &&
         request === this.#fieldsRequest &&
         object === this.configuration.object
       ) {
-        this.fieldsError = i18n(`${PREFIX}.fields_failed`);
+        this.fieldsError = (error.jqXHR || error).responseJSON?.errors?.length
+          ? extractError(error)
+          : i18n(`${PREFIX}.fields_failed`);
       }
     } finally {
       if (

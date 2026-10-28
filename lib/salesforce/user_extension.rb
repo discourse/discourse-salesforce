@@ -25,19 +25,9 @@ module Salesforce
     end
 
     def salesforce_contact_payload
-      name = self.name || self.username
+      first_name, last_name = UserSyncSources.name_parts(self)
 
-      if name.include?(" ")
-        first_name, last_name = name.split(" ", 2)
-      else
-        last_name = name
-      end
-
-      payload = {
-        Email: self.email,
-        LastName: last_name,
-        Description: "#{Discourse.base_url}/u/#{UrlHelper.encode_component(self.username)}",
-      }
+      payload = { Email: self.email, LastName: last_name, Description: full_url }
 
       lead_source = SiteSetting.salesforce_lead_source
       payload[:LeadSource] = lead_source if lead_source.present?

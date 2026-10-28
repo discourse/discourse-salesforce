@@ -6,6 +6,35 @@ RSpec.describe Salesforce::UserSyncSources do
   fab!(:user)
   fab!(:other_user, :user)
 
+  it "loads group memberships and recent regular posts for the whole batch" do
+    group = Fabricate(:group)
+    group.add(user)
+    Fabricate(:post, user: user)
+    Fabricate(:post, user: user, created_at: 31.days.ago)
+    Fabricate(:post, user: other_user, topic: Fabricate(:private_message_topic))
+    data =
+      described_class.new(
+        %w[groups posts30 profile first last].map { |source| { "source" => source } },
+        [user, other_user],
+      )
+    values = nil
+    expect(
+      track_sql_queries do
+        values = [
+          data.value("groups", user),
+          data.value("posts30", user),
+          data.value("posts30", other_user),
+          data.value("profile", user),
+        ]
+      end,
+    ).to be_empty
+    expect(values).to eq([group.name, 1, 0, user.full_url])
+    user.name = "Alex Morgan"
+    expect([data.value("first", user), data.value("last", user)]).to eq(%w[Alex Morgan])
+    user.name = "Alex"
+    expect([data.value("first", user), data.value("last", user)]).to eq([nil, "Alex"])
+  end
+
   it "loads selected profile columns once and skips blank values when mapping to Salesforce" do
     user.user_profile.update!(bio_raw: "I build **communities**.", website: "https://example.com")
     other_user.user_profile.update!(bio_raw: "", website: "")

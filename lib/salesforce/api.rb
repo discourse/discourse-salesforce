@@ -2,6 +2,7 @@
 
 require "json"
 require "cgi"
+require "digest"
 
 module ::Salesforce
   class InvalidApiResponse < ::StandardError
@@ -17,6 +18,7 @@ module ::Salesforce
 
   class Api
     VERSION = "49.0"
+    WRITABLE_FIELDS_CACHE_TTL = 2.hours
     INVALID_RESPONSE = "salesforce.error.invalid_response"
     ACCESS_TOKEN_KEY = "salesforce_access_token"
     CREDENTIAL_SETTINGS = %i[
@@ -88,6 +90,23 @@ module ::Salesforce
         e.set_backtrace(caller)
         ConnectionError.log(e, operation: "api")
         raise e
+      end
+    end
+
+    def self.cached_writable_fields(object, refresh: false)
+      api = new
+      connection = [
+        RailsMultisite::ConnectionManagement.current_db,
+        SiteSetting.salesforce_authorization_server_url,
+        SiteSetting.salesforce_client_id,
+        SiteSetting.salesforce_username,
+        SiteSetting.salesforce_instance_url,
+      ].join(":")
+      cache_key =
+        "salesforce:writable_fields:v1:#{Digest::SHA256.hexdigest(connection)}:#{object}"
+      Rails.cache.delete(cache_key) if refresh
+      Rails.cache.fetch(cache_key, expires_in: WRITABLE_FIELDS_CACHE_TTL) do
+        api.writable_fields(object)
       end
     end
 

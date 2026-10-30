@@ -25,7 +25,8 @@ module Salesforce
       raise Discourse::InvalidParameters.new(:object) if %w[Lead Contact].exclude?(object)
 
       render json: {
-               fields: Api.new.writable_fields(object),
+               fields:
+                 Api.cached_writable_fields(object, refresh: params[:refresh] == "true"),
                custom_sources: UserSyncSources.custom_sources,
              }
     rescue Salesforce::InvalidCredentials,

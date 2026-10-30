@@ -327,15 +327,13 @@ module("Integration | Component | SalesforceGuidedSync", function (hooks) {
     assert
       .dom(".salesforce-guided-sync__section")
       .exists(
-        { count: 4 },
-        "shows scope, behavior, mappings and preview together"
+        { count: 3 },
+        "shows scope, behavior and mappings with inline preview"
       );
     assert.dom("[data-test-save]").isDisabled("requires a group");
     assert
-      .dom(
-        ".salesforce-guided-sync__mapping-headings [data-name='previewMember']"
-      )
-      .doesNotExist("keeps the mapping table focused on field controls");
+      .dom(".salesforce-guided-sync__mapping-preview-heading")
+      .exists("places preview after the mapping controls");
     await selectSyncGroups("customers");
     await formKit().field("schedule").select("weekly");
     await click("[data-test-add-mapping]");
@@ -362,8 +360,10 @@ module("Integration | Component | SalesforceGuidedSync", function (hooks) {
       .dom('[data-name="previewMember"]')
       .includesText("alex", "selects the first member");
     assert
-      .dom("[data-test-preview-section] [data-name='previewMember']")
-      .exists("places user selection in the separate preview section");
+      .dom(
+        ".salesforce-guided-sync__mapping-preview-heading [data-name='previewMember']"
+      )
+      .exists("places the user selector in the preview column heading");
 
     let searchedGroup;
     pretender.get(

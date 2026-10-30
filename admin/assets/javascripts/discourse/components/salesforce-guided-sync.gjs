@@ -1,6 +1,6 @@
 import Component from "@glimmer/component";
 import { tracked } from "@glimmer/tracking";
-import { fn } from "@ember/helper";
+import { fn, get } from "@ember/helper";
 import { on } from "@ember/modifier";
 import { action } from "@ember/object";
 import { cancel, debounce, next } from "@ember/runloop";
@@ -204,12 +204,30 @@ export default class SalesforceGuidedSync extends Component {
   }
 
   get preview() {
-    return this.previewRows.map((row) => ({
-      ...row,
-      current: row.current === "" ? "—" : (row.current ?? "—"),
-      incoming: row.incoming === "" ? "—" : (row.incoming ?? "—"),
-      result: row.result === "" ? "—" : (row.result ?? "—"),
-    }));
+    return this.previewRows.map((row) => {
+      const current = row.current === "" ? "—" : (row.current ?? "—");
+      const result = row.result === "" ? "—" : (row.result ?? "—");
+      const origin =
+        row.field !== "Email" && row.outcome === "kept"
+          ? "salesforce"
+          : "discourse";
+
+      return {
+        ...row,
+        current,
+        incoming: row.incoming === "" ? "—" : (row.incoming ?? "—"),
+        result,
+        origin,
+        originIcon:
+          origin === "salesforce" ? "fab-salesforce" : "fab-discourse",
+        originLabel: i18n(`${PREFIX}.preview_source.${origin}`),
+        showPrevious: row.field !== "Email" && current !== result,
+      };
+    });
+  }
+
+  get previewByField() {
+    return Object.fromEntries(this.preview.map((row) => [row.field, row]));
   }
 
   @action
@@ -305,7 +323,7 @@ export default class SalesforceGuidedSync extends Component {
   }
 
   @action
-  async refreshFields() {
+  async refreshFields(force = false) {
     const object = this.configuration.object;
     const request = ++this.#fieldsRequest;
     this.#invalidatePreview();
@@ -315,7 +333,7 @@ export default class SalesforceGuidedSync extends Component {
     this.fieldsObject = null;
     try {
       const result = await ajax("/salesforce/admin/guided-sync/fields.json", {
-        data: { object },
+        data: { object, refresh: force },
       });
       if (
         this.isDestroying ||
@@ -774,6 +792,9 @@ export default class SalesforceGuidedSync extends Component {
           <h3 id="salesforce-mapping-title">{{i18n
               "salesforce.guided_sync.mapping_title"
             }}</h3>
+          <p class="salesforce-guided-sync__description">{{i18n
+              "salesforce.guided_sync.review_description"
+            }}</p>
           <DConditionalLoadingSpinner
             data-test-fields-loading
             aria-busy={{this.loadingFields}}
@@ -784,7 +805,7 @@ export default class SalesforceGuidedSync extends Component {
               <DButton
                 class="btn-default salesforce-guided-sync__retry-fields"
                 data-test-refresh-fields
-                @action={{this.refreshFields}}
+                @action={{fn this.refreshFields true}}
                 @icon="arrows-rotate"
                 @label="salesforce.guided_sync.retry_fields"
               />
@@ -804,6 +825,72 @@ export default class SalesforceGuidedSync extends Component {
                       }}</:content>
                   </DTooltip>
                 </span>
+                <span class="salesforce-guided-sync__mapping-preview-heading">
+                  <span>{{i18n "salesforce.guided_sync.preview_title"}}</span>
+                  {{#if this.loadingPreview}}
+                    <DConditionalLoadingSpinner @condition={{true}} />
+                  {{else if this.previewDisabled}}
+                    <span
+                      class="salesforce-guided-sync__preview-unavailable"
+                    >{{i18n
+                        "salesforce.guided_sync.preview_unavailable"
+                      }}</span>
+                  {{else if this.samplePreview}}
+                    <span data-test-sample-preview>{{i18n
+                        "salesforce.guided_sync.sample_user"
+                      }}</span>
+                  {{else if this.previewUser}}
+                    <form.Field
+                      @name="previewMember"
+                      @showOptional={{false}}
+                      @showTitle={{false}}
+                      @title={{i18n "salesforce.guided_sync.preview_user"}}
+                      @type="menu"
+                      as |field|
+                    >
+                      <field.Control
+                        @selection={{this.previewUser.username}}
+                        as |menu|
+                      >
+                        <menu.Container>
+                          <DFilterInput
+                            aria-label={{i18n
+                              "salesforce.guided_sync.search_members"
+                            }}
+                            placeholder={{i18n
+                              "salesforce.guided_sync.search_members"
+                            }}
+                            @value={{this.previewQuery}}
+                            @filterAction={{this.filterPreviewUsers}}
+                          />
+                        </menu.Container>
+                        {{#if this.loadingPreviewUsers}}
+                          <menu.Container><DConditionalLoadingSpinner
+                              @condition={{true}}
+                            /></menu.Container>
+                        {{else if this.previewUsersError}}
+                          <menu.Container><p
+                            >{{this.previewUsersError}}</p></menu.Container>
+                        {{else}}
+                          {{#each this.previewUsers as |user|}}
+                            <menu.Item
+                              @action={{fn this.selectPreviewUser user}}
+                              @value={{user.id}}
+                            >
+                              {{user.username}}{{#if user.name}}
+                                ·
+                                {{user.name}}{{/if}}
+                            </menu.Item>
+                          {{else}}
+                            <menu.Container><p>{{i18n
+                                  "salesforce.guided_sync.no_matching_members"
+                                }}</p></menu.Container>
+                          {{/each}}
+                        {{/if}}
+                      </field.Control>
+                    </form.Field>
+                  {{/if}}
+                </span>
               </div>
               <div class="salesforce-guided-sync__locked-mapping">
                 <span>{{dIcon "lock"}}
@@ -813,6 +900,32 @@ export default class SalesforceGuidedSync extends Component {
                   }}</span>
                 <code>Email</code>
                 <span>{{i18n "salesforce.guided_sync.fixed_mapping"}}</span>
+                {{#let (get this.previewByField "Email") as |preview|}}
+                  {{#if preview}}
+                    <div
+                      class="salesforce-guided-sync__mapping-preview"
+                      data-test-preview-field="Email"
+                    >
+                      <span
+                        class="salesforce-guided-sync__preview-origin"
+                        role="img"
+                        aria-label={{preview.originLabel}}
+                      >{{dIcon preview.originIcon}}</span>
+                      <div
+                        class="salesforce-guided-sync__mapping-preview-value"
+                      >
+                        <span
+                          class="salesforce-guided-sync__preview-mobile-label"
+                        >{{i18n "salesforce.guided_sync.preview_title"}}</span>
+                        <span>{{preview.result}}</span>
+                      </div>
+                    </div>
+                  {{else}}
+                    <span
+                      class="salesforce-guided-sync__mapping-preview-empty"
+                    >—</span>
+                  {{/if}}
+                {{/let}}
                 <p class="salesforce-guided-sync__email-help">{{i18n
                     "salesforce.guided_sync.matching_help"
                   }}</p>
@@ -919,6 +1032,43 @@ export default class SalesforceGuidedSync extends Component {
                           }}</select.Option>
                       </field.Control>
                     </collection.Field>
+                    {{#let
+                      (get this.previewByField mapping.destination)
+                      as |preview|
+                    }}
+                      {{#if preview}}
+                        <div
+                          class="salesforce-guided-sync__mapping-preview"
+                          data-test-preview-field={{mapping.destination}}
+                        >
+                          <span
+                            class="salesforce-guided-sync__preview-origin"
+                            role="img"
+                            aria-label={{preview.originLabel}}
+                          >{{dIcon preview.originIcon}}</span>
+                          <div
+                            class="salesforce-guided-sync__mapping-preview-value"
+                          >
+                            <span
+                              class="salesforce-guided-sync__preview-mobile-label"
+                            >{{i18n
+                                "salesforce.guided_sync.preview_title"
+                              }}</span>
+                            <span>{{preview.result}}</span>
+                            {{#if preview.showPrevious}}
+                              <small>
+                                {{i18n "salesforce.guided_sync.previous_value"}}
+                                <del>{{preview.current}}</del>
+                              </small>
+                            {{/if}}
+                          </div>
+                        </div>
+                      {{else}}
+                        <span
+                          class="salesforce-guided-sync__mapping-preview-empty"
+                        >—</span>
+                      {{/if}}
+                    {{/let}}
                     <DButton
                       class="btn-transparent salesforce-guided-sync__remove"
                       data-test-remove-mapping={{mapping.id}}
@@ -940,7 +1090,7 @@ export default class SalesforceGuidedSync extends Component {
                 <DButton
                   class="btn-flat"
                   data-test-refresh-fields
-                  @action={{this.refreshFields}}
+                  @action={{fn this.refreshFields true}}
                   @disabled={{this.loadingFields}}
                   @icon="arrows-rotate"
                   @label="salesforce.guided_sync.refresh_fields"
@@ -952,89 +1102,6 @@ export default class SalesforceGuidedSync extends Component {
                   @icon="triangle-exclamation"
                 >{{this.error}}</form.Alert>
               {{/if}}
-            {{/if}}
-          </DConditionalLoadingSpinner>
-
-        </section>
-        <section
-          class="salesforce-guided-sync__section"
-          data-test-preview-section
-          aria-labelledby="salesforce-preview-title"
-        >
-          <h3 id="salesforce-preview-title">{{i18n
-              "salesforce.guided_sync.preview_title"
-            }}</h3>
-          <p class="salesforce-guided-sync__description">{{i18n
-              "salesforce.guided_sync.review_description"
-            }}</p>
-          {{#if this.previewDisabled}}
-            <p>{{i18n "salesforce.guided_sync.preview_unavailable"}}</p>
-          {{else}}
-            <DConditionalLoadingSpinner
-              data-test-preview-loading
-              @condition={{this.loadingPreview}}
-            >
-              <div class="salesforce-guided-sync__preview-heading">
-
-                {{#if this.configuration.groups.length}}
-                  {{#if this.samplePreview}}<span
-                      data-test-sample-preview
-                    >{{i18n
-                        "salesforce.guided_sync.sample_user"
-                      }}</span>{{else}}
-                    <form.Field
-                      @name="previewMember"
-                      @showOptional={{false}}
-                      @title={{i18n "salesforce.guided_sync.preview_user"}}
-                      @type="menu"
-                      as |field|
-                    >
-                      <field.Control
-                        @selection={{this.previewUser.username}}
-                        as |menu|
-                      >
-                        <menu.Container>
-                          <DFilterInput
-                            aria-label={{i18n
-                              "salesforce.guided_sync.search_members"
-                            }}
-                            placeholder={{i18n
-                              "salesforce.guided_sync.search_members"
-                            }}
-                            @value={{this.previewQuery}}
-                            @filterAction={{this.filterPreviewUsers}}
-                          />
-                        </menu.Container>
-                        {{#if this.loadingPreviewUsers}}
-                          <menu.Container><DConditionalLoadingSpinner
-                              @condition={{true}}
-                            /></menu.Container>
-                        {{else if this.previewUsersError}}
-                          <menu.Container><p
-                            >{{this.previewUsersError}}</p></menu.Container>
-                        {{else}}
-                          {{#each this.previewUsers as |user|}}
-                            <menu.Item
-                              @action={{fn this.selectPreviewUser user}}
-                              @value={{user.id}}
-                            >
-                              {{user.username}}{{#if user.name}}
-                                ·
-                                {{user.name}}{{/if}}
-                            </menu.Item>
-                          {{else}}
-                            <menu.Container><p>{{i18n
-                                  "salesforce.guided_sync.no_matching_members"
-                                }}</p></menu.Container>
-                          {{/each}}
-                        {{/if}}
-                      </field.Control>
-                    </form.Field>{{/if}}{{/if}}
-              </div>
-
-              {{#if this.samplePreview}}<p>{{i18n
-                    "salesforce.guided_sync.sample_preview_help"
-                  }}</p>{{/if}}
               {{#if this.previewError}}
                 <form.Alert @type="error">{{this.previewError}}</form.Alert>
                 <DButton
@@ -1043,50 +1110,10 @@ export default class SalesforceGuidedSync extends Component {
                   @action={{this.loadPreview}}
                   @label="salesforce.guided_sync.retry_fields"
                 />
-              {{else}}
-                <div class="salesforce-guided-sync__preview-table">
-                  <table class="d-table">
-                    <thead class="d-table__header"><tr>
-                        <th>{{i18n
-                            "salesforce.guided_sync.salesforce_field"
-                          }}</th>
-                        <th>{{i18n
-                            "salesforce.guided_sync.discourse_value"
-                          }}</th>
-                        <th>{{i18n "salesforce.guided_sync.current_value"}}</th>
-                        <th>{{i18n "salesforce.guided_sync.after_sync"}}</th>
-                      </tr></thead>
-                    <tbody class="d-table__body">
-                      {{#each this.preview as |row|}}
-                        <tr
-                          class="d-table__row"
-                          data-test-preview-field={{row.field}}
-                        >
-                          <td class="d-table__cell --overview"><code
-                            >{{row.field}}</code></td>
-                          <td class="d-table__cell --detail"><div
-                              class="d-table__mobile-label"
-                            >{{i18n
-                                "salesforce.guided_sync.discourse_value"
-                              }}</div>{{row.incoming}}</td>
-                          <td class="d-table__cell --detail"><div
-                              class="d-table__mobile-label"
-                            >{{i18n
-                                "salesforce.guided_sync.current_value"
-                              }}</div>{{row.current}}</td>
-                          <td class="d-table__cell --detail"><div
-                              class="d-table__mobile-label"
-                            >{{i18n
-                                "salesforce.guided_sync.after_sync"
-                              }}</div><strong>{{row.result}}</strong></td>
-                        </tr>
-                      {{/each}}
-                    </tbody>
-                  </table>
-                </div>
               {{/if}}
-            </DConditionalLoadingSpinner>
-          {{/if}}
+            {{/if}}
+          </DConditionalLoadingSpinner>
+
         </section>
         <form.Actions class="salesforce-guided-sync__footer">
           <span class="salesforce-guided-sync__save-help">{{i18n

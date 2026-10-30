@@ -141,14 +141,14 @@ en:
         review_description: "Preview how your field mappings apply. Salesforce values are examples; no Salesforce records are read or changed."
         preview_title: "Preview"
         preview_unavailable: "Choose groups and complete the field mappings to preview this configuration."
-        discourse_value: "Discourse value"
-        current_value: "Sample Salesforce value"
-        after_sync: "After sync"
         preview_user: "Preview user"
+        preview_source:
+          discourse: "Discourse"
+          salesforce: "Salesforce"
+        previous_value: "Previous:"
         search_members: "Search group members"
         no_matching_members: "No matching eligible members."
         sample_user: "Sample user"
-        sample_preview_help: "No eligible users yet. Previewing sample Discourse and Salesforce data."
       contact_sync_mode:
         link_only: "Link only — link the Discourse user to the Salesforce Contact without updating Salesforce fields"
         fill_blank: "Fill blank Salesforce fields — update selected fields only when they are empty in Salesforce"

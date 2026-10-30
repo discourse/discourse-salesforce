@@ -21,8 +21,25 @@ module Salesforce
       { "id" => legacy.fetch("id"), "account" => legacy.fetch("instance") }
     end
 
-    def write(id)
-      PluginStore.set(PLUGIN_NAME, key, { id: id, account: @account })
+    def write(id, converted_from_lead_id: nil)
+      existing = PluginStore.get(PLUGIN_NAME, key)
+      if existing && existing["id"] == id
+        converted_from_lead_id ||= existing["converted_from_lead_id"]
+      end
+      value = { "id" => id, "account" => @account }
+      value["converted_from_lead_id"] = converted_from_lead_id if converted_from_lead_id
+      PluginStore.set(PLUGIN_NAME, key, value)
+    end
+
+    def mark_converted_to(contact_id)
+      PluginStore.set(
+        PLUGIN_NAME,
+        key,
+        { "account" => @account, "converted_to" => { "object" => "Contact", "id" => contact_id } },
+      )
+      if @provider == "salesforce"
+        PluginStore.remove(PLUGIN_NAME, "configured_user_link:#{@object}:#{@user_id}")
+      end
     end
 
     private

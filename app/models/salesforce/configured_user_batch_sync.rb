@@ -46,8 +46,6 @@ module Salesforce
       if @configuration["instance_url"] != SiteSetting.salesforce_instance_url
         raise Discourse::InvalidParameters.new(:salesforce_instance_url)
       end
-      fields = @api.writable_fields(@object)
-      ConfiguredUserSync.validate_mappings!(@configuration, fields)
       links =
         @users.to_h do |user|
           [
@@ -60,14 +58,34 @@ module Salesforce
             ).read,
           ]
         end
-      records = existing_records(links)
+      users =
+        @users.reject do |user|
+          converted = @object == "Lead" && links[user.id]&.key?("converted_to")
+          GuidedSyncConfiguration.record_result(@configuration["id"], user.id) if converted
+          converted
+        end
+      return if users.empty?
+      fields = @api.writable_fields(@object)
+      ConfiguredUserSync.validate_mappings!(@configuration, fields)
+      records = existing_records(links, users)
       by_id = records.index_by { |record| record["Id"] }
-      by_email = records.group_by { |record| record["Email"].to_s.downcase }
+      by_email =
+        records
+          .reject { |record| @object == "Lead" && record["IsConverted"] == true }
+          .group_by { |record| record["Email"].to_s.downcase }
+      converted_by_email =
+        if @object == "Lead"
+          records
+            .select { |record| record["IsConverted"] == true }
+            .group_by { |record| record["Email"].to_s.downcase }
+        else
+          {}
+        end
       creates = []
       updates = []
       used_ids = Set.new
-      source_data = UserSyncSources.new(@configuration["mappings"], @users)
-      @users.each do |user|
+      source_data = UserSyncSources.new(@configuration["mappings"], users)
+      users.each do |user|
         link = links[user.id]
         if link && (link["account"] != SiteSetting.salesforce_instance_url || !by_id[link["id"]])
           retry_user(user)
@@ -79,6 +97,24 @@ module Salesforce
           next
         end
         record = matches.first
+        if @object == "Lead" && record.nil?
+          converted_matches = converted_by_email.fetch(user.email.downcase, [])
+          if converted_matches.size > 1
+            retry_user(user, AmbiguousEmailMatch.new(@object))
+            next
+          elsif converted_matches.size == 1
+            sync = ConfiguredUserSync.new(@configuration, user, api: @api, source_data: source_data)
+            sync.reconcile_converted_lead(converted_matches.first)
+            GuidedSyncConfiguration.record_result(@configuration["id"], user.id)
+            next
+          end
+        end
+        if @object == "Lead" && record && record["IsConverted"] == true
+          sync = ConfiguredUserSync.new(@configuration, user, api: @api, source_data: source_data)
+          sync.reconcile_converted_lead(record)
+          GuidedSyncConfiguration.record_result(@configuration["id"], user.id)
+          next
+        end
         if record && !used_ids.add?(record["Id"])
           retry_user(user)
           next
@@ -99,20 +135,21 @@ module Salesforce
 
     private
 
-    def existing_records(links)
+    def existing_records(links, sync_users)
       fields = [
         "Id",
         "Email",
         *@configuration["mappings"].map { |mapping| mapping["destination"] },
       ].uniq
+      fields.concat(%w[IsConverted ConvertedContactId]) if @object == "Lead"
       unless fields.all? { |field| Person::FIELD_NAME_PATTERN.match?(field) }
         raise Discourse::InvalidParameters.new(:mappings)
       end
-      @users
+      sync_users
         .each_slice(25)
-        .flat_map do |users|
-          ids = users.filter_map { |user| links[user.id]&.fetch("id") }.uniq
-          conditions = ["Email IN (#{quoted(users.map(&:email))})"]
+        .flat_map do |user_batch|
+          ids = user_batch.filter_map { |user| links[user.id]&.[]("id") }.uniq
+          conditions = ["Email IN (#{quoted(user_batch.map(&:email))})"]
           conditions << "Id IN (#{quoted(ids)})" if ids.present?
           result =
             @api.query(

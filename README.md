@@ -92,7 +92,8 @@ Email is matched within the selected object. Multiple matches fail without writi
 Successful matching/creation retains an object/user link in PluginStore, pinned to the
 Salesforce instance, so email changes do not create a second record. Email is sent only
 on creation. Confirmed deleted, unconverted Leads can be recreated; missing or
-inaccessible records without confirmed deletion remain errors. A local distributed mutex serializes writes per user.
+inaccessible records without confirmed deletion remain errors. Converted Leads are
+reconciled to their Contact and skipped by Lead configurations. A local distributed mutex serializes writes per user.
 A remote create followed by a local failure is reconciled by email on retry; exact
 once-only creation cannot be guaranteed against concurrent external writers.
 
@@ -229,10 +230,11 @@ PluginStore namespace remains `discourse-salesforce`; a future plugin rename mus
 or migrate that namespace. User custom fields remain compatibility fields for legacy
 Salesforce features, not the provider-independent link store.
 
-Reconciliation updates configured Contact links after merges and establishes Contact links
-for converted Leads with a matching configured link. The original Lead link is retained:
-a Lead configuration is never silently redirected to the Contact object. These boundaries
-prepare for another provider without defining a shared API adapter prematurely.
+Reconciliation updates configured Contact links after merges and replaces converted Lead
+links with a conversion marker. Configured Lead syncs skip converted users instead of retrying
+an impossible update or creating a replacement Lead. Contact links retain the converted Lead
+ID as provenance. These boundaries prepare for another provider without defining a shared API
+adapter prematurely.
 
 `ConfigurationScheduler` owns event-triggered enqueueing, activation backfills and periodic
 refresh scheduling. `GuidedSyncConfiguration` retains validation and persistence. Scheduling

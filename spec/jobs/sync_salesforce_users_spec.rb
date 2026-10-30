@@ -72,6 +72,14 @@ RSpec.describe Jobs::SyncSalesforceUsers do
       expect(user1.salesforce_contact_id).to be_nil
       expect(user2.reload.salesforce_lead_id).to be_nil
       expect(user2.salesforce_contact_id).to eq("contact_456")
+      expect(
+        Salesforce::RecordLink.new(
+          provider: "salesforce",
+          account: instance_url,
+          object: "Lead",
+          user_id: user2.id,
+        ).read,
+      ).to include("converted_to" => { "object" => "Contact", "id" => "contact_456" })
     end
 
     it "rolls back the custom field if persisting a configured link fails" do
@@ -147,8 +155,22 @@ RSpec.describe Jobs::SyncSalesforceUsers do
       contact_link.write("contact_123")
       described_class.new.execute({})
 
-      expect(lead_link.read["id"]).to eq("lead_123")
+      expect(lead_link.read).to eq(
+        "account" => instance_url,
+        "converted_to" => {
+          "object" => "Contact",
+          "id" => "contact_456",
+        },
+      )
       expect(contact_link.read["id"]).to eq("contact_789")
+      expect(
+        Salesforce::RecordLink.new(
+          provider: "salesforce",
+          account: instance_url,
+          object: "Contact",
+          user_id: user1.id,
+        ).read,
+      ).to include("id" => "contact_456", "converted_from_lead_id" => "lead_123")
       expect(
         Salesforce::RecordLink.new(
           provider: "salesforce",

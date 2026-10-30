@@ -21,5 +21,17 @@ module ::Salesforce
     def self.payload(user)
       user.salesforce_lead_payload
     end
+
+    def self.find_converted_by_email(email, api: Salesforce.api)
+      escaped_email = escape_soql_string(email)
+      result =
+        api.query(
+          "SELECT Id, IsConverted, ConvertedContactId FROM Lead WHERE Email = '#{escaped_email}' AND IsConverted = true",
+        )
+      return if result["totalSize"] == 0
+      raise AmbiguousEmailMatch.new(OBJECT_NAME) if result["totalSize"] > 1
+
+      result.fetch("records").first
+    end
   end
 end

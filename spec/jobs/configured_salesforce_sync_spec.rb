@@ -151,7 +151,7 @@ RSpec.describe Jobs::SyncSalesforceUser do
       { id: old_id, instance: instance_url },
     )
     stub_request(:get, "#{api_path}/Lead/#{old_id}").to_return(status: 404, body: "[]")
-    query = "SELECT Id, IsDeleted, IsConverted FROM Lead WHERE Id = '#{old_id}'"
+    query = "SELECT Id, IsDeleted, IsConverted, ConvertedContactId FROM Lead WHERE Id = '#{old_id}'"
     stub_request(:get, "#{instance_url}services/data/v49.0/queryAll/").with(
       query: {
         q: query,
@@ -190,16 +190,93 @@ RSpec.describe Jobs::SyncSalesforceUser do
       { id: old_id, instance: instance_url },
     )
     stub_request(:get, "#{api_path}/Lead/#{old_id}").to_return(status: 404, body: "[]")
-    query = "SELECT Id, IsDeleted, IsConverted FROM Lead WHERE Id = '#{old_id}'"
-    [[], [{ Id: old_id, IsDeleted: true, IsConverted: true }]].each do |records|
-      stub_request(:get, "#{instance_url}services/data/v49.0/queryAll/").with(
-        query: {
-          q: query,
-        },
-      ).to_return(body: { records: records }.to_json)
-      expect { run_sync }.to raise_error(Salesforce::InvalidApiResponse)
-    end
+    query = "SELECT Id, IsDeleted, IsConverted, ConvertedContactId FROM Lead WHERE Id = '#{old_id}'"
+    lookup =
+      stub_request(:get, "#{instance_url}services/data/v49.0/queryAll/")
+        .with(query: { q: query })
+        .to_return(body: { records: [] }.to_json)
+        .then
+        .to_return(
+          body: {
+            records: [
+              { Id: old_id, IsDeleted: true, IsConverted: true, ConvertedContactId: "contact-123" },
+            ],
+          }.to_json,
+        )
+    expect { run_sync }.to raise_error(Salesforce::InvalidApiResponse)
+    expect { run_sync }.not_to raise_error
+    expect(lookup).to have_been_requested.twice
     expect(a_request(:post, "#{api_path}/Lead")).not_to have_been_made
+  end
+
+  it "retires a linked converted Lead and skips future syncs without creating a replacement" do
+    lead_id = "00Qbm00000v6wJpEAI"
+    lead_link =
+      Salesforce::RecordLink.new(
+        provider: "salesforce",
+        account: instance_url,
+        object: "Lead",
+        user_id: user.id,
+      )
+    contact_link =
+      Salesforce::RecordLink.new(
+        provider: "salesforce",
+        account: instance_url,
+        object: "Contact",
+        user_id: user.id,
+      )
+    lead_link.write(lead_id)
+    linked_lead =
+      stub_request(:get, "#{api_path}/Lead/#{lead_id}").to_return(
+        body: { Id: lead_id, IsConverted: true, ConvertedContactId: "contact-123" }.to_json,
+      )
+
+    run_sync
+    run_sync
+
+    expect(linked_lead).to have_been_requested.once
+    expect(lead_link.read).to include(
+      "converted_to" => {
+        "object" => "Contact",
+        "id" => "contact-123",
+      },
+    )
+    expect(contact_link.read).to include("id" => "contact-123")
+    expect(user.reload.salesforce_lead_id).to be_nil
+    expect(user.salesforce_contact_id).to eq("contact-123")
+    expect(a_request(:post, "#{api_path}/Lead")).not_to have_been_made
+    expect(a_request(:patch, %r{/sobjects/Lead/})).not_to have_been_made
+  end
+
+  it "reconciles a converted Lead found by email instead of creating a replacement" do
+    stub_salesforce_person_lookup("Lead", user.email, fields: %w[LastName Company Trust__c])
+    stub_request(:get, query_path).with(
+      query: {
+        q:
+          "SELECT Id, IsConverted, ConvertedContactId FROM Lead WHERE Email = '#{user.email}' AND IsConverted = true",
+      },
+    ).to_return(
+      body: {
+        totalSize: 1,
+        records: [
+          { Id: "00Qbm00000v6wJpEAI", IsConverted: true, ConvertedContactId: "contact-456" },
+        ],
+      }.to_json,
+    )
+
+    run_sync
+
+    expect(user.reload.salesforce_lead_id).to be_nil
+    expect(user.salesforce_contact_id).to eq("contact-456")
+    expect(a_request(:post, "#{api_path}/Lead")).not_to have_been_made
+    expect(
+      Salesforce::RecordLink.new(
+        provider: "salesforce",
+        account: instance_url,
+        object: "Lead",
+        user_id: user.id,
+      ).read,
+    ).to include("converted_to" => { "object" => "Contact", "id" => "contact-456" })
   end
 
   it "creates Contacts independently from Leads" do
@@ -244,16 +321,12 @@ RSpec.describe Jobs::SyncSalesforceUser do
       .then
       .to_return(status: 204)
     expect { run_sync }.to raise_error(Salesforce::InvalidApiResponse)
-    expect(
-      PluginStore.get(Salesforce::PLUGIN_NAME, "configuration_status:sync")["error"],
-    ).to be_present
+    expect(Salesforce::GuidedSyncConfiguration.status_for(configuration)["error"]).to be_present
     stub_request(:get, "#{api_path}/Lead/lead123").to_return(
       body: { Id: "lead123", LastName: "CRM name", Company: "Company", Trust__c: 99 }.to_json,
     )
     run_sync
-    expect(PluginStore.get(Salesforce::PLUGIN_NAME, "configuration_status:sync")).not_to have_key(
-      "error",
-    )
+    expect(Salesforce::GuidedSyncConfiguration.status_for(configuration)).not_to have_key("error")
   end
 
   it "rejects unsupported mappings and changed Salesforce instances before writing" do
@@ -393,7 +466,7 @@ RSpec.describe Jobs::SyncSalesforceUser do
     expect { run_sync }.to raise_error(Salesforce::AmbiguousEmailMatch)
     expect(a_request(:post, "#{api_path}/Lead")).not_to have_been_made
     expect(a_request(:patch, %r{/sobjects/})).not_to have_been_made
-    expect(PluginStore.get(Salesforce::PLUGIN_NAME, "configuration_status:sync")["error"]).to eq(
+    expect(Salesforce::GuidedSyncConfiguration.status_for(configuration)["error"]).to eq(
       "Salesforce::AmbiguousEmailMatch",
     )
   end

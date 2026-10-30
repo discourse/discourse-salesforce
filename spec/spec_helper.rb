@@ -42,10 +42,12 @@ RSpec.shared_context "with salesforce spec helper" do
     record ||= { Id: id } if id.present?
     records ||= record.present? ? [record] : []
     query_fields = ["Id", *fields.map(&:to_s)].uniq.join(",")
+    conditions = ["Email = '#{email}'"]
+    conditions << "IsConverted = false" if object_name == "Lead"
 
     stub_request(:get, query_path).with(
       query: {
-        q: "SELECT #{query_fields} FROM #{object_name} WHERE Email = '#{email}'",
+        q: "SELECT #{query_fields} FROM #{object_name} WHERE #{conditions.join(" AND ")}",
       },
     ).to_return(
       status: 200,

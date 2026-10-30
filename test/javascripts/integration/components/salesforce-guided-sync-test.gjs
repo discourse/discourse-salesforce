@@ -760,9 +760,7 @@ module("Integration | Component | SalesforceGuidedSync", function (hooks) {
     await formKit().field("mappings.3.destination").select("Last_Seen__c");
     assert
       .dom(".alert-error")
-      .includesText(
-        "Company (profile field, or None if empty) (text) cannot map to Last_Seen__c (date)"
-      );
+      .includesText("Static text (text) cannot map to Last_Seen__c (date)");
     assert.dom("[data-test-save]").isDisabled();
   });
 });

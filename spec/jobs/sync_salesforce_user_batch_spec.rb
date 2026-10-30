@@ -221,6 +221,103 @@ RSpec.describe Jobs::SyncSalesforceUserBatch do
     expect(a_request(:patch, collection_url)).not_to have_been_made
   end
 
+  it "reconciles linked converted Leads without retrying or recreating them" do
+    configuration["object"] = "Lead"
+    configuration["mappings"] = [
+      { "source" => "last", "destination" => "LastName", "policy" => "keep" },
+      {
+        "source" => "static",
+        "value" => "Unknown",
+        "destination" => "Company",
+        "policy" => "overwrite",
+      },
+    ]
+    PluginStore.set(
+      Salesforce::PLUGIN_NAME,
+      Salesforce::GuidedSyncConfiguration::STORE_KEY,
+      [configuration],
+    )
+    lead_fields =
+      %w[Email LastName Company].map do |name|
+        { name: name, type: "string", createable: true, updateable: true }
+      end
+    stub_request(:get, "#{api_path}/Lead/describe").to_return(body: { fields: lead_fields }.to_json)
+    lead_id = "00Qbm00000v6wJpEAI"
+    Salesforce::RecordLink.new(
+      provider: "salesforce",
+      account: instance_url,
+      object: "Lead",
+      user_id: user.id,
+    ).write(lead_id)
+    query =
+      stub_request(:get, query_path).with(
+        query: hash_including("q" => /Email IN .* OR Id IN \('#{lead_id}'\)/),
+      ).to_return(
+        body: {
+          records: [
+            {
+              Id: lead_id,
+              Email: user.email,
+              LastName: "Morgan",
+              Company: "Unknown",
+              IsConverted: true,
+              ConvertedContactId: "contact-123",
+            },
+            {
+              Id: "lead-converted-other",
+              Email: other_user.email,
+              IsConverted: true,
+              ConvertedContactId: "contact-other",
+            },
+          ],
+        }.to_json,
+      )
+
+    run_batch
+
+    expect(query).to have_been_requested.once
+    expect(a_request(:post, collection_url)).not_to have_been_made
+    expect(a_request(:patch, collection_url)).not_to have_been_made
+    expect(Jobs::SyncSalesforceUser.jobs).to be_empty
+    expect(user.reload.salesforce_lead_id).to be_nil
+    expect(user.salesforce_contact_id).to eq("contact-123")
+    expect(other_user.reload.salesforce_lead_id).to be_nil
+    expect(other_user.salesforce_contact_id).to eq("contact-other")
+    expect(
+      Salesforce::RecordLink.new(
+        provider: "salesforce",
+        account: instance_url,
+        object: "Lead",
+        user_id: user.id,
+      ).read,
+    ).to include("converted_to" => { "object" => "Contact", "id" => "contact-123" })
+  end
+
+  it "skips Lead batches with only already-converted users without contacting Salesforce" do
+    configuration["object"] = "Lead"
+    PluginStore.set(
+      Salesforce::PLUGIN_NAME,
+      Salesforce::GuidedSyncConfiguration::STORE_KEY,
+      [configuration],
+    )
+    [user, other_user].each do |member|
+      Salesforce::RecordLink.new(
+        provider: "salesforce",
+        account: instance_url,
+        object: "Lead",
+        user_id: member.id,
+      ).mark_converted_to("contact-#{member.id}")
+    end
+
+    run_batch
+
+    expect(a_request(:get, %r{/sobjects/Lead/describe})).not_to have_been_made
+    expect(a_request(:get, query_path)).not_to have_been_made
+    expect(a_request(:post, collection_url)).not_to have_been_made
+    expect(a_request(:patch, collection_url)).not_to have_been_made
+    expect(Jobs::SyncSalesforceUser.jobs).to be_empty
+  end
+
   it "rechecks membership and configuration activation before making requests" do
     group.remove(user)
     other_user.update!(active: false)
@@ -292,7 +389,10 @@ RSpec.describe Jobs::SyncSalesforceUserBatch do
 
     expect { run_batch }.to raise_error(Salesforce::InvalidApiResponse)
     status = PluginStore.get(Salesforce::PLUGIN_NAME, "configuration_status:batch")
-    expect(status).to include("error" => "Salesforce::InvalidApiResponse", "user_id" => user.id)
+    expect(status).to include(
+      "batch_error" => hash_including("error" => "Salesforce::InvalidApiResponse"),
+    )
+    expect(status["user_errors"]).to be_empty
     expect(Jobs::SyncSalesforceUser.jobs).to be_empty
     expect(a_request(:post, collection_url)).not_to have_been_made
   end

@@ -10,10 +10,7 @@ module Salesforce
       render json: {
                configurations:
                  GuidedSyncConfiguration.all.map { |record|
-                   record.merge(
-                     "sync_status" =>
-                       PluginStore.get(PLUGIN_NAME, "configuration_status:#{record["id"]}"),
-                   )
+                   record.merge("sync_status" => GuidedSyncConfiguration.status_for(record))
                  },
                credentials_configured: Api.has_credentials?,
                groups: GuidedSyncConfiguration.available_groups,
@@ -25,8 +22,7 @@ module Salesforce
       raise Discourse::InvalidParameters.new(:object) if %w[Lead Contact].exclude?(object)
 
       render json: {
-               fields:
-                 Api.cached_writable_fields(object, refresh: params[:refresh] == "true"),
+               fields: Api.cached_writable_fields(object, refresh: params[:refresh] == "true"),
                custom_sources: UserSyncSources.custom_sources,
              }
     rescue Salesforce::InvalidCredentials,

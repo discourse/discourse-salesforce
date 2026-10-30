@@ -241,7 +241,7 @@ RSpec.describe Jobs::SyncSalesforceUser do
       expect(
         a_request(:get, query_path).with(
           query: {
-            q: "SELECT Id FROM Lead WHERE Email = '#{user.email}'",
+            q: "SELECT Id FROM Lead WHERE Email = '#{user.email}' AND IsConverted = false",
           },
         ),
       ).not_to have_been_made
@@ -251,7 +251,7 @@ RSpec.describe Jobs::SyncSalesforceUser do
     it "reports unexpected Lead lookup errors" do
       stub_request(:get, query_path).with(
         query: {
-          q: "SELECT Id FROM Lead WHERE Email = '#{user.email}'",
+          q: "SELECT Id FROM Lead WHERE Email = '#{user.email}' AND IsConverted = false",
         },
       ).to_return(status: 400, body: %([{"message":"Invalid query","errorCode":"MALFORMED_QUERY"}]))
 

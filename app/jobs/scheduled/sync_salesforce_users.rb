@@ -84,8 +84,15 @@ module ::Jobs
             user_id: field.user_id,
           }
           previous = Salesforce::RecordLink.new(**scope, object: object).read
+          if object == "Lead"
+            Salesforce::RecordLink.new(**scope, object: "Lead").mark_converted_to(id)
+          end
           if previous && previous["account"] == scope[:account] && previous["id"] == previous_id
-            Salesforce::RecordLink.new(**scope, object: destination_object).write(id)
+            Salesforce::RecordLink.new(**scope, object: destination_object).write(
+              id,
+              converted_from_lead_id:
+                (object == "Lead" ? previous_id : previous["converted_from_lead_id"]),
+            )
           end
         end
       end

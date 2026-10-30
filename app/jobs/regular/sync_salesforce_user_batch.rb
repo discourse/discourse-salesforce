@@ -10,12 +10,9 @@ module Jobs
         args[:user_ids],
         reason: args[:reason],
       )
+      Salesforce::GuidedSyncConfiguration.record_batch_success(args[:configuration_id])
     rescue => error
-      Salesforce::GuidedSyncConfiguration.record_result(
-        args[:configuration_id],
-        Array(args[:user_ids]).first,
-        error: error,
-      )
+      Salesforce::GuidedSyncConfiguration.record_result(args[:configuration_id], error: error)
       raise
     end
   end

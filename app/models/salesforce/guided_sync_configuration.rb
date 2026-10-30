@@ -61,23 +61,71 @@ module Salesforce
       end
     end
 
-    def self.record_result(id, user_id, error: nil)
+    def self.record_result(id, user_id = nil, error: nil)
       DistributedMutex.synchronize("salesforce_configuration_status_#{id}") do
         key = "configuration_status:#{id}"
-        status = PluginStore.get(PLUGIN_NAME, key) || {}
+        status = normalize_status(PluginStore.get(PLUGIN_NAME, key) || {})
         if error
-          status.merge!(
-            "last_error_at" => Time.now.utc.iso8601,
-            "error" => error.class.name,
-            "user_id" => user_id,
-          )
+          error_info = { "at" => Time.now.utc.iso8601, "error" => error.class.name }
+          if user_id
+            status["user_errors"][user_id.to_s] = error_info
+          else
+            status["batch_error"] = error_info
+          end
         else
           status["last_synced_at"] = Time.now.utc.iso8601
-          status.except!("last_error_at", "error", "user_id") if status["user_id"] == user_id
+          status["user_errors"].delete(user_id.to_s) if user_id
         end
         PluginStore.set(PLUGIN_NAME, key, status)
       end
     end
+
+    def self.record_batch_success(id)
+      DistributedMutex.synchronize("salesforce_configuration_status_#{id}") do
+        key = "configuration_status:#{id}"
+        status = normalize_status(PluginStore.get(PLUGIN_NAME, key) || {})
+        status.delete("batch_error")
+        PluginStore.set(PLUGIN_NAME, key, status)
+      end
+    end
+
+    def self.status_for(record)
+      id = record.fetch("id")
+      DistributedMutex.synchronize("salesforce_configuration_status_#{id}") do
+        key = "configuration_status:#{id}"
+        status = normalize_status(PluginStore.get(PLUGIN_NAME, key) || {})
+        eligible_ids =
+          Person
+            .eligible_group_members(group_ids(record))
+            .where(id: status["user_errors"].keys.map(&:to_i))
+            .pluck(:id)
+            .map(&:to_s)
+        status["user_errors"].select! { |user_id, _| eligible_ids.include?(user_id) }
+        errors = status["user_errors"].values
+        displayed_error = status["batch_error"] || errors.first
+        status["error"] = displayed_error["error"] if displayed_error
+        status["last_error_at"] = displayed_error["at"] if displayed_error
+        status.except!("error", "last_error_at") unless displayed_error
+        PluginStore.set(PLUGIN_NAME, key, status)
+        status.except("user_errors", "batch_error")
+      end
+    end
+
+    def self.normalize_status(status)
+      status["user_errors"] ||= {}
+      status["batch_error"] ||= if status["error"].present? && status["user_id"].blank?
+        { "at" => status["last_error_at"], "error" => status["error"] }
+      end
+      if status["error"].present? && status["user_id"].present?
+        status["user_errors"][status.delete("user_id").to_s] ||= {
+          "at" => status["last_error_at"],
+          "error" => status["error"],
+        }
+      end
+      status.except!("error", "user_id", "last_error_at")
+      status
+    end
+    private_class_method :normalize_status
 
     def self.destroy!(id:, guardian:)
       raise Discourse::InvalidAccess unless guardian.is_admin?

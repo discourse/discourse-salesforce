@@ -127,9 +127,11 @@ module ::Salesforce
       raise ArgumentError, "Invalid Salesforce field name: #{invalid_field}" if invalid_field
 
       escaped_email = escape_soql_string(email)
+      conditions = ["Email = '#{escaped_email}'"]
+      conditions << "IsConverted = false" if self == Lead
       result =
         api.query(
-          "SELECT #{fields.join(",")} FROM #{self::OBJECT_NAME} WHERE Email = '#{escaped_email}'",
+          "SELECT #{fields.join(",")} FROM #{self::OBJECT_NAME} WHERE #{conditions.join(" AND ")}",
         )
       return if result["totalSize"] == 0
       raise AmbiguousEmailMatch.new(self::OBJECT_NAME) if require_unique && result["totalSize"] > 1

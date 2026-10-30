@@ -83,12 +83,20 @@ module Salesforce
       if @configuration["instance_url"] != SiteSetting.salesforce_instance_url
         raise Discourse::InvalidParameters.new(:salesforce_instance_url)
       end
+      if converted_lead_link?
+        GuidedSyncConfiguration.record_result(@configuration["id"], @user.id)
+        return
+      end
       fingerprint_key = "configuration_user_fingerprint:#{@configuration["id"]}:#{@user.id}"
       fingerprint = source_fingerprint
       return if skip_unchanged && PluginStore.get(PLUGIN_NAME, fingerprint_key) == fingerprint
       fields = @api.writable_fields(@configuration["object"])
       self.class.validate_mappings!(@configuration, fields)
       record = existing_record
+      if record == :converted_lead
+        GuidedSyncConfiguration.record_result(@configuration["id"], @user.id)
+        return
+      end
       values = mapped_values(fields, record)
       if record
         id = record.fetch("Id")
@@ -110,6 +118,25 @@ module Salesforce
       @user.custom_fields[@person::ID_FIELD] = id
       @user.save_custom_fields
       GuidedSyncConfiguration.record_result(@configuration["id"], @user.id)
+    end
+
+    def reconcile_converted_lead(record)
+      UserCustomField.transaction do
+        lead_link.mark_converted_to(record["ConvertedContactId"])
+        if record["ConvertedContactId"].present?
+          RecordLink.new(
+            provider: @configuration.fetch("provider", "salesforce"),
+            account: @configuration.fetch("instance_url"),
+            object: "Contact",
+            user_id: @user.id,
+          ).write(record["ConvertedContactId"], converted_from_lead_id: record["Id"])
+        end
+        @user.salesforce_lead_id = nil
+        if record["ConvertedContactId"].present?
+          @user.salesforce_contact_id = record["ConvertedContactId"]
+        end
+        @user.save_custom_fields
+      end
     end
 
     def mapped_values(fields, record)
@@ -153,8 +180,29 @@ module Salesforce
         raise Discourse::InvalidParameters.new(:salesforce_instance_url)
       end
       record = linked_record(link) if link
+      if @person == Lead && record && record["IsConverted"] == true
+        reconcile_converted_lead(record)
+        return :converted_lead
+      end
       fields = @configuration["mappings"].map { |mapping| mapping["destination"] }
       record ||= @person.find_by_email(@user.email, fields: fields, require_unique: true, api: @api)
+      if @person == Lead && record.nil?
+        converted_lead = Lead.find_converted_by_email(@user.email, api: @api)
+        if converted_lead
+          reconcile_converted_lead(converted_lead)
+          return :converted_lead
+        end
+      end
+      record
+    end
+
+    def converted_lead_link?
+      return false unless @person == Lead
+      link = record_link.read
+      if link && link["account"] != SiteSetting.salesforce_instance_url
+        raise Discourse::InvalidParameters.new(:salesforce_instance_url)
+      end
+      link&.key?("converted_to")
     end
 
     def linked_record(link)
@@ -163,11 +211,30 @@ module Salesforce
       raise unless error.status == 404 && @configuration["object"] == "Lead"
       id = link.fetch("id")
       raise unless id.match?(/\A[a-zA-Z0-9]{15}(?:[a-zA-Z0-9]{3})?\z/)
-      query = "SELECT Id, IsDeleted, IsConverted FROM Lead WHERE Id = '#{id}'"
+      query = "SELECT Id, IsDeleted, IsConverted, ConvertedContactId FROM Lead WHERE Id = '#{id}'"
       records = @api.get("queryAll/?q=#{CGI.escape(query)}").fetch("records")
       deleted = records.find { |record| record["Id"] == id }
+      if deleted && deleted["IsConverted"] == true
+        return(
+          {
+            "Id" => id,
+            "IsConverted" => true,
+            "ConvertedContactId" => deleted["ConvertedContactId"],
+          }
+        )
+      end
       raise error unless deleted && deleted["IsDeleted"] == true && deleted["IsConverted"] == false
       nil
+    end
+
+    def lead_link
+      @lead_link ||=
+        RecordLink.new(
+          provider: @configuration.fetch("provider", "salesforce"),
+          account: @configuration.fetch("instance_url"),
+          object: "Lead",
+          user_id: @user.id,
+        )
     end
 
     def source_value(source)

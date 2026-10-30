@@ -1,6 +1,6 @@
 import Component from "@glimmer/component";
 import { tracked } from "@glimmer/tracking";
-import { fn, get } from "@ember/helper";
+import { concat, fn, get } from "@ember/helper";
 import { on } from "@ember/modifier";
 import { action } from "@ember/object";
 import { cancel, debounce, next } from "@ember/runloop";
@@ -1024,7 +1024,9 @@ export default class SalesforceGuidedSync extends Component {
                         aria-label={{i18n
                           "salesforce.guided_sync.existing_value"
                         }}
-                        @selection={{mapping.policy}}
+                        @selection={{i18n
+                          (concat "salesforce.guided_sync." mapping.policy)
+                        }}
                         as |menu|
                       >
                         <menu.Item @value="keep">{{i18n

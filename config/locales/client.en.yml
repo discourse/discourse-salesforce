@@ -47,8 +47,6 @@ en:
         title: "Configurations"
         description: "Configure how Discourse data syncs with Salesforce."
         enable: "Save and sync"
-        save_new_help: "Sync is off until you save."
-        save_existing_help: "Changes apply when you save."
         save_changes: "Save configuration"
         scope_title: "Who to sync"
         scope_description: "If a member leaves all selected groups, their record stops updating but isn’t removed."

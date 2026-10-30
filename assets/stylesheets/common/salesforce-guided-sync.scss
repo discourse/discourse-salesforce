@@ -308,6 +308,8 @@
 }
 
 .salesforce-guided-sync__mapping-row .form-kit__control-select,
+.salesforce-guided-sync__mapping-row .form-kit__control-menu-trigger,
+.salesforce-guided-sync__scope-fields .form-kit__control-menu-trigger,
 .salesforce-field-menu .form-kit__control-menu-trigger,
 .salesforce-source-menu .form-kit__control-menu-trigger {
   width: 100%;
@@ -318,6 +320,13 @@
   border-radius: 0.25rem;
   background-color: var(--secondary);
   color: var(--primary);
+}
+
+.salesforce-guided-sync__scope-fields .form-kit__control-menu-trigger,
+.salesforce-guided-sync__mapping-row .form-kit__control-menu-trigger {
+  display: flex;
+  justify-content: space-between;
+  text-align: start;
 }
 
 .salesforce-field-menu {
@@ -421,6 +430,23 @@
   grid-template-columns: repeat(auto-fit, minmax(min(100%, 20em), 1fr));
   gap: 1.5em;
   margin-block: 1.5em 2em;
+}
+
+.salesforce-sync-configurations__table {
+  @include viewport.until(md) {
+    .d-table__cell.--controls {
+      position: static;
+      display: block;
+      width: auto;
+      padding-block-start: var(--space-2);
+      text-align: start;
+    }
+
+    .d-table__cell-actions {
+      flex-wrap: wrap;
+      justify-content: flex-start;
+    }
+  }
 }
 
 .salesforce-guided-sync__locked-mapping code,
@@ -585,10 +611,6 @@
     min-width: 0;
     margin: 0;
   }
-}
-
-.salesforce-guided-sync__save-help {
-  margin-inline-end: auto;
 }
 
 .salesforce-guided-sync__behavior-fields {

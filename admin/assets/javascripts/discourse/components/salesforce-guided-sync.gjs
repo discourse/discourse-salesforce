@@ -717,17 +717,17 @@ export default class SalesforceGuidedSync extends Component {
               @name="object"
               @onSet={{this.setConfiguration}}
               @title={{i18n "salesforce.guided_sync.target"}}
-              @type="select"
+              @type="menu"
               @validation="required"
               as |field|
             >
-              <field.Control @includeNone={{false}} as |select|>
-                <select.Option @value="Lead">{{i18n
+              <field.Control @selection={{this.configuration.object}} as |menu|>
+                <menu.Item @value="Lead">{{i18n
                     "salesforce.guided_sync.leads"
-                  }}</select.Option>
-                <select.Option @value="Contact">{{i18n
+                  }}</menu.Item>
+                <menu.Item @value="Contact">{{i18n
                     "salesforce.guided_sync.contacts"
-                  }}</select.Option>
+                  }}</menu.Item>
               </field.Control>
             </form.Field>
 
@@ -763,23 +763,26 @@ export default class SalesforceGuidedSync extends Component {
               @onSet={{this.setConfiguration}}
               @title={{i18n "salesforce.guided_sync.schedule"}}
               @tooltip={{i18n "salesforce.guided_sync.schedule_help"}}
-              @type="select"
+              @type="menu"
               @validation="required"
               as |field|
             >
-              <field.Control @includeNone={{false}} as |select|>
-                <select.Option @value="hourly">{{i18n
+              <field.Control
+                @selection={{this.configuration.schedule}}
+                as |menu|
+              >
+                <menu.Item @value="hourly">{{i18n
                     "salesforce.guided_sync.schedules.hourly"
-                  }}</select.Option>
-                <select.Option @value="daily">{{i18n
+                  }}</menu.Item>
+                <menu.Item @value="daily">{{i18n
                     "salesforce.guided_sync.schedules.daily"
-                  }}</select.Option>
-                <select.Option @value="weekly">{{i18n
+                  }}</menu.Item>
+                <menu.Item @value="weekly">{{i18n
                     "salesforce.guided_sync.schedules.weekly"
-                  }}</select.Option>
-                <select.Option @value="manual">{{i18n
+                  }}</menu.Item>
+                <menu.Item @value="manual">{{i18n
                     "salesforce.guided_sync.schedules.manual"
-                  }}</select.Option>
+                  }}</menu.Item>
               </field.Control>
             </form.Field>
           </div>
@@ -1013,7 +1016,7 @@ export default class SalesforceGuidedSync extends Component {
                       @showTitle={{false}}
                       @onSet={{fn this.setMapping "policy"}}
                       @title={{i18n "salesforce.guided_sync.existing_value"}}
-                      @type="select"
+                      @type="menu"
                       @validation="required"
                       as |field|
                     >
@@ -1021,15 +1024,15 @@ export default class SalesforceGuidedSync extends Component {
                         aria-label={{i18n
                           "salesforce.guided_sync.existing_value"
                         }}
-                        @includeNone={{false}}
-                        as |select|
+                        @selection={{mapping.policy}}
+                        as |menu|
                       >
-                        <select.Option @value="keep">{{i18n
+                        <menu.Item @value="keep">{{i18n
                             "salesforce.guided_sync.keep"
-                          }}</select.Option>
-                        <select.Option @value="overwrite">{{i18n
+                          }}</menu.Item>
+                        <menu.Item @value="overwrite">{{i18n
                             "salesforce.guided_sync.overwrite"
-                          }}</select.Option>
+                          }}</menu.Item>
                       </field.Control>
                     </collection.Field>
                     {{#let
@@ -1116,13 +1119,6 @@ export default class SalesforceGuidedSync extends Component {
 
         </section>
         <form.Actions class="salesforce-guided-sync__footer">
-          <span class="salesforce-guided-sync__save-help">{{i18n
-              (if
-                @record.active
-                "salesforce.guided_sync.save_existing_help"
-                "salesforce.guided_sync.save_new_help"
-              )
-            }}</span>
           {{#if @onCancel}}
             <DButton
               class="btn-flat"

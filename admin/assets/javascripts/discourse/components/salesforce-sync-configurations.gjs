@@ -209,7 +209,7 @@ export default class SalesforceSyncConfigurations extends Component {
           </AdminConfigAreaCard>
         </div>
         {{#if this.records.length}}
-          <table class="d-table">
+          <table class="d-table salesforce-sync-configurations__table">
             <thead class="d-table__header"><tr>
                 <th>{{i18n "salesforce.guided_sync.configuration_name"}}</th>
                 <th>{{i18n "salesforce.guided_sync.sync_type"}}</th>

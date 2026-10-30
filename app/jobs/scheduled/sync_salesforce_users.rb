@@ -70,7 +70,31 @@ module ::Jobs
                    current.value == previous_id
             next
           end
+          scope = {
+            provider: "salesforce",
+            account: SiteSetting.salesforce_instance_url,
+            user_id: field.user_id,
+          }
+          previous = Salesforce::RecordLink.new(**scope, object: object).read
           destination_name = Salesforce::Person.for_object(destination_object)::ID_FIELD
+          if object == "Lead"
+            lead_link_matches =
+              previous.nil? ||
+                (previous["account"] == scope[:account] && previous["id"] == previous_id)
+            contact_link = Salesforce::RecordLink.new(**scope, object: "Contact").read
+            contact_link_matches =
+              contact_link.nil? ||
+                (contact_link["account"] == scope[:account] && contact_link["id"] == id)
+            contact_field =
+              UserCustomField.find_by(user_id: current.user_id, name: destination_name)
+            contact_field_matches = contact_field.nil? || contact_field.value == id
+            unless lead_link_matches && contact_link_matches && contact_field_matches
+              Rails.logger.warn(
+                "Skipping converted Salesforce Lead reconciliation for Discourse user #{current.user_id}: an existing Salesforce record link conflicts",
+              )
+              next
+            end
+          end
           destination = UserCustomField.find_by(user_id: current.user_id, name: destination_name)
           if destination && destination.id != current.id
             destination.update!(value: id)
@@ -78,12 +102,6 @@ module ::Jobs
           else
             current.update!(name: destination_name, value: id)
           end
-          scope = {
-            provider: "salesforce",
-            account: SiteSetting.salesforce_instance_url,
-            user_id: field.user_id,
-          }
-          previous = Salesforce::RecordLink.new(**scope, object: object).read
           if object == "Lead"
             Salesforce::RecordLink.new(**scope, object: "Lead").mark_converted_to(id)
           end

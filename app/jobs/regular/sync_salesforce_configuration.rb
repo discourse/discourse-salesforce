@@ -22,17 +22,15 @@ module Jobs
           .pluck(:id)
       sync_ids = ids
       if args[:reason] == "scheduled"
+        links =
+          Salesforce::RecordLink.read_many(
+            provider: configuration.fetch("provider", "salesforce"),
+            account: configuration.fetch("instance_url"),
+            object: configuration.fetch("object"),
+            user_ids: ids,
+          )
         sync_ids =
-          ids.select do |user_id|
-            link =
-              Salesforce::RecordLink.new(
-                provider: configuration.fetch("provider", "salesforce"),
-                account: configuration.fetch("instance_url"),
-                object: configuration.fetch("object"),
-                user_id: user_id,
-              ).read
-            link && link["account"] == configuration["instance_url"]
-          end
+          ids.select { |user_id| links[user_id]&.[]("account") == configuration["instance_url"] }
       end
       if sync_ids.present?
         Jobs.enqueue(

@@ -48,7 +48,7 @@ module Salesforce
         "bio" => "I enjoy sharing ideas with the community.",
         "website" => "https://example.com",
         "company" => "Example company",
-        "groups" => GuidedSyncConfiguration.group_names(configuration).join(", "),
+        "groups" => GuidedSyncConfiguration.group_names(configuration),
         "trust" => 2,
       }
       return values[source] if values.key?(source)

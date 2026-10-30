@@ -61,7 +61,17 @@ module Salesforce
       users =
         @users.reject do |user|
           converted = @object == "Lead" && links[user.id]&.key?("converted_to")
-          GuidedSyncConfiguration.record_result(@configuration["id"], user.id) if converted
+          if converted
+            if links[user.id].dig("converted_to", "id").present?
+              GuidedSyncConfiguration.record_result(@configuration["id"], user.id)
+            else
+              GuidedSyncConfiguration.record_result(
+                @configuration["id"],
+                user.id,
+                error: LeadConversionReconciliationError.new("Converted Lead has no Contact ID"),
+              )
+            end
+          end
           converted
         end
       return if users.empty?
@@ -105,14 +115,12 @@ module Salesforce
           elsif converted_matches.size == 1
             sync = ConfiguredUserSync.new(@configuration, user, api: @api, source_data: source_data)
             sync.reconcile_converted_lead(converted_matches.first)
-            GuidedSyncConfiguration.record_result(@configuration["id"], user.id)
             next
           end
         end
         if @object == "Lead" && record && record["IsConverted"] == true
           sync = ConfiguredUserSync.new(@configuration, user, api: @api, source_data: source_data)
           sync.reconcile_converted_lead(record)
-          GuidedSyncConfiguration.record_result(@configuration["id"], user.id)
           next
         end
         if record && !used_ids.add?(record["Id"])
@@ -120,7 +128,12 @@ module Salesforce
           next
         end
         sync = ConfiguredUserSync.new(@configuration, user, api: @api, source_data: source_data)
-        values = sync.mapped_values(fields, record)
+        begin
+          values = sync.mapped_values(fields, record)
+        rescue Discourse::InvalidParameters => error
+          GuidedSyncConfiguration.record_result(@configuration["id"], user.id, error: error)
+          next
+        end
         if record && values.empty?
           sync.complete(record.fetch("Id"))
         elsif record
@@ -176,16 +189,11 @@ module Salesforce
     def write_collection(method, entries)
       return if entries.empty?
       records = entries.map { |_, _, values| values.merge("attributes" => { "type" => @object }) }
-      begin
-        results =
-          @api.public_send(method, "composite/sobjects", { allOrNone: false, records: records })
-        unless results.is_a?(Array) && results.size == entries.size &&
-                 results.all? { |result| result.is_a?(Hash) }
-          raise InvalidApiResponse.new("Invalid collection response")
-        end
-      rescue InvalidApiResponse, Faraday::Error => error
-        entries.each { |user, _, _| retry_user(user, error) }
-        return
+      results =
+        @api.public_send(method, "composite/sobjects", { allOrNone: false, records: records })
+      unless results.is_a?(Array) && results.size == entries.size &&
+               results.all? { |result| result.is_a?(Hash) }
+        raise InvalidApiResponse.new("Invalid collection response")
       end
       entries
         .zip(results)

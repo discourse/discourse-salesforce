@@ -103,17 +103,21 @@ module Salesforce
         status["user_errors"].select! { |user_id, _| eligible_ids.include?(user_id) }
         errors = status["user_errors"].values
         displayed_error = status["batch_error"] || errors.first
-        status["error"] = displayed_error["error"] if displayed_error
-        status["last_error_at"] = displayed_error["at"] if displayed_error
-        status.except!("error", "last_error_at") unless displayed_error
         PluginStore.set(PLUGIN_NAME, key, status)
-        status.except("user_errors", "batch_error")
+        display_status = status.except("user_errors", "batch_error")
+        if displayed_error
+          display_status["error"] = displayed_error["error"]
+          display_status["last_error_at"] = displayed_error["at"]
+        end
+        display_status
       end
     end
 
     def self.normalize_status(status)
+      has_user_errors = status.key?("user_errors")
       status["user_errors"] ||= {}
-      status["batch_error"] ||= if status["error"].present? && status["user_id"].blank?
+      status["batch_error"] ||= if status["error"].present? && status["user_id"].blank? &&
+           !has_user_errors
         { "at" => status["last_error_at"], "error" => status["error"] }
       end
       if status["error"].present? && status["user_id"].present?
@@ -134,6 +138,12 @@ module Salesforce
         records = all
         raise Discourse::NotFound unless records.any? { |record| record["id"] == id }
         PluginStore.set(PLUGIN_NAME, STORE_KEY, records.reject { |record| record["id"] == id })
+        PluginStore.remove(PLUGIN_NAME, "configuration_status:#{id}")
+        PluginStore.remove(PLUGIN_NAME, "configuration_scheduled_at:#{id}")
+        PluginStoreRow
+          .where(plugin_name: PLUGIN_NAME)
+          .where("key LIKE ?", "configuration_user_fingerprint:#{id}:%")
+          .delete_all
       end
     end
 

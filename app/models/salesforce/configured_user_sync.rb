@@ -83,20 +83,15 @@ module Salesforce
       if @configuration["instance_url"] != SiteSetting.salesforce_instance_url
         raise Discourse::InvalidParameters.new(:salesforce_instance_url)
       end
-      if converted_lead_link?
-        GuidedSyncConfiguration.record_result(@configuration["id"], @user.id)
-        return
-      end
+      return if converted_lead_link?
       fingerprint_key = "configuration_user_fingerprint:#{@configuration["id"]}:#{@user.id}"
       fingerprint = source_fingerprint
       return if skip_unchanged && PluginStore.get(PLUGIN_NAME, fingerprint_key) == fingerprint
       fields = @api.writable_fields(@configuration["object"])
       self.class.validate_mappings!(@configuration, fields)
       record = existing_record
-      if record == :converted_lead
-        GuidedSyncConfiguration.record_result(@configuration["id"], @user.id)
-        return
-      end
+      return if record == :converted_lead
+      return if record == :conversion_error
       values = mapped_values(fields, record)
       if record
         id = record.fetch("Id")
@@ -121,22 +116,32 @@ module Salesforce
     end
 
     def reconcile_converted_lead(record)
+      contact_id = record["ConvertedContactId"]
+      if contact_id.blank?
+        return(
+          conversion_reconciliation_failed(
+            "Converted Lead #{record["Id"]} has no accessible Contact ID",
+          )
+        )
+      end
+
+      if conversion_link_conflict?(record, contact_id)
+        return(
+          conversion_reconciliation_failed(
+            "Converted Lead #{record["Id"]} conflicts with an existing Salesforce Contact or Lead link",
+          )
+        )
+      end
+
       UserCustomField.transaction do
-        lead_link.mark_converted_to(record["ConvertedContactId"])
-        if record["ConvertedContactId"].present?
-          RecordLink.new(
-            provider: @configuration.fetch("provider", "salesforce"),
-            account: @configuration.fetch("instance_url"),
-            object: "Contact",
-            user_id: @user.id,
-          ).write(record["ConvertedContactId"], converted_from_lead_id: record["Id"])
-        end
-        @user.salesforce_lead_id = nil
-        if record["ConvertedContactId"].present?
-          @user.salesforce_contact_id = record["ConvertedContactId"]
-        end
+        lead_link.mark_converted_to(contact_id)
+        contact_link.write(contact_id, converted_from_lead_id: record["Id"])
+        @user.salesforce_lead_id = nil if @user.salesforce_lead_id == record["Id"]
+        @user.salesforce_contact_id = contact_id
         @user.save_custom_fields
       end
+      GuidedSyncConfiguration.record_result(@configuration["id"], @user.id)
+      true
     end
 
     def mapped_values(fields, record)
@@ -181,16 +186,14 @@ module Salesforce
       end
       record = linked_record(link) if link
       if @person == Lead && record && record["IsConverted"] == true
-        reconcile_converted_lead(record)
-        return :converted_lead
+        return reconcile_converted_lead(record) ? :converted_lead : :conversion_error
       end
       fields = @configuration["mappings"].map { |mapping| mapping["destination"] }
       record ||= @person.find_by_email(@user.email, fields: fields, require_unique: true, api: @api)
       if @person == Lead && record.nil?
         converted_lead = Lead.find_converted_by_email(@user.email, api: @api)
         if converted_lead
-          reconcile_converted_lead(converted_lead)
-          return :converted_lead
+          return reconcile_converted_lead(converted_lead) ? :converted_lead : :conversion_error
         end
       end
       record
@@ -202,7 +205,15 @@ module Salesforce
       if link && link["account"] != SiteSetting.salesforce_instance_url
         raise Discourse::InvalidParameters.new(:salesforce_instance_url)
       end
-      link&.key?("converted_to")
+      return false unless link&.key?("converted_to")
+
+      contact_id = link.dig("converted_to", "id")
+      if contact_id.present?
+        GuidedSyncConfiguration.record_result(@configuration["id"], @user.id)
+      else
+        conversion_reconciliation_failed("Converted Lead has no Contact ID")
+      end
+      true
     end
 
     def linked_record(link)
@@ -235,6 +246,52 @@ module Salesforce
           object: "Lead",
           user_id: @user.id,
         )
+    end
+
+    def contact_link
+      @contact_link ||=
+        RecordLink.new(
+          provider: @configuration.fetch("provider", "salesforce"),
+          account: @configuration.fetch("instance_url"),
+          object: "Contact",
+          user_id: @user.id,
+        )
+    end
+
+    def conversion_link_conflict?(record, contact_id)
+      current_lead = lead_link.read
+      current_contact = contact_link.read
+      legacy_lead_id = @user.salesforce_lead_id
+      legacy_contact_id = @user.salesforce_contact_id
+
+      (
+        current_lead &&
+          (
+            current_lead["account"] != @configuration["instance_url"] ||
+              current_lead["id"] != record["Id"]
+          )
+      ) ||
+        (
+          current_contact &&
+            (
+              current_contact["account"] != @configuration["instance_url"] ||
+                current_contact["id"] != contact_id
+            )
+        ) || (legacy_lead_id.present? && legacy_lead_id != record["Id"]) ||
+        (legacy_contact_id.present? && legacy_contact_id != contact_id)
+    end
+
+    def conversion_reconciliation_failed(message)
+      @conversion_error = LeadConversionReconciliationError.new(message)
+      Rails.logger.warn(
+        "Skipping converted Salesforce Lead reconciliation for Discourse user #{@user.id}: #{message}",
+      )
+      GuidedSyncConfiguration.record_result(
+        @configuration["id"],
+        @user.id,
+        error: @conversion_error,
+      )
+      false
     end
 
     def source_value(source)

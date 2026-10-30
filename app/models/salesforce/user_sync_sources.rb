@@ -134,7 +134,7 @@ module Salesforce
       when "posts30"
         return @recent_posts.fetch(user.id, 0)
       when "groups"
-        return Array(@groups[user.id]).map(&:last).join(", ")
+        return Array(@groups[user.id]).map(&:last)
       when "company"
         return @custom_values.dig(user.id, "user_field_#{@company_field.id}") if @company_field
         return nil

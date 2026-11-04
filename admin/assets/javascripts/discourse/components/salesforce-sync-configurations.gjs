@@ -219,7 +219,11 @@ export default class SalesforceSyncConfigurations extends Component {
                 <tr class="d-table__row" data-test-configuration={{record.id}}>
                   <td class="d-table__cell --overview">
                     <strong>{{record.name}}</strong>
-                    {{#if record.sync_status.error}}
+                    {{#if record.connection_changed}}
+                      <div class="salesforce-sync-configurations__status">
+                        {{i18n "salesforce.guided_sync.connection_changed"}}
+                      </div>
+                    {{else if record.sync_status.error}}
                       <div class="salesforce-sync-configurations__status">
                         {{i18n "salesforce.guided_sync.sync_error"}}
                       </div>

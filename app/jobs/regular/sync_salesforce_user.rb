@@ -20,7 +20,13 @@ module ::Jobs
             args[:user_id],
             error: error,
           )
-          raise
+          unless error.is_a?(Discourse::InvalidParameters) ||
+                   error.is_a?(Salesforce::AmbiguousEmailMatch)
+            raise
+          end
+          Rails.logger.warn(
+            "Salesforce configured sync stopped: configuration_id=#{args[:configuration_id]} user_id=#{args[:user_id]} error=#{error.class.name}",
+          )
         end
         return
       end

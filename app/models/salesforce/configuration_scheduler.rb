@@ -26,12 +26,14 @@ module Salesforce
     end
 
     def self.configuration_saved(record, previous:)
-      if !previous || !previous["active"] || previous["schedule"] != record["schedule"]
+      connection_changed = previous && previous["instance_url"] != record["instance_url"]
+      if !previous || !previous["active"] || connection_changed ||
+           previous["schedule"] != record["schedule"]
         PluginStore.set(PLUGIN_NAME, "configuration_scheduled_at:#{record["id"]}", Time.now.to_i)
       end
       if record["backfill"] &&
            (
-             !previous || !previous["active"] || !previous["backfill"] ||
+             !previous || !previous["active"] || connection_changed || !previous["backfill"] ||
                GuidedSyncConfiguration.group_ids(previous).sort !=
                  GuidedSyncConfiguration.group_ids(record).sort
            )

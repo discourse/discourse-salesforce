@@ -77,8 +77,16 @@ module ::Salesforce
 
     def self.each_dead_user_link(api, person_class)
       account = SiteSetting.salesforce_instance_url
-      # Guided-only links use hashed keys, so check users even without a legacy custom field.
-      User.in_batches(of: BATCH_SIZE) do |batch|
+      legacy_user_ids = UserCustomField.where(name: person_class::ID_FIELD).select(:user_id)
+      configured_ids =
+        RecordLink.user_ids(
+          provider: "salesforce",
+          account: account,
+          object: person_class::OBJECT_NAME,
+        )
+      linked_users =
+        User.where("users.id IN (#{legacy_user_ids.to_sql} UNION #{configured_ids.to_sql})")
+      linked_users.in_batches(of: BATCH_SIZE) do |batch|
         users = batch.select(:id, :username).to_a
         user_ids = users.map(&:id)
         legacy_ids =

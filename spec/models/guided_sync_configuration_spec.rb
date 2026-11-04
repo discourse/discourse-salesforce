@@ -7,16 +7,38 @@ RSpec.describe Salesforce::GuidedSyncConfiguration do
   fab!(:user) { Fabricate(:user, active: true) }
   fab!(:other_user) { Fabricate(:user, active: true) }
 
-  it "only activates Salesforce configurations" do
+  it "selects current-account configurations without querying group display names" do
     SiteSetting.salesforce_enabled = true
     SiteSetting.enable_guided_sync_configuration = true
+    SiteSetting.salesforce_instance_url = "https://current.salesforce.com"
+    current = {
+      "id" => "current",
+      "kind" => "users",
+      "active" => true,
+      "provider" => "salesforce",
+      "instance_url" => SiteSetting.salesforce_instance_url,
+      "group_ids" => [group.id],
+    }
     records = [
-      { "id" => "salesforce", "kind" => "users", "active" => true, "provider" => "salesforce" },
-      { "id" => "other", "kind" => "users", "active" => true, "provider" => "hubspot" },
+      current,
+      current.merge("id" => "stale", "instance_url" => "https://previous.salesforce.com"),
+      current.merge("id" => "other", "provider" => "hubspot"),
     ]
     PluginStore.set(Salesforce::PLUGIN_NAME, described_class::STORE_KEY, records)
-    expect(described_class.all.first["provider"]).to eq("salesforce")
-    expect(described_class.active.map { |record| record["id"] }).to eq(["salesforce"])
+
+    active = nil
+    queries = track_sql_queries { active = described_class.active }
+
+    expect(active).to eq([current])
+    expect(queries.grep(/FROM "groups"/)).to be_empty
+    displayed = nil
+    queries = track_sql_queries { displayed = described_class.all }
+    expect(queries.grep(/FROM "groups"/).size).to eq(1)
+    expect(displayed.map { |record| record["groups"] }).to eq(
+      [[group.name], [group.name], [group.name]],
+    )
+    expect(displayed.find { |record| record["id"] == "stale" }["connection_changed"]).to eq(true)
+    expect(displayed.first).not_to have_key("connection_changed")
   end
 
   it "rejects unsupported providers before contacting Salesforce" do

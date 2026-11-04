@@ -67,7 +67,13 @@ module ::Salesforce
     end
 
     def self.email_verified?(user)
-      user.active? && !user.staged? && user.email_confirmed?
+      return false unless user.active? && !user.staged?
+      return user.email_confirmed? unless user.association(:email_tokens).loaded?
+
+      # Match User#email_confirmed? without querying the preloaded association again.
+      user.email_tokens.empty? ||
+        user.email_tokens.any? { |token| token.confirmed? && token.email == user.email } ||
+        user.single_sign_on_record&.external_email&.downcase == user.email
     end
 
     def self.sync(user)

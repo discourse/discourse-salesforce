@@ -4,9 +4,18 @@ module Salesforce
   class RecordLink
     def self.read_many(provider:, account:, object:, user_ids:)
       ids = user_ids.uniq
-      current_keys = ids.to_h { |user_id| [user_id, key(provider, account, object, user_id)] }
+      scope = prefix(provider, account, object)
+      current_keys = ids.to_h { |user_id| [user_id, "#{scope}#{user_id}"] }
       stored = PluginStore.get_all(PLUGIN_NAME, current_keys.values)
       ids.to_h { |user_id| [user_id, stored[current_keys[user_id]]] }
+    end
+
+    def self.user_ids(provider:, account:, object:)
+      scope = prefix(provider, account, object)
+      PluginStoreRow
+        .where(plugin_name: PLUGIN_NAME)
+        .where("key LIKE ?", "#{scope}%")
+        .select(Arel.sql("split_part(key, ':', 3)::bigint"))
     end
 
     def initialize(provider:, account:, object:, user_id:)
@@ -53,9 +62,12 @@ module Salesforce
     end
 
     def self.key(provider, account, object, user_id)
-      scope = Digest::SHA256.hexdigest([provider, account, object, user_id].to_json)
-      "record_link:#{scope}"
+      "#{prefix(provider, account, object)}#{user_id}"
     end
-    private_class_method :key
+    def self.prefix(provider, account, object)
+      scope = Digest::SHA256.hexdigest([provider, account, object].to_json)
+      "record_link:#{scope}:"
+    end
+    private_class_method :key, :prefix
   end
 end

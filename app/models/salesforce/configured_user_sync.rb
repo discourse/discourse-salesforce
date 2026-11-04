@@ -92,7 +92,7 @@ module Salesforce
       fingerprint_key = "configuration_user_fingerprint:#{@configuration["id"]}:#{@user.id}"
       fingerprint = source_fingerprint
       return if skip_unchanged && PluginStore.get(PLUGIN_NAME, fingerprint_key) == fingerprint
-      fields = @api.writable_fields(@configuration["object"])
+      fields = @api.cached_writable_fields(@configuration["object"])
       self.class.validate_mappings!(@configuration, fields)
       record = existing_record
       return if record == :converted_lead

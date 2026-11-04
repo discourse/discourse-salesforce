@@ -400,14 +400,20 @@ RSpec.describe Jobs::SyncSalesforceUser do
       Salesforce::GuidedSyncConfiguration::STORE_KEY,
       [configuration],
     )
-    expect { run_sync }.to raise_error(Discourse::InvalidParameters)
+    expect { run_sync }.not_to raise_error
+    expect(Salesforce::GuidedSyncConfiguration.status_for(configuration)["error"]).to eq(
+      "Discourse::InvalidParameters",
+    )
     configuration["instance_url"] = "https://other.my.salesforce.com"
     PluginStore.set(
       Salesforce::PLUGIN_NAME,
       Salesforce::GuidedSyncConfiguration::STORE_KEY,
       [configuration],
     )
-    expect { run_sync }.to raise_error(Discourse::InvalidParameters)
+    Jobs::SyncSalesforceUser.clear
+    DiscourseEvent.trigger(:user_updated, user, ["name"])
+    expect(Jobs::SyncSalesforceUser.jobs).to be_empty
+    expect { run_sync }.not_to raise_error
     expect(a_request(:post, "#{api_path}/Lead")).not_to have_been_made
     expect(a_request(:patch, %r{/sobjects/})).not_to have_been_made
   end
@@ -493,6 +499,25 @@ RSpec.describe Jobs::SyncSalesforceUser do
     expect(linked).to have_been_requested.times(3)
   end
 
+  it "reuses metadata while refreshing the linked Salesforce record on every scheduled run" do
+    allow(Rails).to receive(:cache).and_return(ActiveSupport::Cache::MemoryStore.new)
+    record = { Id: "lead123", LastName: "CRM", Company: "CRM", Trust__c: user.trust_level }
+    stub_salesforce_person_lookup(
+      "Lead",
+      user.email,
+      record: record,
+      fields: %w[LastName Company Trust__c],
+    )
+    linked = stub_request(:get, "#{api_path}/Lead/lead123").to_return(body: record.to_json)
+
+    run_sync("scheduled")
+    run_sync("scheduled")
+    run_sync("scheduled")
+
+    expect(a_request(:get, "#{api_path}/Lead/describe")).to have_been_made.once
+    expect(linked).to have_been_requested.twice
+  end
+
   it "preserves nonempty Salesforce values, fills blanks, and overwrites selected fields" do
     stub_salesforce_person_lookup(
       "Lead",
@@ -523,7 +548,7 @@ RSpec.describe Jobs::SyncSalesforceUser do
       records: [{ Id: "one" }, { Id: "two" }],
       fields: %w[LastName Company Trust__c],
     )
-    expect { run_sync }.to raise_error(Salesforce::AmbiguousEmailMatch)
+    expect { run_sync }.not_to raise_error
     expect(a_request(:post, "#{api_path}/Lead")).not_to have_been_made
     expect(a_request(:patch, %r{/sobjects/})).not_to have_been_made
     expect(Salesforce::GuidedSyncConfiguration.status_for(configuration)["error"]).to eq(

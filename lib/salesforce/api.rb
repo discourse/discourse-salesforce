@@ -99,7 +99,10 @@ module ::Salesforce
     end
 
     def self.cached_writable_fields(object, refresh: false)
-      api = new
+      new.cached_writable_fields(object, refresh: refresh)
+    end
+
+    def cached_writable_fields(object, refresh: false)
       connection = [
         RailsMultisite::ConnectionManagement.current_db,
         SiteSetting.salesforce_authorization_server_url,
@@ -111,7 +114,7 @@ module ::Salesforce
       Rails.cache.delete(cache_key) if refresh
       Rails
         .cache
-        .fetch(cache_key, expires_in: WRITABLE_FIELDS_CACHE_TTL) { api.writable_fields(object) }
+        .fetch(cache_key, expires_in: WRITABLE_FIELDS_CACHE_TTL) { writable_fields(object) }
     end
 
     def set_access_token

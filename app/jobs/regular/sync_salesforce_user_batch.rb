@@ -13,7 +13,13 @@ module Jobs
       Salesforce::GuidedSyncConfiguration.record_batch_success(args[:configuration_id])
     rescue => error
       Salesforce::GuidedSyncConfiguration.record_result(args[:configuration_id], error: error)
-      raise
+      unless error.is_a?(Discourse::InvalidParameters) ||
+               error.is_a?(Salesforce::AmbiguousEmailMatch)
+        raise
+      end
+      Rails.logger.warn(
+        "Salesforce configured batch stopped: configuration_id=#{args[:configuration_id]} error=#{error.class.name}",
+      )
     end
   end
 end

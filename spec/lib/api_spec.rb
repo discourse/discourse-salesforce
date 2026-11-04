@@ -21,6 +21,31 @@ RSpec.describe ::Salesforce::Api do
     }
   end
 
+  it "shares metadata across clients, expires it, and honors explicit refreshes" do
+    allow(Rails).to receive(:cache).and_return(ActiveSupport::Cache::MemoryStore.new)
+    field = { name: "Email", type: "email", createable: true, updateable: true }
+    lookup =
+      stub_request(:get, "#{api_path}/Contact/describe").to_return(
+        body: { fields: [field] }.to_json,
+      )
+    freeze_time
+    api = described_class.new
+
+    expect(api.cached_writable_fields("Contact")).to eq([field.stringify_keys])
+    expect(described_class.cached_writable_fields("Contact")).to eq([field.stringify_keys])
+    expect(lookup).to have_been_requested.once
+
+    freeze_time 2.hours.from_now + 1.second
+    api.cached_writable_fields("Contact")
+    expect(lookup).to have_been_requested.twice
+    api.cached_writable_fields("Contact", refresh: true)
+    expect(lookup).to have_been_requested.times(3)
+
+    SiteSetting.salesforce_username = "different-integration-user"
+    described_class.cached_writable_fields("Contact")
+    expect(lookup).to have_been_requested.times(4)
+  end
+
   it "escapes plus signs in SOQL query parameters" do
     soql = "SELECT Id FROM Contact WHERE Email = 'team+salesforce-discourse-dev-ed@example.com'"
 

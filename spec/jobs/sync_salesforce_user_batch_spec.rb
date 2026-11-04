@@ -562,6 +562,21 @@ RSpec.describe Jobs::SyncSalesforceUserBatch do
     end
   end
 
+  it "records invalid mappings without retrying the batch" do
+    configuration["mappings"] = []
+    PluginStore.set(
+      Salesforce::PLUGIN_NAME,
+      Salesforce::GuidedSyncConfiguration::STORE_KEY,
+      [configuration],
+    )
+
+    expect { run_batch }.not_to raise_error
+
+    status = PluginStore.get(Salesforce::PLUGIN_NAME, "configuration_status:batch")
+    expect(status.dig("batch_error", "error")).to eq("Discourse::InvalidParameters")
+    expect(a_request(:get, query_path)).not_to have_been_made
+  end
+
   it "records lookup failures and raises for Sidekiq to retry the batch" do
     stub_request(:get, query_path).with(query: hash_including("q" => /SELECT/)).to_return(
       status: 503,

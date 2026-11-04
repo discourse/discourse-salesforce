@@ -284,6 +284,12 @@ module(
           active: true,
           sync_status: { error: "Salesforce::InvalidApiResponse" },
         },
+        {
+          ...createSyncConfiguration(),
+          id: "stale-connection",
+          name: "Previous Salesforce account",
+          connection_changed: true,
+        },
       ];
       await render(
         <template>
@@ -306,6 +312,13 @@ module(
         .hasText(
           "Sending failed — check background job errors",
           "keeps errors visible"
+        );
+      assert
+        .dom(
+          '[data-test-configuration="stale-connection"] .salesforce-sync-configurations__status'
+        )
+        .hasText(
+          "Salesforce connection changed. Configure and save again to resume sending."
         );
       await click('[data-test-delete-configuration="lead"]');
       assert

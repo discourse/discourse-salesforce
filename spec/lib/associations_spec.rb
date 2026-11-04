@@ -147,6 +147,50 @@ RSpec.describe ::Salesforce::Associations do
       end
     end
 
+    it "enumerates linked users without scanning unrelated users" do
+      Salesforce::RecordLink.new(
+        provider: "salesforce",
+        account: instance_url,
+        object: "Contact",
+        user_id: stale_user.id,
+      ).write(dead_contact_id)
+      Salesforce::RecordLink.new(
+        provider: "salesforce",
+        account: "other-account",
+        object: "Contact",
+        user_id: linked_user.id,
+      ).write(live_contact_id)
+      lookup =
+        stub_request(:get, "#{instance_url}services/data/v49.0/composite/sobjects/Contact").with(
+          query: {
+            fields: "Id",
+            ids: dead_contact_id,
+          },
+        ).to_return(body: [nil].to_json)
+      candidates = []
+      queries = nil
+
+      stub_const(described_class, :BATCH_SIZE, 1) do
+        queries =
+          track_sql_queries do
+            described_class.each_dead_user_link(
+              Salesforce::Api.new,
+              Salesforce::Contact,
+            ) { |user, legacy_id, configured_id| candidates << [user.id, legacy_id, configured_id] }
+          end
+      end
+
+      expect(candidates).to eq([[stale_user.id, nil, dead_contact_id]])
+      expect(lookup).to have_been_requested.once
+      expect(
+        queries.count do |query|
+          query.include?(
+            'SELECT "user_custom_fields"."user_id", "user_custom_fields"."value" FROM "user_custom_fields"',
+          )
+        end,
+      ).to eq(1)
+    end
+
     it "preserves guided links replaced while Salesforce is responding" do
       link =
         Salesforce::RecordLink.new(

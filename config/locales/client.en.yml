@@ -42,6 +42,7 @@ en:
         deleted_message: "Configuration deleted."
         save_success: "Configuration saved."
         sync_error: "Sending failed — check background job errors"
+        connection_changed: "Salesforce connection changed. Configure and save again to resume sending."
         title: "Configurations"
         description: "Create or update Salesforce leads and contacts using Discourse user data."
         save_and_send: "Save and send"

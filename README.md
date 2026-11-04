@@ -122,7 +122,8 @@ topics; group membership includes the user's group names. Last seen uses last_se
 Custom field mappings target real Salesforce field API names and are validated on save
 and execution. Unsupported types and duplicate destinations are rejected server-side.
 
-Configuration jobs retry failures five times. The list shows an error indicator when sending fails. Error class, affected user ID, and timestamps are
+API and temporary connection failures retain five retries. Invalid mappings and ambiguous
+email matches are recorded without automatic retries. The list shows an error indicator when sending fails. Error class, affected user ID, and timestamps are
 stored in `configuration_status:<id>`; background job failures are inspectable in
 Sidekiq. This is a last-error summary, not a full per-user run history. A successful
 retry for that user clears the error. Mapping changes require saving the configuration;
@@ -143,7 +144,9 @@ inaccessible records without confirmed deletion remain errors.
 ### Batch syncing
 
 `Jobs::SyncSalesforceUserBatch` uses `Salesforce::ConfiguredUserBatchSync` for backfills
-and scheduled refreshes. Each batch fetches Describe metadata once, queries records
+and scheduled refreshes. Execution shares writable-field metadata cached for two hours per
+connection and Salesforce object. Explicit saves and **Refresh field list** replace that cache
+with fresh metadata. Each batch queries records
 in groups of 25 (following Salesforce query pagination), and sends separate create
 and update requests to the sObject Collections endpoint with `allOrNone: false`.
 Unchanged records require no write. Each successful result saves its stable record link.
@@ -192,6 +195,10 @@ Mentions, messages, and assignment levels are set to nobody. Membership requests
 joining/leaving are disabled. Groups remain available if the sync setup is canceled;
 membership is managed from Groups.
 
+Configurations for a different Salesforce instance are excluded from events and scheduled
+sending. The list asks the administrator to configure and save them again. Explicitly saving
+for the new connection resets the schedule and queues backfill when enabled.
+
 Group joins and profile changes always trigger sending for active configurations.
 Backfill and the activity refresh schedule remain optional.
 After a successful individual sync, a digest of mapped values and mapping settings lets
@@ -220,7 +227,9 @@ queries. Salesforce serialization lives in `FieldMapping`,
 which belongs to sync execution rather than the source loader.
 
 `RecordLink` scopes a remote ID by provider, account, object and Discourse user. Salesforce
-currently uses its instance URL as the account identity. All configured links use the scoped key. The
+currently uses its instance URL as the account identity. Keys contain a hash of the provider,
+account and object followed by an enumerable Discourse user ID. Pruning selects users with
+stored associations instead of scanning every user. The
 PluginStore namespace remains `discourse-salesforce`; a future plugin rename must preserve
 or migrate that namespace. User custom fields remain compatibility fields for legacy
 Salesforce features, not the provider-independent link store.

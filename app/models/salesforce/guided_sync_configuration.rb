@@ -5,18 +5,20 @@ module Salesforce
     STORE_KEY = "guided_sync_configurations"
 
     def self.all
-      stored_records.map do |record|
-        names = group_names(record)
-        record.merge("groups" => names)
+      records = stored_records
+      ids = records.flat_map { |record| group_ids(record) }.uniq
+      names = groups_by_id(ids).to_h { |group| [group.id, group.name] }
+      records.map do |record|
+        display =
+          record.merge("groups" => group_ids(record).filter_map { |id| names[id.to_i] }.sort)
+        display["connection_changed"] = true if record["instance_url"] !=
+          SiteSetting.salesforce_instance_url
+        display
       end
     end
 
     def self.group_ids(record)
       Array(record["group_ids"])
-    end
-
-    def self.group_names(record)
-      groups_by_id(group_ids(record)).map(&:name).sort
     end
 
     def self.resolve_group_ids!(ids)
@@ -57,8 +59,9 @@ module Salesforce
 
     def self.active
       return [] unless enabled?
-      all.select do |record|
-        record["active"] && record["kind"] == "users" && record["provider"] == "salesforce"
+      stored_records.select do |record|
+        record["active"] && record["kind"] == "users" && record["provider"] == "salesforce" &&
+          record["instance_url"] == SiteSetting.salesforce_instance_url
       end
     end
 
@@ -165,7 +168,7 @@ module Salesforce
 
       ConfiguredUserSync.validate_mappings!(
         configuration,
-        Api.new.writable_fields(configuration["object"]),
+        Api.cached_writable_fields(configuration["object"], refresh: true),
       )
       configuration["group_ids"] = groups.sort_by(&:name).map(&:id)
 

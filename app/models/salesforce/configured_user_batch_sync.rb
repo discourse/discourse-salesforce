@@ -17,6 +17,7 @@ module Salesforce
             .eligible_group_members(GuidedSyncConfiguration.group_ids(configuration))
             .where(id: ids)
             .order(:id)
+            .includes(:primary_email, :email_tokens, :single_sign_on_record)
             .select { |user| Person.email_verified?(user) }
         next if users.empty?
         new(configuration, users, reason).sync
@@ -45,17 +46,12 @@ module Salesforce
         raise Discourse::InvalidParameters.new(:salesforce_instance_url)
       end
       links =
-        @users.to_h do |user|
-          [
-            user.id,
-            RecordLink.new(
-              provider: @configuration.fetch("provider"),
-              account: @configuration.fetch("instance_url"),
-              object: @object,
-              user_id: user.id,
-            ).read,
-          ]
-        end
+        RecordLink.read_many(
+          provider: @configuration.fetch("provider"),
+          account: @configuration.fetch("instance_url"),
+          object: @object,
+          user_ids: @users.map(&:id),
+        )
       users =
         @users.reject do |user|
           converted = @object == "Lead" && links[user.id]&.key?("converted_to")
@@ -73,7 +69,7 @@ module Salesforce
           converted
         end
       return if users.empty?
-      fields = @api.writable_fields(@object)
+      fields = @api.cached_writable_fields(@object)
       ConfiguredUserSync.validate_mappings!(@configuration, fields)
       records = existing_records(links, users)
       by_id = records.index_by { |record| record["Id"] }

@@ -8,8 +8,10 @@ RSpec.shared_context "with salesforce spec helper" do
 
   before do
     Discourse.redis.del(Salesforce::Api::ACCESS_TOKEN_KEY)
+    Rails.cache.clear
 
     SiteSetting.salesforce_enabled = true
+    SiteSetting.salesforce_instance_url = instance_url
     SiteSetting.salesforce_client_id = "SALESFORCE_CLIENT_ID"
     SiteSetting.salesforce_username = "SALESFORCE_API_USERNAME"
     SiteSetting.salesforce_rsa_private_key = "SALESFORCE_PRIVATE_KEY"

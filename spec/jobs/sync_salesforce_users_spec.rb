@@ -20,6 +20,12 @@ RSpec.describe Jobs::SyncSalesforceUsers do
       user1.save_custom_fields
       user2.salesforce_contact_id = "contact_123"
       user2.save_custom_fields
+      Salesforce::RecordLink.new(
+        provider: "salesforce",
+        account: "another-account",
+        object: "Contact",
+        user_id: user2.id,
+      ).write("contact_123")
 
       stub_request(
         :get,
@@ -33,6 +39,22 @@ RSpec.describe Jobs::SyncSalesforceUsers do
 
       expect(user1.reload.salesforce_contact_id).to eq("missing_contact")
       expect(user2.reload.salesforce_contact_id).to eq("contact_456")
+      link =
+        Salesforce::RecordLink.new(
+          provider: "salesforce",
+          account: instance_url,
+          object: "Contact",
+          user_id: user2.id,
+        )
+      expect(link.read).to be_nil
+      foreign_link =
+        Salesforce::RecordLink.new(
+          provider: "salesforce",
+          account: "another-account",
+          object: "Contact",
+          user_id: user2.id,
+        )
+      expect(foreign_link.read).to eq("id" => "contact_123", "account" => "another-account")
     end
 
     it "continues syncing lead conversions after a missing lead" do
@@ -59,6 +81,37 @@ RSpec.describe Jobs::SyncSalesforceUsers do
       expect(user1.salesforce_contact_id).to be_nil
       expect(user2.reload.salesforce_lead_id).to be_nil
       expect(user2.salesforce_contact_id).to eq("contact_456")
+      expect(
+        Salesforce::RecordLink.new(
+          provider: "salesforce",
+          account: instance_url,
+          object: "Lead",
+          user_id: user2.id,
+        ).read,
+      ).to include("converted_to" => { "object" => "Contact", "id" => "contact_456" })
+    end
+
+    it "rolls back the custom field if persisting a configured link fails" do
+      user2.salesforce_contact_id = "contact_123"
+      user2.save_custom_fields
+      SiteSetting.salesforce_instance_url = instance_url
+      link =
+        Salesforce::RecordLink.new(
+          provider: "salesforce",
+          account: instance_url,
+          object: "Contact",
+          user_id: user2.id,
+        )
+      link.write("contact_123")
+      stub_request(:get, "#{path}/Contact?fields=MasterRecordId&ids=contact_123").to_return(
+        body: [{ Id: "contact_123", MasterRecordId: "contact_456" }].to_json,
+      )
+      PluginStore.stubs(:set).raises(ActiveRecord::StatementInvalid)
+
+      described_class.new.execute({})
+
+      expect(user2.reload.salesforce_contact_id).to eq("contact_123")
+      expect(link.read["id"]).to eq("contact_123")
     end
 
     it "skips existing Lead links when Leads are disabled" do
@@ -93,8 +146,50 @@ RSpec.describe Jobs::SyncSalesforceUsers do
     end
 
     it "syncs lead to contact conversions and contact merges from Salesforce" do
+      lead_link =
+        Salesforce::RecordLink.new(
+          provider: "salesforce",
+          account: instance_url,
+          object: "Lead",
+          user_id: user1.id,
+        )
+      contact_link =
+        Salesforce::RecordLink.new(
+          provider: "salesforce",
+          account: instance_url,
+          object: "Contact",
+          user_id: user2.id,
+        )
+      lead_link.write("lead_123")
+      contact_link.write("contact_123")
       described_class.new.execute({})
 
+      expect(lead_link.read).to eq(
+        "account" => instance_url,
+        "converted_to" => {
+          "object" => "Contact",
+          "id" => "contact_456",
+        },
+      )
+      expect(contact_link.read["id"]).to eq("contact_789")
+      expect(
+        Salesforce::RecordLink.new(
+          provider: "salesforce",
+          account: instance_url,
+          object: "Contact",
+          user_id: user1.id,
+        ).read,
+      ).to include("id" => "contact_456", "converted_from_lead_id" => "lead_123")
+      expect(
+        Salesforce::RecordLink.new(
+          provider: "salesforce",
+          account: instance_url,
+          object: "Contact",
+          user_id: user1.id,
+        ).read[
+          "id"
+        ],
+      ).to eq("contact_456")
       fields = user1.reload.custom_fields
       expect(fields[::Salesforce::Lead::ID_FIELD]).to eq(nil)
       expect(fields[::Salesforce::Contact::ID_FIELD]).to eq("contact_456")

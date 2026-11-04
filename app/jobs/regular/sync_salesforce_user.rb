@@ -7,6 +7,24 @@ module ::Jobs
     def execute(args)
       return unless SiteSetting.salesforce_enabled
 
+      if args[:configuration_id]
+        begin
+          ::Salesforce::ConfiguredUserSync.sync(
+            args[:configuration_id],
+            args[:user_id],
+            reason: args[:reason],
+          )
+        rescue => error
+          ::Salesforce::GuidedSyncConfiguration.record_result(
+            args[:configuration_id],
+            args[:user_id],
+            error: error,
+          )
+          raise
+        end
+        return
+      end
+
       user = User.find(args[:user_id])
       return if ::Salesforce::Contact.sync(user)
 
@@ -31,13 +49,16 @@ module ::Jobs
         user.create_salesforce_contact
       end
     rescue Salesforce::AmbiguousEmailMatch => error
+      raise if args[:configuration_id]
       Rails.logger.warn(
         "Skipping Salesforce sync for Discourse user #{user.id}: multiple #{error.object_name} records have the same email",
       )
     rescue Salesforce::InvalidApiResponse => error
+      raise if args[:configuration_id]
       raise if error.status.nil? || error.status == 429 || error.status >= 500
       Rails.logger.warn("Skipping Salesforce sync for Discourse user #{user.id}: #{error.message}")
     rescue Salesforce::InvalidCredentials
+      raise if args[:configuration_id]
     end
   end
 end

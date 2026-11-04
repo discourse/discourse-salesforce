@@ -84,6 +84,89 @@ RSpec.describe ::Salesforce::Associations do
       expect(dead_case_post.reload.custom_fields[::Salesforce::CaseComment::ID_FIELD]).to eq(nil)
     end
 
+    it "prunes guided-only links and fingerprints in the connected account" do
+      scope = { provider: "salesforce", account: instance_url, object: "Contact" }
+      stale_link = Salesforce::RecordLink.new(**scope, user_id: stale_user.id)
+      live_link = Salesforce::RecordLink.new(**scope, user_id: linked_user.id)
+      other_account_link =
+        Salesforce::RecordLink.new(**scope.merge(account: "other-account"), user_id: stale_user.id)
+      lead_link = Salesforce::RecordLink.new(**scope.merge(object: "Lead"), user_id: stale_user.id)
+      stale_link.write(dead_contact_id)
+      live_link.write(live_contact_id)
+      other_account_link.write(dead_contact_id)
+      lead_link.mark_converted_to(dead_contact_id)
+      Salesforce::RecordLink.new(
+        provider: "salesforce",
+        account: instance_url,
+        object: "Contact",
+        user_id: stale_user.id,
+      ).write(dead_contact_id)
+      configurations = [
+        { id: "contact", provider: "salesforce", instance_url: instance_url, object: "Contact" },
+        { id: "lead", provider: "salesforce", instance_url: instance_url, object: "Lead" },
+        { id: "other", provider: "salesforce", instance_url: "other-account", object: "Contact" },
+      ]
+      PluginStore.set(
+        Salesforce::PLUGIN_NAME,
+        Salesforce::GuidedSyncConfiguration::STORE_KEY,
+        configurations,
+      )
+      configurations.each do |configuration|
+        PluginStore.set(
+          Salesforce::PLUGIN_NAME,
+          "configuration_user_fingerprint:#{configuration[:id]}:#{stale_user.id}",
+          "old",
+        )
+      end
+      stub_request(:get, "#{instance_url}services/data/v49.0/composite/sobjects/Contact").with(
+        query: {
+          fields: "Id",
+          ids: "#{live_contact_id},#{dead_contact_id}",
+        },
+      ).to_return(body: [{ Id: live_contact_id }, nil].to_json)
+
+      expect(described_class.prune_dead![:users]).to eq(1)
+
+      expect(stale_link.read).to be_nil
+      expect(live_link.read["id"]).to eq(live_contact_id)
+      expect(other_account_link.read["id"]).to eq(dead_contact_id)
+      expect(lead_link.read.dig("converted_to", "id")).to eq(dead_contact_id)
+      expect(
+        PluginStore.get(
+          Salesforce::PLUGIN_NAME,
+          "configuration_user_fingerprint:contact:#{stale_user.id}",
+        ),
+      ).to be_nil
+      %w[lead other].each do |id|
+        expect(
+          PluginStore.get(
+            Salesforce::PLUGIN_NAME,
+            "configuration_user_fingerprint:#{id}:#{stale_user.id}",
+          ),
+        ).to eq("old")
+      end
+    end
+
+    it "preserves guided links replaced while Salesforce is responding" do
+      link =
+        Salesforce::RecordLink.new(
+          provider: "salesforce",
+          account: instance_url,
+          object: "Contact",
+          user_id: stale_user.id,
+        )
+      link.write(dead_contact_id)
+      stub_request(:get, "#{instance_url}services/data/v49.0/composite/sobjects/Contact")
+        .with(query: { fields: "Id", ids: dead_contact_id })
+        .to_return do
+          link.write(live_contact_id)
+          { status: 200, body: [nil].to_json }
+        end
+
+      expect(described_class.prune_dead![:users]).to eq(0)
+      expect(link.read["id"]).to eq(live_contact_id)
+    end
+
     it "preserves Lead links while cleaning Contacts and Cases when Leads are disabled" do
       SiteSetting.salesforce_leads_enabled = false
       leads_group.add(stale_user)

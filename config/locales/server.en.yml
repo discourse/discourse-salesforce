@@ -1,6 +1,7 @@
 en:
   site_settings:
     salesforce_leads_enabled: "Enable Salesforce Lead lookups, creation, conversion sync, feed items, and association cleanup. Disable for Salesforce organizations where the integration user cannot access Leads. Contact operations continue and existing Lead links are retained."
+    enable_guided_sync_configuration: "Send Discourse user data to Salesforce using configurable field mappings, group membership, and a refresh schedule."
     salesforce_enabled: 'Enable the discourse-salesforce plugin'
     salesforce_login_enabled: 'Enable Salesforce Social Login'
     salesforce_client_id: "Salesforce connected app's client id"
@@ -26,6 +27,13 @@ en:
     salesforce_auth_verbose_logging: "Show verbose Salesforce authentication logs in /logs for troubleshooting"
   salesforce:
     error:
+      connection:
+        authentication: "Salesforce authentication failed. Check the API credentials and the integration user’s app authorization, then retry."
+        permissions: "Salesforce denied access. Check the integration user’s object and field permissions, then retry."
+        rate_limit: "Salesforce’s API request limit was reached. Try again later."
+        temporary: "Salesforce could not be reached or is temporarily unavailable. Try again shortly."
+        invalid_response: "Salesforce returned an unexpected response. Check the server logs for details, then retry."
+      fields_unavailable: "Could not load Salesforce fields. Check the connection and permissions, then try again."
       ambiguous_email_match: "Multiple Salesforce %{object_name} records have the same email"
       invalid_response: "Invalid response from Salesforce API"
       invalid_client_credentials: "There was an issue with the Salesforce credentials. Please confirm the validity of the Salesforce client id and client secret settings"

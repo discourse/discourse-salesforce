@@ -8,6 +8,7 @@ RSpec.describe Salesforce::Lead do
   fab!(:user)
 
   describe ".create!" do
+    before { stub_salesforce_converted_lead_lookup(user.email) }
     it "skips creation when Leads are disabled and the group is missing" do
       SiteSetting.salesforce_leads_enabled = false
       SiteSetting.salesforce_leads_group_id = ""
@@ -26,6 +27,81 @@ RSpec.describe Salesforce::Lead do
       expect(described_class.create!(user)).to be_nil
       expect(user.reload.salesforce_lead_id).to be_nil
       expect(a_request(:get, query_path)).not_to have_been_made
+      expect(a_request(:post, "#{api_path}/Lead")).not_to have_been_made
+    end
+
+    it "reconciles a converted Lead instead of creating a replacement" do
+      stub_salesforce_person_lookup("Lead", user.email)
+      stub_salesforce_converted_lead_lookup(
+        user.email,
+        records: [{ Id: "converted-lead", IsConverted: true, ConvertedContactId: "contact1" }],
+      )
+
+      expect(described_class.create!(user)).to be_nil
+
+      expect(user.reload.salesforce_contact_id).to eq("contact1")
+      expect(user.salesforce_lead_id).to be_nil
+      scope = { provider: "salesforce", account: instance_url, user_id: user.id }
+      expect(
+        Salesforce::RecordLink.new(**scope, object: "Lead").read.dig("converted_to", "id"),
+      ).to eq("contact1")
+      expect(Salesforce::RecordLink.new(**scope, object: "Contact").read["id"]).to eq("contact1")
+      expect(a_request(:post, "#{api_path}/Lead")).not_to have_been_made
+    end
+
+    it "rolls back failed conversion reconciliation and completes it on retry" do
+      Salesforce.seed_groups!
+      stub_salesforce_person_lookup("Lead", user.email)
+      stub_salesforce_converted_lead_lookup(
+        user.email,
+        records: [{ Id: "converted-lead", IsConverted: true, ConvertedContactId: "contact1" }],
+      )
+      scope = { provider: "salesforce", account: instance_url, user_id: user.id }
+      lead_link = Salesforce::RecordLink.new(**scope, object: "Lead")
+      contact_link = Salesforce::RecordLink.new(**scope, object: "Contact")
+      lead_link.write("converted-lead")
+      allow(user).to receive(:save_custom_fields).and_wrap_original do |original, *args, **kwargs|
+        original.call(*args, **kwargs)
+        raise ActiveRecord::StatementInvalid, "Simulated persistence failure"
+      end
+
+      expect { described_class.create!(user) }.to raise_error(ActiveRecord::StatementInvalid)
+
+      expect(lead_link.read["id"]).to eq("converted-lead")
+      expect(contact_link.read).to be_nil
+      expect(user.reload.salesforce_contact_id).to be_nil
+      allow(user).to receive(:save_custom_fields).and_call_original
+
+      expect(described_class.create!(user)).to be_nil
+
+      expect(lead_link.read.dig("converted_to", "id")).to eq("contact1")
+      expect(contact_link.read["id"]).to eq("contact1")
+      expect(user.reload.salesforce_contact_id).to eq("contact1")
+      expect(a_request(:post, "#{api_path}/Lead")).not_to have_been_made
+    end
+
+    it "preserves an existing Contact association when a converted Lead points elsewhere" do
+      user.upsert_custom_fields(Salesforce::Contact::ID_FIELD => "existing-contact")
+      stub_salesforce_person_lookup("Lead", user.email)
+      stub_salesforce_converted_lead_lookup(
+        user.email,
+        records: [{ Id: "converted-lead", IsConverted: true, ConvertedContactId: "other-contact" }],
+      )
+
+      expect(described_class.create!(user)).to be_nil
+      expect(user.reload.salesforce_contact_id).to eq("existing-contact")
+      expect(a_request(:post, "#{api_path}/Lead")).not_to have_been_made
+    end
+
+    it "skips replacement creation when the converted Contact is inaccessible" do
+      stub_salesforce_person_lookup("Lead", user.email)
+      stub_salesforce_converted_lead_lookup(
+        user.email,
+        records: [{ Id: "converted-lead", IsConverted: true, ConvertedContactId: nil }],
+      )
+
+      expect(described_class.create!(user)).to be_nil
+      expect(user.reload.salesforce_contact_id).to be_nil
       expect(a_request(:post, "#{api_path}/Lead")).not_to have_been_made
     end
 

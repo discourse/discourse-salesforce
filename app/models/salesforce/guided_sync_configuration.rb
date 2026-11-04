@@ -8,13 +8,15 @@ module Salesforce
       records = stored_records
       ids = records.flat_map { |record| group_ids(record) }.uniq
       names = groups_by_id(ids).to_h { |group| [group.id, group.name] }
-      records.map do |record|
-        display =
-          record.merge("groups" => group_ids(record).filter_map { |id| names[id.to_i] }.sort)
-        display["connection_changed"] = true if record["instance_url"] !=
-          SiteSetting.salesforce_instance_url
-        display
-      end
+      records.map { |record| display_record(record, names: names) }
+    end
+
+    def self.display_record(record, names: nil)
+      names ||= groups_by_id(group_ids(record)).to_h { |group| [group.id, group.name] }
+      display = record.merge("groups" => group_ids(record).filter_map { |id| names[id.to_i] }.sort)
+      display["connection_changed"] = true if record["instance_url"] !=
+        SiteSetting.salesforce_instance_url
+      display
     end
 
     def self.group_ids(record)
@@ -113,16 +115,20 @@ module Salesforce
         stored_status = PluginStore.get(PLUGIN_NAME, key)
         next unless stored_status
         status = stored_status
-        eligible_ids =
-          Person
-            .eligible_group_members(group_ids(record))
-            .where(id: status["user_errors"].keys.map(&:to_i))
-            .pluck(:id)
-            .map(&:to_s)
-        status["user_errors"].select! { |user_id, _| eligible_ids.include?(user_id) }
+        errors = status["user_errors"]
+        if errors.present?
+          eligible_ids =
+            Person
+              .eligible_group_members(group_ids(record))
+              .where(id: status["user_errors"].keys.map(&:to_i))
+              .pluck(:id)
+              .map(&:to_s)
+          if errors.select! { |user_id, _| eligible_ids.include?(user_id) }
+            PluginStore.set(PLUGIN_NAME, key, status)
+          end
+        end
         errors = status["user_errors"].values
         displayed_error = status["batch_error"] || errors.first
-        PluginStore.set(PLUGIN_NAME, key, status)
         display_status = status.except("user_errors", "batch_error")
         if displayed_error
           display_status["error"] = displayed_error["error"]

@@ -132,7 +132,7 @@ module Salesforce
     end
 
     def self.name_parts(user)
-      name = user.name || user.username
+      name = user.name.presence || user.username
       name.include?(" ") ? name.split(" ", 2) : [nil, name]
     end
 

@@ -7,8 +7,28 @@ RSpec.describe Salesforce::Lead do
 
   fab!(:user)
 
+  describe ".sync" do
+    it "preserves a different legacy Lead association during conversion reconciliation" do
+      user.upsert_custom_fields(Salesforce::Lead::ID_FIELD => "live-lead")
+      stub_salesforce_person_lookup("Lead", user.email)
+      stub_salesforce_converted_lead_lookup(
+        user.email,
+        records: [{ Id: "converted-lead", IsConverted: true, ConvertedContactId: "contact1" }],
+      )
+
+      expect(described_class.sync(user)).to eq(true)
+
+      expect(user.reload.salesforce_lead_id).to eq("live-lead")
+      expect(user.salesforce_contact_id).to be_nil
+      scope = { provider: "salesforce", account: instance_url, user_id: user.id }
+      expect(Salesforce::RecordLink.new(**scope, object: "Lead").read).to be_nil
+      expect(Salesforce::RecordLink.new(**scope, object: "Contact").read).to be_nil
+    end
+  end
+
   describe ".create!" do
     before { stub_salesforce_converted_lead_lookup(user.email) }
+
     it "skips creation when Leads are disabled and the group is missing" do
       SiteSetting.salesforce_leads_enabled = false
       SiteSetting.salesforce_leads_group_id = ""

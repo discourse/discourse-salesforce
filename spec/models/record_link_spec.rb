@@ -29,6 +29,18 @@ RSpec.describe Salesforce::RecordLink do
     expect(link.read["id"]).to eq("contact-1")
   end
 
+  it "preserves conversion metadata without rewriting an unchanged link" do
+    link = described_class.new(**scope)
+    link.write("contact-1", converted_from_lead_id: "lead-1")
+
+    queries = track_sql_queries { link.write("contact-1") }
+
+    expect(queries.grep(/(?:INSERT INTO|UPDATE|DELETE FROM).*plugin_store_rows/i)).to be_empty
+    expect(link.read["converted_from_lead_id"]).to eq("lead-1")
+    link.write("contact-2")
+    expect(link.read).to eq("id" => "contact-2", "account" => scope[:account])
+  end
+
   it "removes only the requested record and preserves replacements and other accounts" do
     link = described_class.new(**scope)
     other_link = described_class.new(**scope.merge(account: "other-account"))

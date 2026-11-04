@@ -33,6 +33,10 @@ RSpec.describe Salesforce::UserSyncSources do
     expect([data.value("first", user), data.value("last", user)]).to eq(%w[Alex Morgan])
     user.name = "Alex"
     expect([data.value("first", user), data.value("last", user)]).to eq([nil, "Alex"])
+    [nil, "", "   "].each do |name|
+      user.name = name
+      expect([data.value("first", user), data.value("last", user)]).to eq([nil, user.username])
+    end
   end
 
   it "loads recent reads, likes and first seen dates for a batch" do

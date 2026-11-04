@@ -51,6 +51,14 @@ module ::Salesforce
         return true
       end
 
+      existing_lead_id = user.salesforce_lead_id
+      if existing_lead_id.present? && existing_lead_id != converted_lead["Id"]
+        Rails.logger.warn(
+          "Skipping converted Salesforce Lead reconciliation for Discourse user #{user.id}: an existing Lead link conflicts",
+        )
+        return true
+      end
+
       existing_contact_id = user.salesforce_contact_id
       if existing_contact_id.present? && existing_contact_id != contact_id
         Rails.logger.warn(

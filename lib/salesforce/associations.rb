@@ -93,7 +93,8 @@ module ::Salesforce
           UserCustomField
             .where(user_id: user_ids, name: person_class::ID_FIELD)
             .pluck(:user_id, :value)
-            .to_h
+            .group_by(&:first)
+            .transform_values { |rows| rows.map(&:last).uniq }
         links =
           RecordLink.read_many(
             provider: "salesforce",
@@ -108,13 +109,14 @@ module ::Salesforce
             end
             .to_h
         dead_values =
-          dead_ids(api, person_class::OBJECT_NAME, legacy_ids.values + guided_ids.values)
+          dead_ids(api, person_class::OBJECT_NAME, legacy_ids.values.flatten + guided_ids.values)
         users.each do |user|
-          legacy_id = dead_values.include?(legacy_ids[user.id]) ? legacy_ids[user.id] : nil
+          dead_legacy_ids = Array(legacy_ids[user.id]).select { |id| dead_values.include?(id) }
           guided_id = dead_values.include?(guided_ids[user.id]) ? guided_ids[user.id] : nil
-          next unless legacy_id || guided_id
+          next if dead_legacy_ids.empty? && !guided_id
 
-          yield user, legacy_id, guided_id
+          yield user, dead_legacy_ids.shift, guided_id
+          dead_legacy_ids.each { |id| yield user, id, nil }
         end
       end
     end

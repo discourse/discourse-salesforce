@@ -76,6 +76,24 @@ RSpec.describe Salesforce::GuidedSyncConfiguration do
     ).to be_empty
   end
 
+  it "reads unchanged status without rewriting it or checking eligibility when there are no errors" do
+    configuration = { "id" => "sync", "group_ids" => [group.id] }
+    described_class.record_result("sync", user.id)
+
+    queries = track_sql_queries { described_class.status_for(configuration) }
+
+    expect(queries.grep(/(?:INSERT INTO|UPDATE|DELETE FROM).*plugin_store_rows/i)).to be_empty
+    expect(queries.grep(/FROM "users"/)).to be_empty
+
+    group.add(user)
+    described_class.record_result("sync", user.id, error: Salesforce::InvalidApiResponse.new)
+    status = nil
+    queries = track_sql_queries { status = described_class.status_for(configuration) }
+
+    expect(status["error"]).to eq("Salesforce::InvalidApiResponse")
+    expect(queries.grep(/(?:INSERT INTO|UPDATE|DELETE FROM).*plugin_store_rows/i)).to be_empty
+  end
+
   it "stores batch errors separately from user errors and clears them on batch success" do
     described_class.record_result("sync", error: Salesforce::InvalidApiResponse.new)
 

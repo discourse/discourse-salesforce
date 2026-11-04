@@ -36,6 +36,8 @@ module Salesforce
       end
       value = { "id" => id, "account" => @account }
       value["converted_from_lead_id"] = converted_from_lead_id if converted_from_lead_id
+      return if existing == value
+
       PluginStore.set(PLUGIN_NAME, key, value)
     end
 

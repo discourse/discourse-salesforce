@@ -53,7 +53,9 @@ module Salesforce
       record = GuidedSyncConfiguration.save!(configuration, id: params[:id], guardian: guardian)
       render json: {
                configuration:
-                 record.merge("sync_status" => GuidedSyncConfiguration.status_for(record)),
+                 GuidedSyncConfiguration.display_record(record).merge(
+                   "sync_status" => GuidedSyncConfiguration.status_for(record),
+                 ),
              },
              status: params[:id] ? :ok : :created
     rescue Salesforce::InvalidCredentials,

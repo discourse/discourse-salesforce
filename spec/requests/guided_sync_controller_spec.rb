@@ -251,6 +251,10 @@ RSpec.describe Salesforce::GuidedSyncController do
            },
            as: :json
       expect(response).to have_http_status(:created)
+      expect(response.parsed_body.dig("configuration", "groups")).to eq(
+        [sync_group.name, second_group.name].sort,
+      )
+      expect(response.parsed_body.fetch("configuration")).not_to have_key("connection_changed")
       expect(response.parsed_body.dig("configuration", "group_ids")).to contain_exactly(
         sync_group.id,
         second_group.id,

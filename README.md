@@ -63,7 +63,8 @@ memberships are still removed when their Contact links are pruned. Guided sync l
 checked, including links without a legacy user custom field. Removing a dead guided association
 clears its configuration fingerprints for the connected account and object; links in other
 accounts and converted-Lead markers are preserved. `DRY_RUN=1` reports the same legacy and guided
-user links that cleanup checks, without deleting links or fingerprints.
+user links that cleanup checks, without deleting links or fingerprints. If a user has multiple
+legacy ID rows, each ID is checked; live rows and their Contact group membership are preserved.
 
 ### Experimental configurations: send users to Salesforce
 
@@ -111,7 +112,8 @@ once-only creation cannot be guaranteed against concurrent external writers.
 Each mapping preserves nonempty Salesforce values or overwrites them as selected.
 Empty Discourse values never clear a Salesforce field. New records use Discourse values.
 Names use the existing plugin splitting rules, including a last-name fallback for
-single-word names. New Lead configurations map editable static text `Unknown` to Company.
+single-word names. Blank names fall back to the username. Legacy and configured Lead conversion
+reconciliation preserve conflicting existing Lead or Contact associations. New Lead configurations map editable static text `Unknown` to Company.
 LeadSource can be mapped to optional static text. Administrators must
 map values accepted by their org's picklists and validation rules; Salesforce rejects
 invalid payloads and the job records the failure. No implicit AccountId lookup occurs.

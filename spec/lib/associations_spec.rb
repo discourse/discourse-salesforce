@@ -84,6 +84,38 @@ RSpec.describe ::Salesforce::Associations do
       expect(dead_case_post.reload.custom_fields[::Salesforce::CaseComment::ID_FIELD]).to eq(nil)
     end
 
+    it "removes every dead custom field row while preserving a live row for the same user" do
+      contacts_group.add(stale_user)
+      [dead_contact_id, live_contact_id, dead_default_contact_id].each do |id|
+        UserCustomField.create!(user: stale_user, name: Salesforce::Contact::ID_FIELD, value: id)
+      end
+      lookup =
+        stub_request(:get, "#{instance_url}services/data/v49.0/composite/sobjects/Contact").with(
+          query: {
+            fields: "Id",
+            ids: [dead_contact_id, live_contact_id, dead_default_contact_id].join(","),
+          },
+        ).to_return(body: [nil, { Id: live_contact_id }, nil].to_json)
+      candidates = []
+
+      described_class.each_dead_user_link(
+        Salesforce::Api.new,
+        Salesforce::Contact,
+      ) { |user, legacy_id, guided_id| candidates << [user.id, legacy_id, guided_id] }
+      expect(candidates).to contain_exactly(
+        [stale_user.id, dead_contact_id, nil],
+        [stale_user.id, dead_default_contact_id, nil],
+      )
+
+      described_class.prune_dead!
+
+      expect(
+        stale_user.user_custom_fields.where(name: Salesforce::Contact::ID_FIELD).pluck(:value),
+      ).to eq([live_contact_id])
+      expect(contacts_group.users.exists?(stale_user.id)).to eq(true)
+      expect(lookup).to have_been_requested.twice
+    end
+
     it "prunes guided-only links and fingerprints in the connected account" do
       scope = { provider: "salesforce", account: instance_url, object: "Contact" }
       stale_link = Salesforce::RecordLink.new(**scope, user_id: stale_user.id)

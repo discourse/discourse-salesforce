@@ -50,3 +50,25 @@ module Salesforce
     end
   end
 end
+
+# == Schema Information
+#
+# Table name: crm_record_links
+#
+#  id                  :bigint           not null, primary key
+#  account             :string           not null
+#  converted_to_object :string
+#  object              :string           not null
+#  provider            :string           not null
+#  created_at          :datetime         not null
+#  updated_at          :datetime         not null
+#  converted_from_id   :string
+#  converted_to_id     :string
+#  external_id         :string           not null
+#  user_id             :integer          not null
+#
+# Indexes
+#
+#  idx_on_provider_account_object_external_id_e6565f303b  (provider,account,object,external_id)
+#  idx_on_provider_account_object_user_id_2760c0fe2e      (provider,account,object,user_id) UNIQUE
+#

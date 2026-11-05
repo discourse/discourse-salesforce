@@ -16,3 +16,21 @@ module Salesforce
     end
   end
 end
+
+# == Schema Information
+#
+# Table name: crm_sync_states
+#
+#  id               :bigint           not null, primary key
+#  error            :string
+#  error_at         :datetime
+#  fingerprint      :string
+#  created_at       :datetime         not null
+#  updated_at       :datetime         not null
+#  configuration_id :bigint           not null
+#  user_id          :integer          not null
+#
+# Indexes
+#
+#  index_crm_sync_states_on_configuration_id_and_user_id  (configuration_id,user_id) UNIQUE
+#

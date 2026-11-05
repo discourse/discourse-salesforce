@@ -198,3 +198,29 @@ module Salesforce
     end
   end
 end
+
+# == Schema Information
+#
+# Table name: crm_sync_configurations
+#
+#  id                :bigint           not null, primary key
+#  account           :string           not null
+#  active            :boolean          default(TRUE), not null
+#  backfill          :boolean          default(FALSE), not null
+#  kind              :string           default("users"), not null
+#  last_error        :string
+#  last_error_at     :datetime
+#  last_scheduled_at :datetime
+#  last_synced_at    :datetime
+#  mappings          :jsonb            not null
+#  name              :string           not null
+#  object            :string           not null
+#  provider          :string           not null
+#  schedule          :string           not null
+#  created_at        :datetime         not null
+#  updated_at        :datetime         not null
+#
+# Indexes
+#
+#  index_crm_sync_configurations_on_provider_and_account  (provider,account)
+#

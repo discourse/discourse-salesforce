@@ -30,7 +30,7 @@ module ::Jobs
               next if contact_id.blank?
 
               field = lead_fields.find_by(value: lead["Id"])
-              field.update(name: ::Salesforce::Contact::ID_FIELD, value: contact_id)
+              reconcile_link(field, "Lead", lead["Id"], "Contact", contact_id)
             end
           rescue => e
             Discourse.warn_exception(e, message: "Failed to sync Salesforce leads")
@@ -51,10 +51,70 @@ module ::Jobs
             next if new_contact_id.blank?
 
             field = contact_fields.find_by(value: contact["Id"])
-            field.update(value: new_contact_id)
+            reconcile_link(field, "Contact", contact["Id"], "Contact", new_contact_id)
           end
         rescue => e
           Discourse.warn_exception(e, message: "Failed to sync Salesforce contacts")
+        end
+      end
+    end
+
+    private
+
+    def reconcile_link(field, object, previous_id, destination_object, id)
+      return unless field
+      DistributedMutex.synchronize("salesforce_person_create_#{field.user_id}") do
+        UserCustomField.transaction do
+          current = UserCustomField.lock.find_by(id: field.id)
+          unless current && current.name == Salesforce::Person.for_object(object)::ID_FIELD &&
+                   current.value == previous_id
+            next
+          end
+          scope = {
+            provider: "salesforce",
+            account: SiteSetting.salesforce_instance_url,
+            user_id: field.user_id,
+          }
+          previous = Salesforce::RecordLink.find_by(**scope, object: object)
+          destination_name = Salesforce::Person.for_object(destination_object)::ID_FIELD
+          if object == "Lead"
+            lead_link_matches = previous.nil? || previous.external_id == previous_id
+            contact_link = Salesforce::RecordLink.find_by(**scope, object: "Contact")
+            contact_link_matches = contact_link.nil? || contact_link.external_id == id
+            contact_field =
+              UserCustomField.find_by(user_id: current.user_id, name: destination_name)
+            contact_field_matches = contact_field.nil? || contact_field.value == id
+            unless lead_link_matches && contact_link_matches && contact_field_matches
+              Rails.logger.warn(
+                "Skipping converted Salesforce Lead reconciliation for Discourse user #{current.user_id}: an existing Salesforce record link conflicts",
+              )
+              next
+            end
+          end
+          destination = UserCustomField.find_by(user_id: current.user_id, name: destination_name)
+          if destination && destination.id != current.id
+            destination.update!(value: id)
+            current.destroy!
+          else
+            current.update!(name: destination_name, value: id)
+          end
+          if object == "Lead"
+            Salesforce::RecordLink.mark_converted!(
+              **scope,
+              object: "Lead",
+              external_id: previous_id,
+              to_object: "Contact",
+              to_id: id,
+            )
+          end
+          if previous && previous.external_id == previous_id
+            Salesforce::RecordLink.link!(
+              **scope,
+              object: destination_object,
+              external_id: id,
+              converted_from_id: (object == "Lead" ? previous_id : previous.converted_from_id),
+            )
+          end
         end
       end
     end

@@ -1,0 +1,497 @@
+@use "lib/viewport";
+
+.salesforce-sync-configuration {
+  width: 100%;
+  min-width: 0;
+
+  &__form {
+    align-items: stretch;
+    gap: 0.75em;
+
+    > h3,
+    > p {
+      margin-block: 0 0.5em;
+    }
+  }
+
+  &__group-controls {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 0.5em;
+
+    .d-multi-select-trigger {
+      max-width: 100%;
+      min-width: 0;
+    }
+  }
+
+  &__mapping-headings {
+    display: none;
+    align-items: center;
+    color: var(--primary-medium);
+    font-size: var(--font-down-1);
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.025em;
+    padding-block: 0.75em;
+    border-block-end: 1px solid var(--primary-low);
+  }
+
+  &__mapping-arrow {
+    display: none;
+    color: var(--primary-medium);
+    justify-self: center;
+    align-self: center;
+  }
+
+  &__locked-mapping {
+    display: grid;
+    gap: 0.5em;
+    color: var(--primary-medium);
+    margin-block: 0.5em;
+  }
+
+  &__email-help {
+    grid-column: 1 / -1;
+    margin: 0;
+    color: var(--primary-high);
+    font-size: var(--font-down-1);
+  }
+
+  &__mapping-list {
+    display: grid;
+    gap: 0;
+    width: 100%;
+  }
+
+  &__mapping-row {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    gap: 0.75em;
+    padding-block: 0.75em;
+    border-block-end: 1px solid var(--primary-low);
+    align-items: start;
+
+    > .form-kit__field {
+      grid-column: 1;
+      min-width: 0;
+      margin: 0;
+    }
+  }
+
+  &__mapping-row > &__mapping-arrow {
+    align-self: start;
+    align-items: center;
+    min-height: 2.5rem;
+  }
+
+  &__mapping-source {
+    display: grid;
+    gap: 0.5em;
+    min-width: 0;
+
+    .form-kit__field {
+      margin: 0;
+      min-width: 0;
+    }
+  }
+
+  &__remove {
+    grid-column: 2;
+    grid-row: 1;
+    justify-self: center;
+    align-self: start;
+    width: 2.5rem;
+    min-height: 2.5rem;
+  }
+
+  &__actions {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 0.75em;
+    margin-block: 1.25em;
+
+    &.--spread {
+      justify-content: space-between;
+    }
+  }
+
+  &__footer {
+    position: sticky;
+    inset-block-end: 0;
+    z-index: 2;
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: flex-end;
+    gap: 0.75em;
+    width: 100%;
+    box-sizing: border-box;
+    padding: 1em;
+    margin-block-start: 2em;
+    border: 1px solid var(--primary-low);
+    border-radius: var(--d-border-radius);
+    background: var(--secondary);
+    box-shadow: var(--shadow-menu);
+  }
+
+  @include viewport.from(lg) {
+    &__mapping-headings,
+    &__locked-mapping,
+    &__mapping-row {
+      display: grid;
+      grid-template-columns:
+        minmax(0, 1fr) 1.75em minmax(0, 1fr) minmax(0, 0.7fr)
+        2em;
+      gap: 0.75em;
+      align-items: start;
+    }
+
+    &__mapping-arrow {
+      display: inline-flex;
+    }
+
+    &__mapping-row > .form-kit__field {
+      grid-column: auto;
+    }
+
+    &__mapping-row .form-kit__container-title {
+      display: none;
+    }
+
+    &__remove {
+      grid-column: 5;
+      grid-row: 1;
+      justify-self: center;
+      width: auto;
+      margin: 0;
+    }
+  }
+}
+
+.salesforce-sync-configuration__mapping-row .form-kit__control-menu-trigger,
+.salesforce-sync-configuration__scope-fields .form-kit__control-menu-trigger,
+.salesforce-field-menu .form-kit__control-menu-trigger,
+.salesforce-source-menu .form-kit__control-menu-trigger {
+  width: 100%;
+  min-width: 0;
+  min-height: 2.5rem;
+  box-sizing: border-box;
+  border: 1px solid var(--primary-medium);
+  border-radius: 0.25rem;
+  background-color: var(--secondary);
+  color: var(--primary);
+}
+
+.salesforce-sync-configuration__scope-fields .form-kit__control-menu-trigger,
+.salesforce-sync-configuration__mapping-row .form-kit__control-menu-trigger {
+  display: flex;
+  justify-content: space-between;
+  text-align: start;
+}
+
+.salesforce-field-menu {
+  position: relative;
+  width: 100%;
+  min-width: 0;
+
+  .form-kit__control-menu-trigger {
+    display: flex;
+    justify-content: space-between;
+    text-align: start;
+    font-family: var(--font-family-monospace, monospace);
+
+    .d-button-label {
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+  }
+
+  &__search {
+    width: 100%;
+    min-width: 0;
+    box-sizing: border-box;
+
+    .filter-input {
+      min-width: 0;
+    }
+  }
+
+  &__option {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 0.35em;
+    width: 100%;
+    line-height: 1.4;
+    white-space: normal;
+    text-align: start;
+
+    &.--selected {
+      background: var(--d-selected);
+    }
+  }
+
+  &__option-label {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 1em;
+  }
+
+  &__selected-badge {
+    position: absolute;
+    inset-inline-end: 2.5em;
+    inset-block-start: 50%;
+    transform: translateY(-50%);
+    pointer-events: none;
+  }
+
+  &.--placeholder .form-kit__control-menu-trigger {
+    font-family: var(--font-family);
+  }
+
+  &.--custom .d-button-label {
+    padding-inline-end: 4.5em;
+  }
+
+  &__badge,
+  &__selected-badge {
+    flex-shrink: 0;
+    padding: 0.1em 0.5em;
+    border-radius: 0.25em;
+    color: var(--primary-high);
+    background: var(--primary-very-low);
+    font-family: var(--font-family);
+    font-size: var(--font-down-1);
+  }
+
+  &__description {
+    color: var(--primary-high);
+    font-size: var(--font-down-1);
+    white-space: normal;
+  }
+}
+
+.salesforce-sync-configurations__choices {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 20em), 1fr));
+  gap: 1.5em;
+  margin-block: 1.5em 2em;
+}
+
+.salesforce-sync-configurations__table {
+  @include viewport.until(md) {
+    .d-table__cell.--controls {
+      position: static;
+      display: block;
+      width: auto;
+      padding-block-start: var(--space-2);
+      text-align: start;
+    }
+
+    .d-table__cell-actions {
+      flex-wrap: wrap;
+      justify-content: flex-start;
+    }
+  }
+}
+
+.salesforce-sync-configuration__locked-mapping code,
+.salesforce-field-menu__option-label code {
+  background: none;
+  padding: 0;
+}
+
+.form-kit__control-menu-content
+  .dropdown-menu:has(
+    .salesforce-field-menu__search,
+    .salesforce-source-menu__search
+  ) {
+  width: min(26em, calc(100vw - 2em));
+  box-sizing: border-box;
+  min-width: 0;
+  max-height: min(24rem, 60dvh);
+  overflow-y: auto;
+  overflow-x: hidden;
+  overscroll-behavior: contain;
+
+  .form-kit__control-menu-container:has(
+    .salesforce-field-menu__search,
+    .salesforce-source-menu__search
+  ) {
+    position: sticky;
+    top: 0;
+    z-index: 1;
+    min-width: 0;
+    box-sizing: border-box;
+    padding: 0.5em;
+    background: var(--secondary);
+  }
+
+  .salesforce-field-menu__option-label code {
+    overflow-wrap: anywhere;
+    min-width: 0;
+  }
+}
+
+.salesforce-sync-configuration__retry-fields {
+  margin-block-start: 1em;
+}
+
+.form-kit__control-menu-content:has(.salesforce-source-menu__search) {
+  .fk-d-menu__inner-content {
+    flex-direction: column;
+    overflow: hidden;
+  }
+
+  .dropdown-menu {
+    height: min(24rem, 60dvh);
+    min-height: 0;
+    padding-block-start: 0;
+    scrollbar-gutter: stable;
+  }
+}
+
+.salesforce-sync-configurations__coming-soon {
+  color: var(--primary-medium);
+
+  .admin-config-area-card__title {
+    color: inherit;
+  }
+}
+
+.salesforce-source-menu {
+  width: 100%;
+  min-width: 0;
+
+  .form-kit__control-menu-trigger {
+    justify-content: space-between;
+    text-align: start;
+
+    .d-button-label {
+      min-width: 0;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+
+    .d-icon {
+      flex-shrink: 0;
+    }
+  }
+
+  &__search {
+    width: 100%;
+    min-width: 0;
+
+    .filter-input {
+      min-width: 0;
+    }
+  }
+
+  &__group {
+    margin: 0;
+    padding: 0.65em var(--d-sidebar-row-horizontal-padding);
+    border-block-start: 1px solid var(--primary-low);
+    background: var(--primary-very-low);
+    color: var(--primary-high);
+    font-size: var(--font-down-1);
+    font-weight: 600;
+    line-height: 1.4;
+  }
+
+  &__option {
+    width: 100%;
+    padding: 0.65em var(--d-sidebar-row-horizontal-padding);
+    text-align: start;
+    white-space: normal;
+    overflow-wrap: anywhere;
+    line-height: 1.4;
+
+    &.--selected {
+      background: var(--d-selected);
+    }
+  }
+}
+
+.salesforce-sync-configuration__heading {
+  display: flex;
+  align-items: center;
+  gap: 0.5em;
+
+  .d-page-subheader__title-row {
+    margin: 0;
+  }
+}
+
+.salesforce-sync-configuration__name-form {
+  display: flex;
+  flex-direction: row;
+  align-items: flex-start;
+  gap: 0.5em;
+  width: min(100%, 26em);
+  margin: 0;
+
+  > .form-kit__field {
+    flex: 1;
+    min-width: 0;
+    margin: 0;
+  }
+
+  .form-kit__control-input {
+    width: 100%;
+    box-sizing: border-box;
+  }
+}
+
+.salesforce-sync-configuration__name-actions {
+  display: flex;
+  flex-shrink: 0;
+  gap: 0.5em;
+}
+
+.salesforce-sync-configuration__section {
+  min-width: 0;
+  padding-block: 1.5em;
+  border-block-end: 1px solid var(--primary-low);
+
+  > h3 {
+    margin-block: 0 0.35em;
+  }
+
+  > .salesforce-sync-configuration__description {
+    margin-block: 0 1em;
+    color: var(--primary-high);
+  }
+}
+
+.salesforce-sync-configuration__scope-fields {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  gap: 1.5em;
+
+  > .form-kit__field {
+    min-width: 0;
+    margin: 0;
+  }
+}
+
+.salesforce-sync-configuration__behavior-fields {
+  display: flex;
+  flex-direction: column;
+  gap: 1.5em;
+
+  > .form-kit__field {
+    margin: 0;
+  }
+}
+
+.salesforce-sync-configuration__create-group {
+  width: 100%;
+  justify-content: flex-start;
+  color: var(--tertiary);
+}

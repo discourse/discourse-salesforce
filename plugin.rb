@@ -22,6 +22,9 @@ end
 require_relative "lib/salesforce/engine"
 
 register_asset "stylesheets/salesforce.scss"
+register_asset "stylesheets/common/salesforce-sync-configuration.scss", :admin
+
+add_admin_route "salesforce.title", "discourse-salesforce", use_new_show_route: true
 
 register_svg_icon "fab-salesforce"
 register_svg_icon "address-card"
@@ -63,15 +66,40 @@ after_initialize do
   end
 
   on(:user_confirmed_email) do |user, scope|
+    Salesforce::ConfigurationScheduler.enqueue_user(user, reason: "change")
     if scope == EmailToken.scopes[:signup] && ::Salesforce::Api.has_credentials?
       Jobs.enqueue(:sync_salesforce_user, user_id: user.id)
     end
   end
 
   add_model_callback(User, :after_commit, on: :update) do
+    if saved_change_to_active?(from: false, to: true)
+      Salesforce::ConfigurationScheduler.enqueue_user(self, reason: "join")
+    end
     if saved_change_to_active?(from: false, to: true) && ::Salesforce::Api.has_credentials?
       Jobs.enqueue(:sync_salesforce_user, user_id: self.id)
     end
+  end
+
+  on(:user_added_to_group) do |user, group, **opts|
+    Salesforce::ConfigurationScheduler.enqueue_user(user, reason: "join", group_id: group.id)
+    Salesforce::ConfigurationScheduler.enqueue_user(
+      user,
+      reason: "change",
+      excluding_group_id: group.id,
+    )
+  end
+
+  on(:user_updated) do |user, *args|
+    Salesforce::ConfigurationScheduler.enqueue_user(user, reason: "change")
+  end
+
+  on(:user_removed_from_group) do |user, group, *args|
+    Salesforce::ConfigurationScheduler.enqueue_user(user, reason: "change")
+  end
+
+  on(:user_first_logged_in) do |user|
+    Salesforce::ConfigurationScheduler.enqueue_user(user, reason: "change")
   end
 
   on(:post_created) do |post, opts|

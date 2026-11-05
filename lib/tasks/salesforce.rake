@@ -10,15 +10,12 @@ task "salesforce:prune_dead_associations" => :environment do
   { Salesforce::Contact => "contact", Salesforce::Lead => "lead" }.each do |person_class, label|
     next if person_class == Salesforce::Lead && !Salesforce.leads_enabled?
 
-    fields = UserCustomField.where(name: person_class::ID_FIELD)
-    dead = Salesforce::Associations.dead_ids(api, person_class::OBJECT_NAME, fields.pluck(:value))
-    fields
-      .where(value: dead)
-      .includes(:user)
-      .find_each do |field|
+    Salesforce::Associations.each_dead_user_link(api, person_class) do |user, legacy_id, guided_id|
+      [legacy_id, guided_id].compact.uniq.each do |id|
         found += 1
-        puts "dead #{label} #{field.value}: #{Discourse.base_url}/u/#{field.user&.username} (user #{field.user_id})"
+        puts "dead #{label} #{id}: #{Discourse.base_url}/u/#{user.username} (user #{user.id})"
       end
+    end
   end
 
   dead_uids = Salesforce::Associations.dead_ids(api, "Case", Salesforce::Case.pluck(:uid))

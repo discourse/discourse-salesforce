@@ -92,6 +92,7 @@ RSpec.describe ::Salesforce::PersonsController do
     end
 
     it "creates a new lead object in Salesforce" do
+      stub_salesforce_converted_lead_lookup(user.email)
       stub_salesforce_person_lookup("Lead", user.email)
 
       stub_request(:post, "#{api_path}/Lead").with(

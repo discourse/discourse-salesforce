@@ -113,7 +113,6 @@ class OmniAuth::Strategies::Salesforce < OmniAuth::Strategies::OAuth2
 
   def request_phase
     req = Rack::Request.new(@env)
-    options.update(req.params)
     ua = req.user_agent.to_s
     if !options.has_key?(:display)
       mobile_request = ua.downcase =~ Regexp.new(MOBILE_USER_AGENTS)

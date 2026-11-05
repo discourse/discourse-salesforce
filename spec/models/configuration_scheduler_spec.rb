@@ -12,7 +12,7 @@ RSpec.describe Salesforce::ConfigurationScheduler do
   it "enqueues weekly and hourly configurations once per interval and skips manual schedules" do
     configurations =
       %w[weekly hourly manual].to_h do |schedule|
-        [schedule, Fabricate(:guided_sync_configuration, schedule: schedule)]
+        [schedule, Fabricate(:sync_configuration, schedule: schedule)]
       end
     freeze_time Time.utc(2026, 10, 26, 2)
     Jobs::SyncSalesforceConfiguration.clear
@@ -37,7 +37,7 @@ RSpec.describe Salesforce::ConfigurationScheduler do
   it "resets scheduling and backfills when explicitly saved for a different connection" do
     configuration =
       Fabricate(
-        :guided_sync_configuration,
+        :sync_configuration,
         account: "https://previous.salesforce.com",
         last_scheduled_at: 1.day.ago,
       )
@@ -60,9 +60,9 @@ RSpec.describe Salesforce::ConfigurationScheduler do
     other_group = Fabricate(:group)
     user = Fabricate(:user)
     group.add(user)
-    scoped = Fabricate(:guided_sync_configuration, groups: [group])
-    Fabricate(:guided_sync_configuration, groups: [other_group])
-    manual = Fabricate(:guided_sync_configuration, groups: [group], schedule: "manual")
+    scoped = Fabricate(:sync_configuration, groups: [group])
+    Fabricate(:sync_configuration, groups: [other_group])
+    manual = Fabricate(:sync_configuration, groups: [group], schedule: "manual")
     Jobs::SyncSalesforceUser.clear
 
     described_class.enqueue_user(user, reason: "change")

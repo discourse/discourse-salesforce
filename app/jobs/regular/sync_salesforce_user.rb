@@ -15,7 +15,7 @@ module ::Jobs
             reason: args[:reason],
           )
         rescue => error
-          ::Salesforce::GuidedSyncConfiguration.record_result(
+          ::Salesforce::SyncConfiguration.record_result(
             args[:configuration_id],
             args[:user_id],
             error: error,

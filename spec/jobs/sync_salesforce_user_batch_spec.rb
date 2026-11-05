@@ -10,7 +10,7 @@ RSpec.describe Jobs::SyncSalesforceUserBatch do
   fab!(:other_user) { Fabricate(:user, name: "Maya Chen") }
   let!(:configuration) do
     Fabricate(
-      :guided_sync_configuration,
+      :sync_configuration,
       groups: [group],
       object: "Contact",
       account: instance_url,

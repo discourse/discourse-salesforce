@@ -54,12 +54,12 @@ module Salesforce
     end
 
     def self.sync(configuration_id, user_id, reason: nil)
-      return unless GuidedSyncConfiguration.enabled?
+      return unless SyncConfiguration.enabled?
       DistributedMutex.synchronize(
         "salesforce_person_create_#{user_id}",
         validity: SYNC_LOCK_VALIDITY,
       ) do
-        configuration = GuidedSyncConfiguration.active.find_by(id: configuration_id)
+        configuration = SyncConfiguration.active.find_by(id: configuration_id)
         return unless configuration&.reason_enabled?(reason)
         user = User.find_by(id: user_id)
         return unless user && Person.auto_create_eligible?(user) && Person.email_verified?(user)
@@ -116,7 +116,7 @@ module Salesforce
       SyncState.where(configuration_id: @configuration.id, user_id: @user.id).update_all(
         fingerprint: nil,
       )
-      GuidedSyncConfiguration.record_result(@configuration.id, @user.id)
+      SyncConfiguration.record_result(@configuration.id, @user.id)
     end
 
     def reconcile_converted_lead(record)
@@ -153,7 +153,7 @@ module Salesforce
         @user.salesforce_contact_id = contact_id
         @user.save_custom_fields
       end
-      GuidedSyncConfiguration.record_result(@configuration.id, @user.id)
+      SyncConfiguration.record_result(@configuration.id, @user.id)
       true
     end
 
@@ -216,7 +216,7 @@ module Salesforce
       return false unless @person == Lead
       return false unless @configuration.record_link_for(@user.id)&.converted?
 
-      GuidedSyncConfiguration.record_result(@configuration.id, @user.id)
+      SyncConfiguration.record_result(@configuration.id, @user.id)
       true
     end
 
@@ -259,7 +259,7 @@ module Salesforce
       Rails.logger.warn(
         "Skipping converted Salesforce Lead reconciliation for Discourse user #{@user.id}: #{message}",
       )
-      GuidedSyncConfiguration.record_result(@configuration.id, @user.id, error: @conversion_error)
+      SyncConfiguration.record_result(@configuration.id, @user.id, error: @conversion_error)
       false
     end
 

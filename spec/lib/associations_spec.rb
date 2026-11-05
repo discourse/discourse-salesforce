@@ -132,9 +132,9 @@ RSpec.describe ::Salesforce::Associations do
         to_id: dead_contact_id,
       )
       configurations = {
-        contact: Fabricate(:guided_sync_configuration, object: "Contact", account: instance_url),
-        lead: Fabricate(:guided_sync_configuration, object: "Lead", account: instance_url),
-        other: Fabricate(:guided_sync_configuration, object: "Contact", account: "other-account"),
+        contact: Fabricate(:sync_configuration, object: "Contact", account: instance_url),
+        lead: Fabricate(:sync_configuration, object: "Lead", account: instance_url),
+        other: Fabricate(:sync_configuration, object: "Contact", account: "other-account"),
       }
       configurations.each_value do |configuration|
         Salesforce::SyncState.store(configuration.id, stale_user.id, fingerprint: "old")

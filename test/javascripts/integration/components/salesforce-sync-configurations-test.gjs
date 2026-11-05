@@ -56,7 +56,7 @@ module(
         .dom("[data-test-sync-posts]")
         .isDisabled("shows the disabled choice");
       assert
-        .dom(".salesforce-guided-sync")
+        .dom(".salesforce-sync-configuration")
         .doesNotExist("does not open an editor");
     });
 
@@ -97,13 +97,15 @@ module(
         .dom('[data-test-configuration="saved"]')
         .exists("shows the saved configuration in the list");
       assert
-        .dom(".salesforce-guided-sync")
+        .dom(".salesforce-sync-configuration")
         .doesNotExist("closes the editor after creation");
       assert.strictEqual(closes, 1, "clears the configuration query parameter");
       await click('[data-test-configuration="saved"] button');
       await click("[data-test-edit-name]");
       await fillIn('[data-name="name"] input', "Updated user export");
-      await click('.salesforce-guided-sync__name-form button[type="submit"]');
+      await click(
+        '.salesforce-sync-configuration__name-form button[type="submit"]'
+      );
       await click("[data-test-save]");
       assert
         .dom('[data-test-configuration="saved"]')
@@ -164,7 +166,7 @@ module(
         .dom('[data-name="object"] .form-kit__control-menu-trigger')
         .hasText("Lead", "starts a new Lead configuration");
       assert
-        .dom(".salesforce-guided-sync__heading")
+        .dom(".salesforce-sync-configuration__heading")
         .includesText("Send users", "provides a default configuration name");
       await click("[data-test-configurations-back]");
       await click(".dialog-footer .btn-danger");
@@ -249,7 +251,7 @@ module(
         </template>
       );
       assert
-        .dom(".salesforce-guided-sync__heading")
+        .dom(".salesforce-sync-configuration__heading")
         .includesText("Contact sync");
       assert
         .dom('[data-name="object"] .form-kit__control-menu-trigger')

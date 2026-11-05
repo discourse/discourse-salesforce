@@ -5,8 +5,7 @@ module Jobs
     sidekiq_options retry: 5
 
     def execute(args)
-      configuration =
-        Salesforce::GuidedSyncConfiguration.active.find_by(id: args[:configuration_id])
+      configuration = Salesforce::SyncConfiguration.active.find_by(id: args[:configuration_id])
       return unless configuration&.reason_enabled?(args[:reason])
       ids =
         Salesforce::Person

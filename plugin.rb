@@ -22,7 +22,7 @@ end
 require_relative "lib/salesforce/engine"
 
 register_asset "stylesheets/salesforce.scss"
-register_asset "stylesheets/common/salesforce-guided-sync.scss", :admin
+register_asset "stylesheets/common/salesforce-sync-configuration.scss", :admin
 
 add_admin_route "salesforce.title", "discourse-salesforce", use_new_show_route: true
 

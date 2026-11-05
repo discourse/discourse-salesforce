@@ -2,7 +2,7 @@
 
 require_relative "../spec_helper"
 
-RSpec.describe Salesforce::GuidedSyncConfiguration do
+RSpec.describe Salesforce::SyncConfiguration do
   fab!(:group)
   fab!(:user) { Fabricate(:user, active: true) }
   fab!(:other_user) { Fabricate(:user, active: true) }
@@ -13,16 +13,12 @@ RSpec.describe Salesforce::GuidedSyncConfiguration do
     SiteSetting.salesforce_instance_url = "https://current.salesforce.com"
   end
 
-  let!(:configuration) { Fabricate(:guided_sync_configuration, groups: [group]) }
+  let!(:configuration) { Fabricate(:sync_configuration, groups: [group]) }
 
   it "selects only active current-account configurations" do
     stale =
-      Fabricate(
-        :guided_sync_configuration,
-        account: "https://previous.salesforce.com",
-        groups: [group],
-      )
-    inactive = Fabricate(:guided_sync_configuration, active: false, groups: [group])
+      Fabricate(:sync_configuration, account: "https://previous.salesforce.com", groups: [group])
+    inactive = Fabricate(:sync_configuration, active: false, groups: [group])
 
     expect(described_class.active).to eq([configuration])
     expect(stale.connection_changed?).to eq(true)
@@ -47,9 +43,7 @@ RSpec.describe Salesforce::GuidedSyncConfiguration do
 
     described_class.remove!(configuration.id, guardian: Fabricate(:admin).guardian)
 
-    expect(
-      Salesforce::GuidedSyncConfigurationGroup.where(configuration_id: configuration.id),
-    ).to be_empty
+    expect(Salesforce::SyncConfigurationGroup.where(configuration_id: configuration.id)).to be_empty
     expect(Salesforce::SyncState.where(configuration_id: configuration.id)).to be_empty
     expect {
       described_class.remove!(configuration.id, guardian: Fabricate(:admin).guardian)

@@ -11,7 +11,7 @@ import DButton from "discourse/ui-kit/d-button";
 import DPageSubheader from "discourse/ui-kit/d-page-subheader";
 import { i18n } from "discourse-i18n";
 import SalesforceDeleteSyncConfirmation from "discourse/plugins/discourse-salesforce/discourse/components/salesforce-delete-sync-confirmation";
-import SalesforceGuidedSync from "discourse/plugins/discourse-salesforce/discourse/components/salesforce-guided-sync";
+import SalesforceSyncConfiguration from "discourse/plugins/discourse-salesforce/discourse/components/salesforce-sync-configuration";
 import { createSyncConfiguration } from "discourse/plugins/discourse-salesforce/discourse/lib/sync-configuration";
 
 export default class SalesforceSyncConfigurations extends Component {
@@ -160,7 +160,7 @@ export default class SalesforceSyncConfigurations extends Component {
       </AdminConfigAreaCard>
     {{else if this.selected}}
       {{#each this.editors key="key" as |editor|}}
-        <SalesforceGuidedSync
+        <SalesforceSyncConfiguration
           @groups={{@groups}}
           @record={{editor.configuration}}
           @onCancel={{this.close}}

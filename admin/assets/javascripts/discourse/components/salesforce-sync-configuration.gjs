@@ -28,7 +28,7 @@ import {
 
 const PREFIX = "salesforce.guided_sync";
 
-export default class SalesforceGuidedSync extends Component {
+export default class SalesforceSyncConfiguration extends Component {
   @service a11y;
   @service dialog;
   @service modal;
@@ -477,13 +477,13 @@ export default class SalesforceGuidedSync extends Component {
 
   <template>
     <div
-      class="salesforce-guided-sync admin-config-page__main-area"
+      class="salesforce-sync-configuration admin-config-page__main-area"
       ...attributes
     >
-      <div class="salesforce-guided-sync__heading">
+      <div class="salesforce-sync-configuration__heading">
         {{#if this.nameFormData}}
           <Form
-            class="salesforce-guided-sync__name-form"
+            class="salesforce-sync-configuration__name-form"
             @data={{this.nameFormData}}
             @onSubmit={{this.applyName}}
             @onDirtyCheck={{this.allowNavigation}}
@@ -504,7 +504,7 @@ export default class SalesforceGuidedSync extends Component {
                 {{on "keydown" this.handleNameKeydown}}
               />
             </nameForm.Field>
-            <div class="salesforce-guided-sync__name-actions">
+            <div class="salesforce-sync-configuration__name-actions">
               <DButton
                 class="btn-primary"
                 type="submit"
@@ -535,7 +535,7 @@ export default class SalesforceGuidedSync extends Component {
       <p>{{i18n "salesforce.guided_sync.description"}}</p>
 
       <Form
-        class="salesforce-guided-sync__form"
+        class="salesforce-sync-configuration__form"
         @data={{this.formData}}
         @onDirtyCheck={{this.allowNavigation}}
         @onRegisterApi={{this.registerForm}}
@@ -545,17 +545,17 @@ export default class SalesforceGuidedSync extends Component {
         as |form|
       >
         <section
-          class="salesforce-guided-sync__section"
+          class="salesforce-sync-configuration__section"
           aria-labelledby="salesforce-scope-title"
         >
           <h3 id="salesforce-scope-title">{{i18n
               "salesforce.guided_sync.scope_title"
             }}</h3>
-          <p class="salesforce-guided-sync__description">{{i18n
+          <p class="salesforce-sync-configuration__description">{{i18n
               "salesforce.guided_sync.scope_description"
             }}</p>
 
-          <div class="salesforce-guided-sync__scope-fields">
+          <div class="salesforce-sync-configuration__scope-fields">
             <form.Field
               @format="full"
               @name="group_ids"
@@ -565,7 +565,7 @@ export default class SalesforceGuidedSync extends Component {
               as |field|
             >
               <field.Control>
-                <div class="salesforce-guided-sync__group-controls">
+                <div class="salesforce-sync-configuration__group-controls">
                   <DMultiSelect
                     @compareFn={{this.compareGroups}}
                     @label={{i18n "salesforce.guided_sync.group"}}
@@ -578,7 +578,7 @@ export default class SalesforceGuidedSync extends Component {
                     <:result as |group|>{{group.name}}</:result>
                     <:footer as |menu|>
                       <DButton
-                        class="btn-flat salesforce-guided-sync__create-group"
+                        class="btn-flat salesforce-sync-configuration__create-group"
                         data-test-create-group
                         @action={{fn this.createGroup menu}}
                         @icon="plus"
@@ -611,17 +611,17 @@ export default class SalesforceGuidedSync extends Component {
           </div>
         </section>
         <section
-          class="salesforce-guided-sync__section"
+          class="salesforce-sync-configuration__section"
           aria-labelledby="salesforce-behavior-title"
         >
           <h3 id="salesforce-behavior-title">{{i18n
               "salesforce.guided_sync.behavior_title"
             }}</h3>
-          <p class="salesforce-guided-sync__description">{{i18n
+          <p class="salesforce-sync-configuration__description">{{i18n
               "salesforce.guided_sync.behavior_description"
             }}</p>
 
-          <div class="salesforce-guided-sync__behavior-fields">
+          <div class="salesforce-sync-configuration__behavior-fields">
             <form.Field
               @format="full"
               @name="backfill"
@@ -633,7 +633,7 @@ export default class SalesforceGuidedSync extends Component {
               <field.Control />
             </form.Field>
             <form.Field
-              class="salesforce-guided-sync__schedule"
+              class="salesforce-sync-configuration__schedule"
               @format="full"
               @helpText={{this.scheduleTiming}}
               @name="schedule"
@@ -666,13 +666,13 @@ export default class SalesforceGuidedSync extends Component {
 
         </section>
         <section
-          class="salesforce-guided-sync__section"
+          class="salesforce-sync-configuration__section"
           aria-labelledby="salesforce-mapping-title"
         >
           <h3 id="salesforce-mapping-title">{{i18n
               "salesforce.guided_sync.mapping_title"
             }}</h3>
-          <p class="salesforce-guided-sync__description">{{i18n
+          <p class="salesforce-sync-configuration__description">{{i18n
               "salesforce.guided_sync.mapping_description"
             }}</p>
           <DConditionalLoadingSpinner
@@ -683,16 +683,18 @@ export default class SalesforceGuidedSync extends Component {
             {{#if this.fieldsError}}
               <form.Alert @type="error">{{this.fieldsError}}</form.Alert>
               <DButton
-                class="btn-default salesforce-guided-sync__retry-fields"
+                class="btn-default salesforce-sync-configuration__retry-fields"
                 data-test-refresh-fields
                 @action={{fn this.refreshFields true}}
                 @icon="arrows-rotate"
                 @label="salesforce.guided_sync.retry_fields"
               />
             {{else}}
-              <div class="salesforce-guided-sync__mapping-headings">
+              <div class="salesforce-sync-configuration__mapping-headings">
                 <span>{{i18n "salesforce.guided_sync.discourse_field"}}</span>
-                <span class="salesforce-guided-sync__arrow-heading"></span>
+                <span
+                  class="salesforce-sync-configuration__arrow-heading"
+                ></span>
                 <span>{{i18n "salesforce.guided_sync.salesforce_field"}}</span>
                 <span>{{i18n "salesforce.guided_sync.existing_value"}}
                   <DTooltip
@@ -706,28 +708,28 @@ export default class SalesforceGuidedSync extends Component {
                   </DTooltip>
                 </span>
               </div>
-              <div class="salesforce-guided-sync__locked-mapping">
+              <div class="salesforce-sync-configuration__locked-mapping">
                 <span>{{dIcon "lock"}}
                   {{i18n "salesforce.guided_sync.email"}}</span>
-                <span class="salesforce-guided-sync__mapping-arrow">{{dIcon
-                    "arrow-right"
-                  }}</span>
+                <span
+                  class="salesforce-sync-configuration__mapping-arrow"
+                >{{dIcon "arrow-right"}}</span>
                 <code>Email</code>
                 <span>{{i18n "salesforce.guided_sync.fixed_mapping"}}</span>
-                <p class="salesforce-guided-sync__email-help">{{i18n
+                <p class="salesforce-sync-configuration__email-help">{{i18n
                     "salesforce.guided_sync.matching_help"
                   }}</p>
               </div>
               <div
-                class="salesforce-guided-sync__mapping-list"
+                class="salesforce-sync-configuration__mapping-list"
                 id="control-mappings"
               >
                 <form.Collection @name="mappings" as |collection index mapping|>
                   <div
-                    class="salesforce-guided-sync__mapping-row"
+                    class="salesforce-sync-configuration__mapping-row"
                     data-test-mapping={{mapping.id}}
                   >
-                    <div class="salesforce-guided-sync__mapping-source">
+                    <div class="salesforce-sync-configuration__mapping-source">
                       <collection.Field
                         @format="full"
                         @name="source"
@@ -768,9 +770,9 @@ export default class SalesforceGuidedSync extends Component {
                         </collection.Field>
                       {{/if}}
                     </div>
-                    <span class="salesforce-guided-sync__mapping-arrow">{{dIcon
-                        "arrow-right"
-                      }}</span>
+                    <span
+                      class="salesforce-sync-configuration__mapping-arrow"
+                    >{{dIcon "arrow-right"}}</span>
                     <collection.Field
                       @description={{if
                         mapping.moved
@@ -821,7 +823,7 @@ export default class SalesforceGuidedSync extends Component {
                       </field.Control>
                     </collection.Field>
                     <DButton
-                      class="btn-transparent salesforce-guided-sync__remove"
+                      class="btn-transparent salesforce-sync-configuration__remove"
                       data-test-remove-mapping={{mapping.id}}
                       @action={{fn this.removeMapping index}}
                       @icon="trash-can"
@@ -830,7 +832,7 @@ export default class SalesforceGuidedSync extends Component {
                   </div>
                 </form.Collection>
               </div>
-              <div class="salesforce-guided-sync__actions --spread">
+              <div class="salesforce-sync-configuration__actions --spread">
                 <DButton
                   class="btn-flat"
                   data-test-add-mapping
@@ -851,7 +853,7 @@ export default class SalesforceGuidedSync extends Component {
           </DConditionalLoadingSpinner>
 
         </section>
-        <form.Actions class="salesforce-guided-sync__footer">
+        <form.Actions class="salesforce-sync-configuration__footer">
           {{#if @onCancel}}
             <DButton
               class="btn-flat"

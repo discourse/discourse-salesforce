@@ -1,17 +1,17 @@
 # frozen_string_literal: true
 
 module Salesforce
-  class GuidedSyncController < ::Admin::AdminController
+  class SyncConfigurationController < ::Admin::AdminController
     requires_plugin PLUGIN_NAME
 
     prepend_before_action :ensure_configurations_enabled
 
     def configurations
-      records = GuidedSyncConfiguration.includes(:groups).order(:id)
+      records = SyncConfiguration.includes(:groups).order(:id)
       render json: {
-               configurations: serialize_data(records, GuidedSyncConfigurationSerializer),
+               configurations: serialize_data(records, SyncConfigurationSerializer),
                credentials_configured: Api.has_credentials?,
-               groups: GuidedSyncConfiguration.available_groups,
+               groups: SyncConfiguration.available_groups,
              }
     end
 
@@ -31,7 +31,7 @@ module Salesforce
     end
 
     def groups
-      render json: { groups: GuidedSyncConfiguration.available_groups(query: params[:q]) }
+      render json: { groups: SyncConfiguration.available_groups(query: params[:q]) }
     end
 
     def save_configuration
@@ -49,14 +49,9 @@ module Salesforce
           )
           .to_h
       record =
-        GuidedSyncConfiguration.create_or_update!(
-          configuration,
-          id: params[:id],
-          guardian: guardian,
-        )
+        SyncConfiguration.create_or_update!(configuration, id: params[:id], guardian: guardian)
       render json: {
-               configuration:
-                 serialize_data(record, GuidedSyncConfigurationSerializer, root: false),
+               configuration: serialize_data(record, SyncConfigurationSerializer, root: false),
              },
              status: params[:id] ? :ok : :created
     rescue Salesforce::InvalidCredentials,
@@ -67,7 +62,7 @@ module Salesforce
     end
 
     def destroy_configuration
-      GuidedSyncConfiguration.remove!(params[:id], guardian: guardian)
+      SyncConfiguration.remove!(params[:id], guardian: guardian)
       head :no_content
     end
 

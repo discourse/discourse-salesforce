@@ -60,7 +60,7 @@ RSpec.describe "salesforce:prune_dead_associations" do
     salesforce_case.destroy!
     scope = { provider: "salesforce", account: instance_url, object: "Contact", user_id: user.id }
     Salesforce::RecordLink.link!(**scope, external_id: contact_id)
-    configuration = Fabricate(:guided_sync_configuration, object: "Contact", account: instance_url)
+    configuration = Fabricate(:sync_configuration, object: "Contact", account: instance_url)
     Salesforce::SyncState.store(configuration.id, user.id, fingerprint: "previous")
     fingerprint = -> do
       Salesforce::SyncState.find_by(configuration: configuration, user_id: user.id).fingerprint

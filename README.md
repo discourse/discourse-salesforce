@@ -243,7 +243,7 @@ ID as provenance. These boundaries prepare for another provider without defining
 adapter prematurely.
 
 `ConfigurationScheduler` owns event-triggered enqueueing, activation backfills and periodic
-refresh scheduling. `GuidedSyncConfiguration` retains validation and persistence. Scheduling
+refresh scheduling. `SyncConfiguration` retains validation and persistence. Scheduling
 continues to use the existing timestamps and locks, so extracting it does not reset due dates.
 
 `FieldMapping` evaluates payloads, including ownership rules, writable fields, and type conversion.

@@ -10,7 +10,7 @@ RSpec.describe Salesforce::ConfiguredUserSync do
   end
 
   def configuration(object, destinations)
-    Salesforce::GuidedSyncConfiguration.new(
+    Salesforce::SyncConfiguration.new(
       object: object,
       mappings:
         destinations.map do |destination|
@@ -54,7 +54,7 @@ RSpec.describe Salesforce::ConfiguredUserSync do
       described_class.validate_mappings!(configuration("Account", %w[LastName]), fields)
     }.to raise_error(Discourse::InvalidParameters)
     expect {
-      described_class.new(Salesforce::GuidedSyncConfiguration.new(object: "Account"), nil)
+      described_class.new(Salesforce::SyncConfiguration.new(object: "Account"), nil)
     }.to raise_error(Discourse::InvalidParameters)
   end
 end

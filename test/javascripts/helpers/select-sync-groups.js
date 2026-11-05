@@ -13,5 +13,5 @@ export default async function selectSyncGroups(...names) {
     await fillIn(".d-multi-select__search-input", name);
     await click(".d-multi-select__result");
   }
-  await click(".salesforce-guided-sync__heading");
+  await click(".salesforce-sync-configuration__heading");
 }

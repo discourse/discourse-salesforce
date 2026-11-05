@@ -9,7 +9,7 @@ RSpec.describe Jobs::SyncSalesforceUser do
   fab!(:group)
   let!(:configuration) do
     Fabricate(
-      :guided_sync_configuration,
+      :sync_configuration,
       groups: [group],
       object: "Lead",
       account: instance_url,

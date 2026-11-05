@@ -10,9 +10,9 @@ module Jobs
         args[:user_ids],
         reason: args[:reason],
       )
-      Salesforce::GuidedSyncConfiguration.record_batch_success(args[:configuration_id])
+      Salesforce::SyncConfiguration.record_batch_success(args[:configuration_id])
     rescue => error
-      Salesforce::GuidedSyncConfiguration.record_result(args[:configuration_id], error: error)
+      Salesforce::SyncConfiguration.record_result(args[:configuration_id], error: error)
       unless error.is_a?(Discourse::InvalidParameters) ||
                error.is_a?(Salesforce::AmbiguousEmailMatch)
         raise

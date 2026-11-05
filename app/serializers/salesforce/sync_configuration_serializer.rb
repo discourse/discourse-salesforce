@@ -1,7 +1,7 @@
 # frozen_string_literal: true
 
 module Salesforce
-  class GuidedSyncConfigurationSerializer < ApplicationSerializer
+  class SyncConfigurationSerializer < ApplicationSerializer
     attributes :id,
                :name,
                :kind,

@@ -1,7 +1,7 @@
 # frozen_string_literal: true
 
 module Salesforce
-  class GuidedSyncConfiguration < ActiveRecord::Base
+  class SyncConfiguration < ActiveRecord::Base
     self.table_name = "crm_sync_configurations"
 
     PROVIDER = "salesforce"
@@ -12,7 +12,7 @@ module Salesforce
     MAX_MAPPINGS = 50
 
     has_many :configuration_groups,
-             class_name: "Salesforce::GuidedSyncConfigurationGroup",
+             class_name: "Salesforce::SyncConfigurationGroup",
              foreign_key: :configuration_id,
              dependent: :delete_all
     has_many :groups, through: :configuration_groups

@@ -2,7 +2,7 @@
 
 require_relative "../spec_helper"
 
-RSpec.describe Salesforce::GuidedSyncController do
+RSpec.describe Salesforce::SyncConfigurationController do
   fab!(:admin)
   fab!(:user)
   fab!(:sync_group) { Fabricate(:group, name: "community-members") }
@@ -15,7 +15,7 @@ RSpec.describe Salesforce::GuidedSyncController do
   describe "disabled experimental feature" do
     it "hides the page and blocks all configuration endpoints without changing stored data" do
       sign_in(admin)
-      record = Fabricate(:guided_sync_configuration, name: "Saved configuration")
+      record = Fabricate(:sync_configuration, name: "Saved configuration")
       SiteSetting.enable_guided_sync_configuration = false
 
       get "/admin/plugins/discourse-salesforce/configurations"
@@ -38,7 +38,7 @@ RSpec.describe Salesforce::GuidedSyncController do
       expect(response).to have_http_status(:not_found)
       delete "/salesforce/admin/guided-sync/configurations/#{record.id}.json"
       expect(response).to have_http_status(:not_found)
-      expect(Salesforce::GuidedSyncConfiguration.pluck(:id, :name)).to eq(
+      expect(Salesforce::SyncConfiguration.pluck(:id, :name)).to eq(
         [[record.id, "Saved configuration"]],
       )
     end
@@ -51,10 +51,10 @@ RSpec.describe Salesforce::GuidedSyncController do
       get "/admin/plugins/discourse-salesforce/configurations"
 
       expect(response).to have_http_status(:ok)
-      expect(response.headers["X-Discourse-Route"]).to eq("salesforce/guided_sync/index")
+      expect(response.headers["X-Discourse-Route"]).to eq("salesforce/sync_configuration/index")
       get "/admin/plugins/discourse-salesforce/configurations"
       expect(response).to have_http_status(:ok)
-      expect(response.headers["X-Discourse-Route"]).to eq("salesforce/guided_sync/index")
+      expect(response.headers["X-Discourse-Route"]).to eq("salesforce/sync_configuration/index")
     end
 
     it "rejects non-admin users" do
@@ -250,10 +250,10 @@ RSpec.describe Salesforce::GuidedSyncController do
 
         expect(response).to have_http_status(method == "post" ? :created : :ok)
         record_id = response.parsed_body.dig("configuration", "id")
-        record = Salesforce::GuidedSyncConfiguration.find(record_id)
+        record = Salesforce::SyncConfiguration.find(record_id)
         expect(record.account).to eq(instance_url)
         expect(record.connection_changed?).to eq(false)
-        expect(Salesforce::GuidedSyncConfiguration.active).to include(record)
+        expect(Salesforce::SyncConfiguration.active).to include(record)
       end
     end
 
@@ -329,7 +329,7 @@ RSpec.describe Salesforce::GuidedSyncController do
            },
            as: :json
       expect(response).to have_http_status(:bad_request)
-      expect(Salesforce::GuidedSyncConfiguration.active).to be_empty
+      expect(Salesforce::SyncConfiguration.active).to be_empty
       post "/salesforce/admin/guided-sync/configurations.json",
            params: {
              configuration: configuration,
@@ -373,7 +373,7 @@ RSpec.describe Salesforce::GuidedSyncController do
              as: :json
         expect(response).to have_http_status(:bad_request)
       end
-      expect(Salesforce::GuidedSyncConfiguration.all).to be_empty
+      expect(Salesforce::SyncConfiguration.all).to be_empty
     end
 
     it "stores independent Lead and Contact configurations" do
@@ -418,7 +418,7 @@ RSpec.describe Salesforce::GuidedSyncController do
 
       delete "/salesforce/admin/guided-sync/configurations/#{lead.fetch("id")}.json"
       expect(response).to have_http_status(:no_content)
-      expect(Salesforce::GuidedSyncConfiguration.pluck(:id)).to eq([contact.fetch("id")])
+      expect(Salesforce::SyncConfiguration.pluck(:id)).to eq([contact.fetch("id")])
       delete "/salesforce/admin/guided-sync/configurations/#{lead.fetch("id")}.json"
       expect(response).to have_http_status(:not_found)
     end
@@ -431,7 +431,7 @@ RSpec.describe Salesforce::GuidedSyncController do
            },
            as: :json
       expect(response).to have_http_status(:bad_request)
-      expect(Salesforce::GuidedSyncConfiguration.all).to be_empty
+      expect(Salesforce::SyncConfiguration.all).to be_empty
     end
 
     it "rejects invalid configurations and changes to the target object" do
@@ -442,7 +442,7 @@ RSpec.describe Salesforce::GuidedSyncController do
            },
            as: :json
       expect(response).to have_http_status(:bad_request)
-      expect(Salesforce::GuidedSyncConfiguration.all).to be_empty
+      expect(Salesforce::SyncConfiguration.all).to be_empty
       post "/salesforce/admin/guided-sync/configurations.json",
            params: {
              configuration: configuration,
@@ -455,7 +455,7 @@ RSpec.describe Salesforce::GuidedSyncController do
           },
           as: :json
       expect(response).to have_http_status(:bad_request)
-      expect(Salesforce::GuidedSyncConfiguration.pluck(:id, :object)).to eq(
+      expect(Salesforce::SyncConfiguration.pluck(:id, :object)).to eq(
         [[record.fetch("id"), "Lead"]],
       )
     end
@@ -485,7 +485,7 @@ RSpec.describe Salesforce::GuidedSyncController do
       expect(response).to have_http_status(:forbidden)
       delete "/salesforce/admin/guided-sync/configurations/#{record.fetch("id")}.json"
       expect(response).to have_http_status(:forbidden)
-      expect(Salesforce::GuidedSyncConfiguration.pluck(:id, :name)).to eq(
+      expect(Salesforce::SyncConfiguration.pluck(:id, :name)).to eq(
         [[record.fetch("id"), "Lead sync"]],
       )
     end

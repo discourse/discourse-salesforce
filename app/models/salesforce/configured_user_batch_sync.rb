@@ -5,11 +5,11 @@ module Salesforce
     BATCH_SIZE = 100
 
     def self.sync(configuration_id, user_ids, reason:)
-      return unless GuidedSyncConfiguration.enabled?
+      return unless SyncConfiguration.enabled?
       ids = Array(user_ids).map(&:to_i).uniq.sort
       raise Discourse::InvalidParameters.new(:user_ids) if ids.size > BATCH_SIZE
       with_user_locks(ids) do
-        configuration = GuidedSyncConfiguration.active.find_by(id: configuration_id)
+        configuration = SyncConfiguration.active.find_by(id: configuration_id)
         next unless configuration&.reason_enabled?(reason)
         users =
           Person
@@ -48,7 +48,7 @@ module Salesforce
       users =
         @users.reject do |user|
           converted = @object == "Lead" && links[user.id]&.converted?
-          GuidedSyncConfiguration.record_result(@configuration.id, user.id) if converted
+          SyncConfiguration.record_result(@configuration.id, user.id) if converted
           converted
         end
       return if users.empty?
@@ -108,7 +108,7 @@ module Salesforce
         begin
           values = sync.mapped_values(fields, record)
         rescue Discourse::InvalidParameters => error
-          GuidedSyncConfiguration.record_result(@configuration.id, user.id, error: error)
+          SyncConfiguration.record_result(@configuration.id, user.id, error: error)
           next
         end
         if record && values.empty?
@@ -196,7 +196,7 @@ module Salesforce
     end
 
     def retry_user(user, error = nil)
-      GuidedSyncConfiguration.record_result(@configuration.id, user.id, error: error) if error
+      SyncConfiguration.record_result(@configuration.id, user.id, error: error) if error
       Jobs.enqueue(
         :sync_salesforce_user,
         configuration_id: @configuration.id,

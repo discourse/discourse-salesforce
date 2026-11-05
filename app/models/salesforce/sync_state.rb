@@ -4,7 +4,7 @@ module Salesforce
   class SyncState < ActiveRecord::Base
     self.table_name = "crm_sync_states"
 
-    belongs_to :configuration, class_name: "Salesforce::GuidedSyncConfiguration"
+    belongs_to :configuration, class_name: "Salesforce::SyncConfiguration"
 
     def self.store(configuration_id, user_id, **attributes)
       now = Time.zone.now

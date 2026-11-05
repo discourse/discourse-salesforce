@@ -3,73 +3,76 @@
 module Salesforce
   class ConfigurationScheduler
     def self.enqueue_user(user, reason:, group_id: nil, excluding_group_id: nil)
-      GuidedSyncConfiguration.active.each do |record|
-        next unless GuidedSyncConfiguration.reason_enabled?(record, reason)
-        next if group_id && !GuidedSyncConfiguration.group_ids(record).include?(group_id)
-        if excluding_group_id &&
-             GuidedSyncConfiguration.group_ids(record).include?(excluding_group_id)
-          next
-        end
-        unless GroupUser.exists?(
-                 group_id: GuidedSyncConfiguration.group_ids(record),
-                 user_id: user.id,
-               )
-          next
-        end
+      member_group_ids = GroupUser.where(user_id: user.id).select(:group_id)
+      configurations =
+        GuidedSyncConfiguration.active.where(id: configuration_ids_for(member_group_ids))
+      configurations = configurations.where(id: configuration_ids_for(group_id)) if group_id
+      if excluding_group_id
+        configurations = configurations.where.not(id: configuration_ids_for(excluding_group_id))
+      end
+      configurations.find_each do |configuration|
+        next unless configuration.reason_enabled?(reason)
         Jobs.enqueue(
           :sync_salesforce_user,
           user_id: user.id,
-          configuration_id: record["id"],
+          configuration_id: configuration.id,
           reason: reason,
         )
       end
     end
 
-    def self.configuration_saved(record, previous:)
-      connection_changed = previous && previous["instance_url"] != record["instance_url"]
-      if !previous || !previous["active"] || connection_changed ||
-           previous["schedule"] != record["schedule"]
-        PluginStore.set(PLUGIN_NAME, "configuration_scheduled_at:#{record["id"]}", Time.now.to_i)
+    def self.configuration_saved(configuration, group_ids_changed:)
+      activated =
+        configuration.previously_new_record? ||
+          configuration.saved_change_to_active?(from: false, to: true)
+      connection_changed = configuration.saved_change_to_account?
+      if activated || connection_changed || configuration.saved_change_to_schedule?
+        configuration.update_column(:last_scheduled_at, Time.zone.now)
       end
-      if record["backfill"] &&
-           (
-             !previous || !previous["active"] || connection_changed || !previous["backfill"] ||
-               GuidedSyncConfiguration.group_ids(previous).sort !=
-                 GuidedSyncConfiguration.group_ids(record).sort
-           )
+      return unless configuration.backfill
+      if activated || connection_changed || group_ids_changed ||
+           configuration.saved_change_to_backfill?(from: false, to: true)
         Jobs.enqueue(
           :sync_salesforce_configuration,
-          configuration_id: record["id"],
+          configuration_id: configuration.id,
           reason: "backfill",
         )
       end
     end
 
     def self.enqueue_due
-      Salesforce::GuidedSyncConfiguration.active.each do |configuration|
-        now = Time.now.utc
-        due =
-          case configuration["schedule"]
-          when "hourly"
-            now.beginning_of_hour
-          when "daily"
-            now.beginning_of_day + 2.hours
-          when "weekly"
-            now.beginning_of_week + 2.hours
-          end
-        next unless due && now >= due
-        DistributedMutex.synchronize("salesforce_configuration_schedule_#{configuration["id"]}") do
-          key = "configuration_scheduled_at:#{configuration["id"]}"
-          previous = PluginStore.get(PLUGIN_NAME, key)
-          next if previous && previous.to_i >= due.to_i
+      now = Time.now.utc
+      GuidedSyncConfiguration
+        .active
+        .where.not(schedule: "manual")
+        .find_each do |configuration|
+          due =
+            case configuration.schedule
+            when "hourly"
+              now.beginning_of_hour
+            when "daily"
+              now.beginning_of_day + 2.hours
+            when "weekly"
+              now.beginning_of_week + 2.hours
+            end
+          next unless due && now >= due
+          claimed =
+            GuidedSyncConfiguration
+              .where(id: configuration.id)
+              .where("last_scheduled_at IS NULL OR last_scheduled_at < ?", due)
+              .update_all(last_scheduled_at: now)
+          next if claimed == 0
           Jobs.enqueue(
             :sync_salesforce_configuration,
-            configuration_id: configuration["id"],
+            configuration_id: configuration.id,
             reason: "scheduled",
           )
-          PluginStore.set(PLUGIN_NAME, key, Time.now.to_i)
         end
-      end
     end
+
+    def self.configuration_ids_for(group_ids)
+      GuidedSyncConfigurationGroup.where(group_id: group_ids).select(:configuration_id)
+    end
+    private_class_method :configuration_ids_for
   end
 end

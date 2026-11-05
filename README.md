@@ -101,8 +101,8 @@ There is no Workflows dependency. The group picker uses the optional core `DMult
 footer slot for group creation. Sync posts is Coming soon.
 
 Email is matched within the selected object. Multiple matches fail without writing.
-Successful matching/creation retains an object/user link in PluginStore, pinned to the
-Salesforce instance, so email changes do not create a second record. Email is sent only
+Successful matching/creation retains an object/user link in the `crm_record_links` table,
+pinned to the Salesforce instance, so email changes do not create a second record. Email is sent only
 on creation. Confirmed deleted, unconverted Leads can be recreated; missing or
 inaccessible records without confirmed deletion remain errors. Converted Leads are
 reconciled to their Contact and skipped by Lead configurations. A local distributed mutex serializes writes per user.
@@ -228,12 +228,12 @@ formats. It batches profile, statistics, custom field, group membership and rece
 queries. Salesforce serialization lives in `FieldMapping`,
 which belongs to sync execution rather than the source loader.
 
-`RecordLink` scopes a remote ID by provider, account, object and Discourse user. Salesforce
-currently uses its instance URL as the account identity. Keys contain a hash of the provider,
-account and object followed by an enumerable Discourse user ID. Pruning selects users with
-stored associations instead of scanning every user. The
-PluginStore namespace remains `discourse-salesforce`; a future plugin rename must preserve
-or migrate that namespace. User custom fields remain compatibility fields for legacy
+`RecordLink` rows scope a remote ID by provider, account, object and Discourse user, with a
+unique index on that tuple and an index on the remote ID for reverse lookups. Salesforce
+currently uses its instance URL as the account identity. Configurations, their group scopes
+and per-user sync state (fingerprint and last error) live in the `crm_sync_configurations`,
+`crm_sync_configuration_groups` and `crm_sync_states` tables, named generically so another
+CRM provider can share them. User custom fields remain compatibility fields for legacy
 Salesforce features, not the provider-independent link store.
 
 Reconciliation updates configured Contact links after merges and replaces converted Lead

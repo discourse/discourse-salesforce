@@ -7,18 +7,13 @@ RSpec.describe Jobs::SyncSalesforceUser do
 
   fab!(:user) { Fabricate(:user, name: "Alex Morgan", active: true) }
   fab!(:group)
-  let(:configuration) do
-    {
-      "id" => "sync",
-      "kind" => "users",
-      "provider" => "salesforce",
-      "active" => true,
-      "group_ids" => [group.id],
-      "object" => "Lead",
-      "instance_url" => instance_url,
-      "backfill" => true,
-      "schedule" => "daily",
-      "mappings" => [
+  let!(:configuration) do
+    Fabricate(
+      :guided_sync_configuration,
+      groups: [group],
+      object: "Lead",
+      account: instance_url,
+      mappings: [
         { "source" => "last", "destination" => "LastName", "policy" => "keep" },
         {
           "source" => "static",
@@ -28,7 +23,7 @@ RSpec.describe Jobs::SyncSalesforceUser do
         },
         { "source" => "trust", "destination" => "Trust__c", "policy" => "overwrite" },
       ],
-    }
+    )
   end
   let(:fields) do
     %w[Email LastName Company Trust__c].map do |name|
@@ -45,11 +40,6 @@ RSpec.describe Jobs::SyncSalesforceUser do
     SiteSetting.enable_guided_sync_configuration = true
     user.activate
     group.add(user)
-    PluginStore.set(
-      Salesforce::PLUGIN_NAME,
-      Salesforce::GuidedSyncConfiguration::STORE_KEY,
-      [configuration],
-    )
     stub_request(:get, "#{api_path}/Lead/describe").to_return(body: { fields: fields }.to_json)
     stub_request(:get, query_path).with(
       query: {
@@ -60,7 +50,11 @@ RSpec.describe Jobs::SyncSalesforceUser do
   end
 
   def run_sync(reason = "backfill")
-    Jobs::SyncSalesforceUser.new.execute(configuration_id: "sync", user_id: user.id, reason: reason)
+    Jobs::SyncSalesforceUser.new.execute(
+      configuration_id: configuration.id,
+      user_id: user.id,
+      reason: reason,
+    )
   end
 
   it "skips active users whose current email is unconfirmed" do
@@ -92,7 +86,7 @@ RSpec.describe Jobs::SyncSalesforceUser do
       Jobs::SyncSalesforceUser
         .jobs
         .map { |job| job["args"].first }
-        .select { |args| args["configuration_id"] == "sync" }
+        .select { |args| args["configuration_id"] == configuration.id }
     expect(jobs).to contain_exactly(hash_including("user_id" => user.id, "reason" => "change"))
     stub_salesforce_person_lookup("Lead", user.email, fields: %w[LastName Company Trust__c])
     create =
@@ -141,18 +135,19 @@ RSpec.describe Jobs::SyncSalesforceUser do
   end
 
   it "sends static text on creation and respects ownership on updates" do
-    configuration["mappings"] << {
-      "source" => "static",
-      "destination" => "LeadSource",
-      "policy" => "overwrite",
-      "value" => "Discourse",
-    }
-    fields << { name: "LeadSource", type: "picklist", createable: true, updateable: true }
-    PluginStore.set(
-      Salesforce::PLUGIN_NAME,
-      Salesforce::GuidedSyncConfiguration::STORE_KEY,
-      [configuration],
+    configuration.update!(
+      mappings:
+        configuration.mappings +
+          [
+            {
+              "source" => "static",
+              "destination" => "LeadSource",
+              "policy" => "overwrite",
+              "value" => "Discourse",
+            },
+          ],
     )
+    fields << { name: "LeadSource", type: "picklist", createable: true, updateable: true }
     stub_request(:get, "#{api_path}/Lead/describe").to_return(body: { fields: fields }.to_json)
     stub_request(:get, query_path).with(
       query: {
@@ -195,24 +190,22 @@ RSpec.describe Jobs::SyncSalesforceUser do
         },
       ).to_return(status: 204)
     run_sync
-    configuration["mappings"].last["policy"] = "keep"
-    PluginStore.set(
-      Salesforce::PLUGIN_NAME,
-      Salesforce::GuidedSyncConfiguration::STORE_KEY,
-      [configuration],
-    )
+    mappings = configuration.mappings.deep_dup
+    mappings.last["policy"] = "keep"
+    configuration.update!(mappings: mappings)
     run_sync
     expect(update).to have_been_requested.once
   end
 
   it "recreates a confirmed deleted Lead and relinks subsequent retries" do
     old_id = "00Qbm00000v6wJpEAI"
-    Salesforce::RecordLink.new(
+    Salesforce::RecordLink.link!(
       provider: "salesforce",
       account: instance_url,
       object: "Lead",
       user_id: user.id,
-    ).write(old_id)
+      external_id: old_id,
+    )
     stub_request(:get, "#{api_path}/Lead/#{old_id}").to_return(status: 404, body: "[]")
     query = "SELECT Id, IsDeleted, IsConverted, ConvertedContactId FROM Lead WHERE Id = '#{old_id}'"
     stub_request(:get, "#{instance_url}services/data/v49.0/queryAll/").with(
@@ -247,12 +240,13 @@ RSpec.describe Jobs::SyncSalesforceUser do
 
   it "does not recreate inaccessible or converted Leads" do
     old_id = "00Qbm00000v6wJpEAI"
-    Salesforce::RecordLink.new(
+    Salesforce::RecordLink.link!(
       provider: "salesforce",
       account: instance_url,
       object: "Lead",
       user_id: user.id,
-    ).write(old_id)
+      external_id: old_id,
+    )
     stub_request(:get, "#{api_path}/Lead/#{old_id}").to_return(status: 404, body: "[]")
     query = "SELECT Id, IsDeleted, IsConverted, ConvertedContactId FROM Lead WHERE Id = '#{old_id}'"
     lookup =
@@ -275,21 +269,9 @@ RSpec.describe Jobs::SyncSalesforceUser do
 
   it "retires a linked converted Lead and skips future syncs without creating a replacement" do
     lead_id = "00Qbm00000v6wJpEAI"
-    lead_link =
-      Salesforce::RecordLink.new(
-        provider: "salesforce",
-        account: instance_url,
-        object: "Lead",
-        user_id: user.id,
-      )
-    contact_link =
-      Salesforce::RecordLink.new(
-        provider: "salesforce",
-        account: instance_url,
-        object: "Contact",
-        user_id: user.id,
-      )
-    lead_link.write(lead_id)
+    lead_scope = { provider: "salesforce", account: instance_url, object: "Lead", user_id: user.id }
+    contact_scope = lead_scope.merge(object: "Contact")
+    Salesforce::RecordLink.link!(**lead_scope, external_id: lead_id)
     linked_lead =
       stub_request(:get, "#{api_path}/Lead/#{lead_id}").to_return(
         body: { Id: lead_id, IsConverted: true, ConvertedContactId: "contact-123" }.to_json,
@@ -299,13 +281,8 @@ RSpec.describe Jobs::SyncSalesforceUser do
     run_sync
 
     expect(linked_lead).to have_been_requested.once
-    expect(lead_link.read).to include(
-      "converted_to" => {
-        "object" => "Contact",
-        "id" => "contact-123",
-      },
-    )
-    expect(contact_link.read).to include("id" => "contact-123")
+    expect(Salesforce::RecordLink.find_by(**lead_scope).converted_to_id).to eq("contact-123")
+    expect(Salesforce::RecordLink.find_by(**contact_scope).external_id).to eq("contact-123")
     expect(user.reload.salesforce_lead_id).to be_nil
     expect(user.salesforce_contact_id).to eq("contact-123")
     expect(a_request(:post, "#{api_path}/Lead")).not_to have_been_made
@@ -334,24 +311,19 @@ RSpec.describe Jobs::SyncSalesforceUser do
     expect(user.salesforce_contact_id).to eq("contact-456")
     expect(a_request(:post, "#{api_path}/Lead")).not_to have_been_made
     expect(
-      Salesforce::RecordLink.new(
+      Salesforce::RecordLink.find_by(
         provider: "salesforce",
         account: instance_url,
         object: "Lead",
         user_id: user.id,
-      ).read,
-    ).to include("converted_to" => { "object" => "Contact", "id" => "contact-456" })
+      ).converted_to_id,
+    ).to eq("contact-456")
   end
 
   it "creates Contacts independently from Leads" do
-    configuration["object"] = "Contact"
-    configuration["mappings"] = [
-      { "source" => "last", "destination" => "LastName", "policy" => "keep" },
-    ]
-    PluginStore.set(
-      Salesforce::PLUGIN_NAME,
-      Salesforce::GuidedSyncConfiguration::STORE_KEY,
-      [configuration],
+    configuration.update!(
+      object: "Contact",
+      mappings: [{ "source" => "last", "destination" => "LastName", "policy" => "keep" }],
     )
     stub_request(:get, "#{api_path}/Contact/describe").to_return(body: { fields: fields }.to_json)
     stub_salesforce_person_lookup("Contact", user.email, records: [], fields: %w[LastName])
@@ -385,31 +357,21 @@ RSpec.describe Jobs::SyncSalesforceUser do
       .then
       .to_return(status: 204)
     expect { run_sync }.to raise_error(Salesforce::InvalidApiResponse)
-    expect(Salesforce::GuidedSyncConfiguration.status_for(configuration)["error"]).to be_present
+    expect(configuration.reload.sync_status["error"]).to be_present
     stub_request(:get, "#{api_path}/Lead/lead123").to_return(
       body: { Id: "lead123", LastName: "CRM name", Company: "Company", Trust__c: 99 }.to_json,
     )
     run_sync
-    expect(Salesforce::GuidedSyncConfiguration.status_for(configuration)).not_to have_key("error")
+    expect(configuration.reload.sync_status).not_to have_key("error")
   end
 
   it "rejects unsupported mappings and changed Salesforce instances before writing" do
-    configuration["mappings"].first["destination"] = "LastName FROM Contact"
-    PluginStore.set(
-      Salesforce::PLUGIN_NAME,
-      Salesforce::GuidedSyncConfiguration::STORE_KEY,
-      [configuration],
-    )
+    mappings = configuration.mappings.deep_dup
+    mappings.first["destination"] = "LastName FROM Contact"
+    configuration.update!(mappings: mappings)
     expect { run_sync }.not_to raise_error
-    expect(Salesforce::GuidedSyncConfiguration.status_for(configuration)["error"]).to eq(
-      "Discourse::InvalidParameters",
-    )
-    configuration["instance_url"] = "https://other.my.salesforce.com"
-    PluginStore.set(
-      Salesforce::PLUGIN_NAME,
-      Salesforce::GuidedSyncConfiguration::STORE_KEY,
-      [configuration],
-    )
+    expect(configuration.reload.sync_status["error"]).to eq("Discourse::InvalidParameters")
+    configuration.update!(account: "https://other.my.salesforce.com")
     Jobs::SyncSalesforceUser.clear
     DiscourseEvent.trigger(:user_updated, user, ["name"])
     expect(Jobs::SyncSalesforceUser.jobs).to be_empty
@@ -422,15 +384,10 @@ RSpec.describe Jobs::SyncSalesforceUser do
     Fabricate(:post, user: user, created_at: 31.days.ago)
     Fabricate(:post, user: user, created_at: 2.days.ago)
     Fabricate(:post, user: user, topic: Fabricate(:private_message_topic, user: user))
-    configuration["mappings"] << {
-      "source" => "posts30",
-      "destination" => "Posts30__c",
-      "policy" => "overwrite",
-    }
-    PluginStore.set(
-      Salesforce::PLUGIN_NAME,
-      Salesforce::GuidedSyncConfiguration::STORE_KEY,
-      [configuration],
+    configuration.update!(
+      mappings:
+        configuration.mappings +
+          [{ "source" => "posts30", "destination" => "Posts30__c", "policy" => "overwrite" }],
     )
     fields << { name: "Posts30__c", type: "int", createable: true, updateable: true }
     stub_request(:get, "#{api_path}/Lead/describe").to_return(body: { fields: fields }.to_json)
@@ -465,7 +422,11 @@ RSpec.describe Jobs::SyncSalesforceUser do
     Jobs::SyncSalesforceUser.clear
     DiscourseEvent.trigger(:user_updated, user, ["name"])
     expect(Jobs::SyncSalesforceUser.jobs.map { |job| job["args"].first }).to include(
-      hash_including("user_id" => user.id, "configuration_id" => "sync", "reason" => "change"),
+      hash_including(
+        "user_id" => user.id,
+        "configuration_id" => configuration.id,
+        "reason" => "change",
+      ),
     )
   end
 
@@ -536,9 +497,7 @@ RSpec.describe Jobs::SyncSalesforceUser do
       ).to_return(status: 204)
     run_sync
     expect(update).to have_been_requested.once
-    expect(
-      PluginStore.get(Salesforce::PLUGIN_NAME, "configuration_status:sync")["last_synced_at"],
-    ).to be_present
+    expect(configuration.reload.last_synced_at).to be_present
   end
 
   it "rejects ambiguous matches without writing and records a failure" do
@@ -551,9 +510,7 @@ RSpec.describe Jobs::SyncSalesforceUser do
     expect { run_sync }.not_to raise_error
     expect(a_request(:post, "#{api_path}/Lead")).not_to have_been_made
     expect(a_request(:patch, %r{/sobjects/})).not_to have_been_made
-    expect(Salesforce::GuidedSyncConfiguration.status_for(configuration)["error"]).to eq(
-      "Salesforce::AmbiguousEmailMatch",
-    )
+    expect(configuration.reload.sync_status["error"]).to eq("Salesforce::AmbiguousEmailMatch")
   end
 
   it "does not write for removed members, deleted configurations, or disabled features" do
@@ -563,25 +520,15 @@ RSpec.describe Jobs::SyncSalesforceUser do
     SiteSetting.enable_guided_sync_configuration = false
     run_sync
     SiteSetting.enable_guided_sync_configuration = true
-    PluginStore.set(Salesforce::PLUGIN_NAME, Salesforce::GuidedSyncConfiguration::STORE_KEY, [])
+    configuration.destroy!
     run_sync
     expect(a_request(:get, %r{/sobjects/})).not_to have_been_made
   end
 
   it "does not run inactive configurations or disabled backfills" do
-    configuration["active"] = false
-    PluginStore.set(
-      Salesforce::PLUGIN_NAME,
-      Salesforce::GuidedSyncConfiguration::STORE_KEY,
-      [configuration],
-    )
+    configuration.update!(active: false)
     run_sync
-    configuration.merge!("active" => true, "backfill" => false)
-    PluginStore.set(
-      Salesforce::PLUGIN_NAME,
-      Salesforce::GuidedSyncConfiguration::STORE_KEY,
-      [configuration],
-    )
+    configuration.update!(active: true, backfill: false)
     run_sync
     expect(a_request(:get, %r{/sobjects/})).not_to have_been_made
   end
@@ -594,13 +541,16 @@ RSpec.describe Jobs::SyncSalesforceUser do
       Jobs::SyncSalesforceUser
         .jobs
         .map { |job| job["args"].first }
-        .select { |args| args["configuration_id"] == "sync" },
+        .select { |args| args["configuration_id"] == configuration.id },
     ).to include(hash_including("user_id" => newcomer.id, "reason" => "join"))
     group.add(Fabricate(:user, active: false))
     group.add(Discourse.system_user)
     Jobs::SyncSalesforceUser.clear
     Jobs::SyncSalesforceUserBatch.clear
-    Jobs::SyncSalesforceConfiguration.new.execute(configuration_id: "sync", reason: "backfill")
+    Jobs::SyncSalesforceConfiguration.new.execute(
+      configuration_id: configuration.id,
+      reason: "backfill",
+    )
     expect(Jobs::SyncSalesforceUser.jobs).to be_empty
     expect(
       Jobs::SyncSalesforceUserBatch.jobs.flat_map { |job| job["args"].first["user_ids"] },
@@ -610,15 +560,19 @@ RSpec.describe Jobs::SyncSalesforceUser do
   it "limits scheduled refreshes to members with a linked Salesforce record" do
     existing = Fabricate(:user)
     group.add(existing)
-    Salesforce::RecordLink.new(
+    Salesforce::RecordLink.link!(
       provider: "salesforce",
       account: instance_url,
       object: "Lead",
       user_id: existing.id,
-    ).write("lead-existing")
+      external_id: "lead-existing",
+    )
     Jobs::SyncSalesforceUserBatch.clear
 
-    Jobs::SyncSalesforceConfiguration.new.execute(configuration_id: "sync", reason: "scheduled")
+    Jobs::SyncSalesforceConfiguration.new.execute(
+      configuration_id: configuration.id,
+      reason: "scheduled",
+    )
 
     expect(
       Jobs::SyncSalesforceUserBatch.jobs.flat_map { |job| job["args"].first["user_ids"] },
@@ -628,12 +582,7 @@ RSpec.describe Jobs::SyncSalesforceUser do
   it "syncs the union of groups once and continues syncing members of another selected group" do
     second_group = Fabricate(:group)
     newcomer = Fabricate(:user)
-    configuration.merge!("group_ids" => [group.id, second_group.id])
-    PluginStore.set(
-      Salesforce::PLUGIN_NAME,
-      Salesforce::GuidedSyncConfiguration::STORE_KEY,
-      [configuration],
-    )
+    configuration.configuration_groups.create!(group_id: second_group.id)
     second_group.add(user)
     Jobs::SyncSalesforceUser.clear
     second_group.add(newcomer)
@@ -641,11 +590,14 @@ RSpec.describe Jobs::SyncSalesforceUser do
       Jobs::SyncSalesforceUser
         .jobs
         .map { |job| job["args"].first }
-        .select { |args| args["configuration_id"] == "sync" }
+        .select { |args| args["configuration_id"] == configuration.id }
     expect(jobs).to contain_exactly(hash_including("user_id" => newcomer.id, "reason" => "join"))
 
     Jobs::SyncSalesforceUserBatch.clear
-    Jobs::SyncSalesforceConfiguration.new.execute(configuration_id: "sync", reason: "backfill")
+    Jobs::SyncSalesforceConfiguration.new.execute(
+      configuration_id: configuration.id,
+      reason: "backfill",
+    )
     expect(
       Jobs::SyncSalesforceUserBatch.jobs.flat_map { |job| job["args"].first["user_ids"] },
     ).to contain_exactly(user.id, newcomer.id)

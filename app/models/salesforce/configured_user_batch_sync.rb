@@ -9,12 +9,11 @@ module Salesforce
       ids = Array(user_ids).map(&:to_i).uniq.sort
       raise Discourse::InvalidParameters.new(:user_ids) if ids.size > BATCH_SIZE
       with_user_locks(ids) do
-        configuration =
-          GuidedSyncConfiguration.active.find { |record| record["id"] == configuration_id }
-        next unless configuration && GuidedSyncConfiguration.reason_enabled?(configuration, reason)
+        configuration = GuidedSyncConfiguration.active.find_by(id: configuration_id)
+        next unless configuration&.reason_enabled?(reason)
         users =
           Person
-            .eligible_group_members(GuidedSyncConfiguration.group_ids(configuration))
+            .eligible_group_members(configuration.configuration_groups.select(:group_id))
             .where(id: ids)
             .order(:id)
             .includes(:primary_email, :email_tokens, :single_sign_on_record)
@@ -38,34 +37,18 @@ module Salesforce
       @users = users
       @reason = reason
       @api = Api.new
-      @object = configuration.fetch("object")
+      @object = configuration.object
     end
 
     def sync
-      if @configuration["instance_url"] != SiteSetting.salesforce_instance_url
+      if @configuration.connection_changed?
         raise Discourse::InvalidParameters.new(:salesforce_instance_url)
       end
-      links =
-        RecordLink.read_many(
-          provider: @configuration.fetch("provider"),
-          account: @configuration.fetch("instance_url"),
-          object: @object,
-          user_ids: @users.map(&:id),
-        )
+      links = @configuration.record_links.where(user_id: @users.map(&:id)).index_by(&:user_id)
       users =
         @users.reject do |user|
-          converted = @object == "Lead" && links[user.id]&.key?("converted_to")
-          if converted
-            if links[user.id].dig("converted_to", "id").present?
-              GuidedSyncConfiguration.record_result(@configuration["id"], user.id)
-            else
-              GuidedSyncConfiguration.record_result(
-                @configuration["id"],
-                user.id,
-                error: LeadConversionReconciliationError.new("Converted Lead has no Contact ID"),
-              )
-            end
-          end
+          converted = @object == "Lead" && links[user.id]&.converted?
+          GuidedSyncConfiguration.record_result(@configuration.id, user.id) if converted
           converted
         end
       return if users.empty?
@@ -88,14 +71,14 @@ module Salesforce
       creates = []
       updates = []
       used_ids = Set.new
-      source_data = UserSyncSources.new(@configuration["mappings"], users)
+      source_data = UserSyncSources.new(@configuration.mappings, users)
       users.each do |user|
         link = links[user.id]
-        if link && (link["account"] != SiteSetting.salesforce_instance_url || !by_id[link["id"]])
+        if link && !by_id[link.external_id]
           retry_user(user)
           next
         end
-        matches = link ? [by_id.fetch(link["id"])] : by_email.fetch(user.email.downcase, [])
+        matches = link ? [by_id.fetch(link.external_id)] : by_email.fetch(user.email.downcase, [])
         if matches.size > 1
           retry_user(user, AmbiguousEmailMatch.new(@object))
           next
@@ -125,7 +108,7 @@ module Salesforce
         begin
           values = sync.mapped_values(fields, record)
         rescue Discourse::InvalidParameters => error
-          GuidedSyncConfiguration.record_result(@configuration["id"], user.id, error: error)
+          GuidedSyncConfiguration.record_result(@configuration.id, user.id, error: error)
           next
         end
         if record && values.empty?
@@ -147,7 +130,7 @@ module Salesforce
       fields = [
         "Id",
         "Email",
-        *@configuration["mappings"].map { |mapping| mapping["destination"] },
+        *@configuration.mappings.map { |mapping| mapping["destination"] },
       ].uniq
       fields.concat(%w[IsConverted ConvertedContactId]) if @object == "Lead"
       unless fields.all? { |field| Person::FIELD_NAME_PATTERN.match?(field) }
@@ -156,7 +139,7 @@ module Salesforce
       sync_users
         .each_slice(25)
         .flat_map do |user_batch|
-          ids = user_batch.filter_map { |user| links[user.id]&.[]("id") }.uniq
+          ids = user_batch.filter_map { |user| links[user.id]&.external_id }.uniq
           conditions = ["Email IN (#{quoted(user_batch.map(&:email))})"]
           conditions << "Id IN (#{quoted(ids)})" if ids.present?
           result =
@@ -213,10 +196,10 @@ module Salesforce
     end
 
     def retry_user(user, error = nil)
-      GuidedSyncConfiguration.record_result(@configuration["id"], user.id, error: error) if error
+      GuidedSyncConfiguration.record_result(@configuration.id, user.id, error: error) if error
       Jobs.enqueue(
         :sync_salesforce_user,
-        configuration_id: @configuration["id"],
+        configuration_id: @configuration.id,
         user_id: user.id,
         reason: @reason,
       )

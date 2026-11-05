@@ -75,16 +75,12 @@ module ::Jobs
             account: SiteSetting.salesforce_instance_url,
             user_id: field.user_id,
           }
-          previous = Salesforce::RecordLink.new(**scope, object: object).read
+          previous = Salesforce::RecordLink.find_by(**scope, object: object)
           destination_name = Salesforce::Person.for_object(destination_object)::ID_FIELD
           if object == "Lead"
-            lead_link_matches =
-              previous.nil? ||
-                (previous["account"] == scope[:account] && previous["id"] == previous_id)
-            contact_link = Salesforce::RecordLink.new(**scope, object: "Contact").read
-            contact_link_matches =
-              contact_link.nil? ||
-                (contact_link["account"] == scope[:account] && contact_link["id"] == id)
+            lead_link_matches = previous.nil? || previous.external_id == previous_id
+            contact_link = Salesforce::RecordLink.find_by(**scope, object: "Contact")
+            contact_link_matches = contact_link.nil? || contact_link.external_id == id
             contact_field =
               UserCustomField.find_by(user_id: current.user_id, name: destination_name)
             contact_field_matches = contact_field.nil? || contact_field.value == id
@@ -103,13 +99,20 @@ module ::Jobs
             current.update!(name: destination_name, value: id)
           end
           if object == "Lead"
-            Salesforce::RecordLink.new(**scope, object: "Lead").mark_converted_to(id)
+            Salesforce::RecordLink.mark_converted!(
+              **scope,
+              object: "Lead",
+              external_id: previous_id,
+              to_object: "Contact",
+              to_id: id,
+            )
           end
-          if previous && previous["account"] == scope[:account] && previous["id"] == previous_id
-            Salesforce::RecordLink.new(**scope, object: destination_object).write(
-              id,
-              converted_from_lead_id:
-                (object == "Lead" ? previous_id : previous["converted_from_lead_id"]),
+          if previous && previous.external_id == previous_id
+            Salesforce::RecordLink.link!(
+              **scope,
+              object: destination_object,
+              external_id: id,
+              converted_from_id: (object == "Lead" ? previous_id : previous.converted_from_id),
             )
           end
         end

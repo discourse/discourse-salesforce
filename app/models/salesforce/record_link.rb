@@ -1,75 +1,52 @@
 # frozen_string_literal: true
 
 module Salesforce
-  class RecordLink
+  class RecordLink < ActiveRecord::Base
+    self.table_name = "crm_record_links"
+
+    scope :within, ->(provider:, account:, object:) { where(provider:, account:, object:) }
+    scope :live, -> { where(converted_to_id: nil) }
+
     def self.read_many(provider:, account:, object:, user_ids:)
-      ids = user_ids.uniq
-      scope = prefix(provider, account, object)
-      current_keys = ids.to_h { |user_id| [user_id, "#{scope}#{user_id}"] }
-      stored = PluginStore.get_all(PLUGIN_NAME, current_keys.values)
-      ids.to_h { |user_id| [user_id, stored[current_keys[user_id]]] }
+      within(provider:, account:, object:)
+        .where(user_id: user_ids)
+        .order(:user_id)
+        .index_by(&:user_id)
     end
 
-    def self.user_ids(provider:, account:, object:)
-      scope = prefix(provider, account, object)
-      PluginStoreRow
-        .where(plugin_name: PLUGIN_NAME)
-        .where("key LIKE ?", "#{scope}%")
-        .select(Arel.sql("split_part(key, ':', 3)::bigint"))
-    end
-
-    def initialize(provider:, account:, object:, user_id:)
-      @provider = provider
-      @account = account
-      @object = object
-      @user_id = user_id
-    end
-
-    def read
-      PluginStore.get(PLUGIN_NAME, key)
-    end
-
-    def write(id, converted_from_lead_id: nil)
-      existing = PluginStore.get(PLUGIN_NAME, key)
-      if existing && existing["id"] == id
-        converted_from_lead_id ||= existing["converted_from_lead_id"]
-      end
-      value = { "id" => id, "account" => @account }
-      value["converted_from_lead_id"] = converted_from_lead_id if converted_from_lead_id
-      return if existing == value
-
-      PluginStore.set(PLUGIN_NAME, key, value)
-    end
-
-    def remove(id)
-      link = read
-      return false unless link && link["id"] == id && link["account"] == @account
-
-      PluginStore.remove(PLUGIN_NAME, key)
-      true
-    end
-
-    def mark_converted_to(contact_id)
-      PluginStore.set(
-        PLUGIN_NAME,
-        key,
-        { "account" => @account, "converted_to" => { "object" => "Contact", "id" => contact_id } },
+    def self.link!(provider:, account:, object:, user_id:, external_id:, converted_from_id: nil)
+      link = find_or_initialize_by(provider:, account:, object:, user_id:)
+      converted_from_id ||= link.converted_from_id if link.external_id == external_id
+      link.assign_attributes(
+        external_id:,
+        converted_from_id:,
+        converted_to_object: nil,
+        converted_to_id: nil,
       )
+      link.save! if link.new_record? || link.changed?
+      link
     end
 
-    private
-
-    def key
-      self.class.send(:key, @provider, @account, @object, @user_id)
+    def self.mark_converted!(
+      provider:,
+      account:,
+      object:,
+      user_id:,
+      external_id:,
+      to_object:,
+      to_id:
+    )
+      link = find_or_initialize_by(provider:, account:, object:, user_id:)
+      link.update!(external_id:, converted_to_object: to_object, converted_to_id: to_id)
+      link
     end
 
-    def self.key(provider, account, object, user_id)
-      "#{prefix(provider, account, object)}#{user_id}"
+    def self.unlink!(provider:, account:, object:, user_id:, external_id:)
+      within(provider:, account:, object:).where(user_id:, external_id:).live.delete_all > 0
     end
-    def self.prefix(provider, account, object)
-      scope = Digest::SHA256.hexdigest([provider, account, object].to_json)
-      "record_link:#{scope}:"
+
+    def converted?
+      converted_to_id.present?
     end
-    private_class_method :key, :prefix
   end
 end

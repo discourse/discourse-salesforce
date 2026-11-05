@@ -10,13 +10,13 @@ RSpec.describe Salesforce::ConfiguredUserSync do
   end
 
   def configuration(object, destinations)
-    {
-      "object" => object,
-      "mappings" =>
+    Salesforce::GuidedSyncConfiguration.new(
+      object: object,
+      mappings:
         destinations.map do |destination|
           { "source" => "last", "destination" => destination, "policy" => "keep" }
         end,
-    }
+    )
   end
 
   it "requires the Lead mapping fields" do
@@ -53,8 +53,8 @@ RSpec.describe Salesforce::ConfiguredUserSync do
     expect {
       described_class.validate_mappings!(configuration("Account", %w[LastName]), fields)
     }.to raise_error(Discourse::InvalidParameters)
-    expect { described_class.new({ "object" => "Account" }, nil) }.to raise_error(
-      Discourse::InvalidParameters,
-    )
+    expect {
+      described_class.new(Salesforce::GuidedSyncConfiguration.new(object: "Account"), nil)
+    }.to raise_error(Discourse::InvalidParameters)
   end
 end

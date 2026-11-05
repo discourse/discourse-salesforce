@@ -15,12 +15,7 @@ RSpec.describe Salesforce::GuidedSyncController do
   describe "disabled experimental feature" do
     it "hides the page and blocks all configuration endpoints without changing stored data" do
       sign_in(admin)
-      record = { "id" => "existing", "name" => "Saved configuration" }
-      PluginStore.set(
-        Salesforce::PLUGIN_NAME,
-        Salesforce::GuidedSyncConfiguration::STORE_KEY,
-        [record],
-      )
+      record = Fabricate(:guided_sync_configuration, name: "Saved configuration")
       SiteSetting.enable_guided_sync_configuration = false
 
       get "/admin/plugins/discourse-salesforce/configurations"
@@ -34,18 +29,18 @@ RSpec.describe Salesforce::GuidedSyncController do
              },
            }
       expect(response).to have_http_status(:not_found)
-      put "/salesforce/admin/guided-sync/configurations/existing.json",
+      put "/salesforce/admin/guided-sync/configurations/#{record.id}.json",
           params: {
             configuration: {
               name: "Changed",
             },
           }
       expect(response).to have_http_status(:not_found)
-      delete "/salesforce/admin/guided-sync/configurations/existing.json"
+      delete "/salesforce/admin/guided-sync/configurations/#{record.id}.json"
       expect(response).to have_http_status(:not_found)
-      expect(
-        PluginStore.get(Salesforce::PLUGIN_NAME, Salesforce::GuidedSyncConfiguration::STORE_KEY),
-      ).to eq([record])
+      expect(Salesforce::GuidedSyncConfiguration.pluck(:id, :name)).to eq(
+        [[record.id, "Saved configuration"]],
+      )
     end
   end
 
@@ -241,6 +236,27 @@ RSpec.describe Salesforce::GuidedSyncController do
       }
     end
 
+    it "pins new and updated configurations to the instance returned by authentication" do
+      sign_in(admin)
+      record_id = nil
+
+      %w[post put].each do |method|
+        SiteSetting.salesforce_instance_url = "https://previous.salesforce.com/"
+        Discourse.redis.del(Salesforce::Api::ACCESS_TOKEN_KEY)
+        path =
+          "/salesforce/admin/guided-sync/configurations#{record_id ? "/#{record_id}" : ""}.json"
+
+        public_send(method, path, params: { configuration: configuration }, as: :json)
+
+        expect(response).to have_http_status(method == "post" ? :created : :ok)
+        record_id = response.parsed_body.dig("configuration", "id")
+        record = Salesforce::GuidedSyncConfiguration.find(record_id)
+        expect(record.account).to eq(instance_url)
+        expect(record.connection_changed?).to eq(false)
+        expect(Salesforce::GuidedSyncConfiguration.active).to include(record)
+      end
+    end
+
     it "saves multiple groups and rejects missing or unrestricted scopes" do
       sign_in(admin)
       second_group = Fabricate(:group)
@@ -254,7 +270,7 @@ RSpec.describe Salesforce::GuidedSyncController do
       expect(response.parsed_body.dig("configuration", "groups")).to eq(
         [sync_group.name, second_group.name].sort,
       )
-      expect(response.parsed_body.fetch("configuration")).not_to have_key("connection_changed")
+      expect(response.parsed_body.dig("configuration", "connection_changed")).to eq(false)
       expect(response.parsed_body.dig("configuration", "group_ids")).to contain_exactly(
         sync_group.id,
         second_group.id,
@@ -369,7 +385,6 @@ RSpec.describe Salesforce::GuidedSyncController do
            as: :json
       expect(response).to have_http_status(:created)
       lead = response.parsed_body.fetch("configuration")
-      expect(lead.fetch("active")).to eq(true)
       expect(lead.fetch("group_ids")).to eq([sync_group.id])
       expect(
         Jobs::SyncSalesforceConfiguration.jobs.any? do |job|
@@ -399,16 +414,11 @@ RSpec.describe Salesforce::GuidedSyncController do
       get "/salesforce/admin/guided-sync/configurations.json"
       expect(
         response.parsed_body.fetch("configurations").map { |record| record.except("sync_status") },
-      ).to contain_exactly(
-        updated.except("sync_status").merge("groups" => [sync_group.name]),
-        contact.except("sync_status").merge("groups" => [sync_group.name]),
-      )
+      ).to contain_exactly(updated.except("sync_status"), contact.except("sync_status"))
 
       delete "/salesforce/admin/guided-sync/configurations/#{lead.fetch("id")}.json"
       expect(response).to have_http_status(:no_content)
-      expect(Salesforce::GuidedSyncConfiguration.all).to eq(
-        [contact.except("sync_status").merge("groups" => [sync_group.name])],
-      )
+      expect(Salesforce::GuidedSyncConfiguration.pluck(:id)).to eq([contact.fetch("id")])
       delete "/salesforce/admin/guided-sync/configurations/#{lead.fetch("id")}.json"
       expect(response).to have_http_status(:not_found)
     end
@@ -445,13 +455,8 @@ RSpec.describe Salesforce::GuidedSyncController do
           },
           as: :json
       expect(response).to have_http_status(:bad_request)
-      expect(Salesforce::GuidedSyncConfiguration.all).to eq(
-        [
-          record.except("sync_status").merge(
-            "provider" => "salesforce",
-            "groups" => [sync_group.name],
-          ),
-        ],
+      expect(Salesforce::GuidedSyncConfiguration.pluck(:id, :object)).to eq(
+        [[record.fetch("id"), "Lead"]],
       )
     end
 
@@ -480,13 +485,8 @@ RSpec.describe Salesforce::GuidedSyncController do
       expect(response).to have_http_status(:forbidden)
       delete "/salesforce/admin/guided-sync/configurations/#{record.fetch("id")}.json"
       expect(response).to have_http_status(:forbidden)
-      expect(Salesforce::GuidedSyncConfiguration.all).to eq(
-        [
-          record.except("sync_status").merge(
-            "provider" => "salesforce",
-            "groups" => [sync_group.name],
-          ),
-        ],
+      expect(Salesforce::GuidedSyncConfiguration.pluck(:id, :name)).to eq(
+        [[record.fetch("id"), "Lead sync"]],
       )
     end
   end

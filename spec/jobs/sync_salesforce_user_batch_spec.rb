@@ -8,18 +8,13 @@ RSpec.describe Jobs::SyncSalesforceUserBatch do
   fab!(:group)
   fab!(:user) { Fabricate(:user, name: "Alex Morgan") }
   fab!(:other_user) { Fabricate(:user, name: "Maya Chen") }
-  let(:configuration) do
-    {
-      "id" => "batch",
-      "kind" => "users",
-      "provider" => "salesforce",
-      "active" => true,
-      "group_ids" => [group.id],
-      "object" => "Contact",
-      "instance_url" => instance_url,
-      "backfill" => true,
-      "schedule" => "daily",
-      "mappings" => [
+  let!(:configuration) do
+    Fabricate(
+      :guided_sync_configuration,
+      groups: [group],
+      object: "Contact",
+      account: instance_url,
+      mappings: [
         { "source" => "last", "destination" => "LastName", "policy" => "keep" },
         {
           "source" => "static",
@@ -28,7 +23,7 @@ RSpec.describe Jobs::SyncSalesforceUserBatch do
           "policy" => "overwrite",
         },
       ],
-    }
+    )
   end
   let(:fields) do
     %w[Email LastName LeadSource].map do |name|
@@ -43,18 +38,13 @@ RSpec.describe Jobs::SyncSalesforceUserBatch do
     other_user.activate
     group.add(user)
     group.add(other_user)
-    PluginStore.set(
-      Salesforce::PLUGIN_NAME,
-      Salesforce::GuidedSyncConfiguration::STORE_KEY,
-      [configuration],
-    )
     stub_request(:get, "#{api_path}/Contact/describe").to_return(body: { fields: fields }.to_json)
     Jobs::SyncSalesforceUser.clear
   end
 
   def run_batch
     described_class.new.execute(
-      configuration_id: "batch",
+      configuration_id: configuration.id,
       user_ids: [user.id, other_user.id],
       reason: "backfill",
     )
@@ -95,21 +85,15 @@ RSpec.describe Jobs::SyncSalesforceUserBatch do
       }.to_json,
     )
     stub_request(:patch, collection_url).to_timeout
-    fingerprint_key = "configuration_user_fingerprint:batch:#{user.id}"
-    PluginStore.set(Salesforce::PLUGIN_NAME, fingerprint_key, "previous")
+    Salesforce::SyncState.store(configuration.id, user.id, fingerprint: "previous")
 
     run_batch
 
-    link =
-      Salesforce::RecordLink.new(
-        provider: "salesforce",
-        account: instance_url,
-        object: "Contact",
-        user_id: user.id,
-      )
-    expect(link.read["id"]).to eq("contact1")
+    expect(configuration.record_link_for(user.id).external_id).to eq("contact1")
     expect(user.reload.salesforce_contact_id).to be_nil
-    expect(PluginStore.get(Salesforce::PLUGIN_NAME, fingerprint_key)).to eq("previous")
+    expect(
+      Salesforce::SyncState.find_by(configuration: configuration, user_id: user.id).fingerprint,
+    ).to eq("previous")
     user.primary_email.update!(email: "changed@example.com")
     user.reload.activate
     stub_request(:get, "#{api_path}/Contact/contact1").to_return(
@@ -134,20 +118,17 @@ RSpec.describe Jobs::SyncSalesforceUserBatch do
     other_user.custom_fields["user_field_#{custom_field.id}"] = "Designer"
     other_user.save_custom_fields
     other_user.user_stat.update!(posts_read_count: 30)
-    configuration["mappings"].concat(
-      [
-        { "source" => "posts_read", "destination" => "Posts_Read__c", "policy" => "overwrite" },
-        {
-          "source" => "user_field_#{custom_field.id}",
-          "destination" => "Role__c",
-          "policy" => "overwrite",
-        },
-      ],
-    )
-    PluginStore.set(
-      Salesforce::PLUGIN_NAME,
-      Salesforce::GuidedSyncConfiguration::STORE_KEY,
-      [configuration],
+    configuration.update!(
+      mappings:
+        configuration.mappings +
+          [
+            { "source" => "posts_read", "destination" => "Posts_Read__c", "policy" => "overwrite" },
+            {
+              "source" => "user_field_#{custom_field.id}",
+              "destination" => "Role__c",
+              "policy" => "overwrite",
+            },
+          ],
     )
     fields.concat(
       [
@@ -265,26 +246,20 @@ RSpec.describe Jobs::SyncSalesforceUserBatch do
     run_batch
     expect(update).to have_been_requested.once
     expect(user.reload.salesforce_contact_id).to eq("contact1")
-    failed_link =
-      Salesforce::RecordLink.new(
-        provider: "salesforce",
-        account: instance_url,
-        object: "Contact",
-        user_id: other_user.id,
-      )
-    expect(failed_link.read["id"]).to eq("contact2")
+    expect(configuration.record_link_for(other_user.id).external_id).to eq("contact2")
     expect(Jobs::SyncSalesforceUser.jobs.map { |job| job["args"].first["user_id"] }).to eq(
       [other_user.id],
     )
   end
 
   it "defers ambiguous matches and missing linked records to individual jobs" do
-    Salesforce::RecordLink.new(
+    Salesforce::RecordLink.link!(
       provider: "salesforce",
       account: instance_url,
       object: "Contact",
       user_id: other_user.id,
-    ).write("missing")
+      external_id: "missing",
+    )
     stub_request(:get, query_path).with(query: hash_including("q" => /SELECT/)).to_return(
       body: {
         records: [{ Id: "contact1", Email: user.email }, { Id: "contact2", Email: user.email }],
@@ -299,20 +274,17 @@ RSpec.describe Jobs::SyncSalesforceUserBatch do
   end
 
   it "reconciles linked converted Leads without retrying or recreating them" do
-    configuration["object"] = "Lead"
-    configuration["mappings"] = [
-      { "source" => "last", "destination" => "LastName", "policy" => "keep" },
-      {
-        "source" => "static",
-        "value" => "Unknown",
-        "destination" => "Company",
-        "policy" => "overwrite",
-      },
-    ]
-    PluginStore.set(
-      Salesforce::PLUGIN_NAME,
-      Salesforce::GuidedSyncConfiguration::STORE_KEY,
-      [configuration],
+    configuration.update!(
+      object: "Lead",
+      mappings: [
+        { "source" => "last", "destination" => "LastName", "policy" => "keep" },
+        {
+          "source" => "static",
+          "value" => "Unknown",
+          "destination" => "Company",
+          "policy" => "overwrite",
+        },
+      ],
     )
     lead_fields =
       %w[Email LastName Company].map do |name|
@@ -320,12 +292,13 @@ RSpec.describe Jobs::SyncSalesforceUserBatch do
       end
     stub_request(:get, "#{api_path}/Lead/describe").to_return(body: { fields: lead_fields }.to_json)
     lead_id = "00Qbm00000v6wJpEAI"
-    Salesforce::RecordLink.new(
+    Salesforce::RecordLink.link!(
       provider: "salesforce",
       account: instance_url,
       object: "Lead",
       user_id: user.id,
-    ).write(lead_id)
+      external_id: lead_id,
+    )
     query =
       stub_request(:get, query_path).with(
         query: hash_including("q" => /Email IN .* OR Id IN \('#{lead_id}'\)/),
@@ -360,30 +333,21 @@ RSpec.describe Jobs::SyncSalesforceUserBatch do
     expect(user.salesforce_contact_id).to eq("contact-123")
     expect(other_user.reload.salesforce_lead_id).to be_nil
     expect(other_user.salesforce_contact_id).to eq("contact-other")
-    expect(
-      Salesforce::RecordLink.new(
-        provider: "salesforce",
-        account: instance_url,
-        object: "Lead",
-        user_id: user.id,
-      ).read,
-    ).to include("converted_to" => { "object" => "Contact", "id" => "contact-123" })
+    expect(configuration.record_link_for(user.id).converted_to_id).to eq("contact-123")
   end
 
   it "skips Lead batches with only already-converted users without contacting Salesforce" do
-    configuration["object"] = "Lead"
-    PluginStore.set(
-      Salesforce::PLUGIN_NAME,
-      Salesforce::GuidedSyncConfiguration::STORE_KEY,
-      [configuration],
-    )
+    configuration.update!(object: "Lead")
     [user, other_user].each do |member|
-      Salesforce::RecordLink.new(
+      Salesforce::RecordLink.mark_converted!(
         provider: "salesforce",
         account: instance_url,
         object: "Lead",
         user_id: member.id,
-      ).mark_converted_to("contact-#{member.id}")
+        external_id: "lead-#{member.id}",
+        to_object: "Contact",
+        to_id: "contact-#{member.id}",
+      )
     end
 
     run_batch
@@ -399,24 +363,20 @@ RSpec.describe Jobs::SyncSalesforceUserBatch do
     group.remove(user)
     other_user.update!(active: false)
     run_batch
-    configuration["active"] = false
-    PluginStore.set(
-      Salesforce::PLUGIN_NAME,
-      Salesforce::GuidedSyncConfiguration::STORE_KEY,
-      [configuration],
-    )
+    configuration.update!(active: false)
     group.add(user)
     run_batch
     expect(a_request(:get, "#{api_path}/Contact/describe")).not_to have_been_made
   end
 
   it "follows query pages and uses saved IDs after an email change" do
-    Salesforce::RecordLink.new(
+    Salesforce::RecordLink.link!(
       provider: "salesforce",
       account: instance_url,
       object: "Contact",
       user_id: user.id,
-    ).write("contact1")
+      external_id: "contact1",
+    )
     lookup =
       stub_request(:get, query_path).with(
         query: hash_including("q" => /Id IN \(\x27contact1\x27\)/),
@@ -459,10 +419,12 @@ RSpec.describe Jobs::SyncSalesforceUserBatch do
 
     retries = Jobs::SyncSalesforceUser.jobs.map { |job| job["args"].first }
     expect(retries.map { |args| args["user_id"] }).to contain_exactly(user.id, other_user.id)
-    expect(retries).to all(include("configuration_id" => "batch", "reason" => "backfill"))
-    status = PluginStore.get(Salesforce::PLUGIN_NAME, "configuration_status:batch")
-    expect(status["user_errors"].keys).to contain_exactly(user.id.to_s, other_user.id.to_s)
-    expect(status["batch_error"]).to be_nil
+    expect(retries).to all(include("configuration_id" => configuration.id, "reason" => "backfill"))
+    expect(configuration.sync_states.where.not(error: nil).pluck(:user_id)).to contain_exactly(
+      user.id,
+      other_user.id,
+    )
+    expect(configuration.reload.last_error).to be_nil
 
     stub_salesforce_person_lookup(
       "Contact",
@@ -495,7 +457,7 @@ RSpec.describe Jobs::SyncSalesforceUserBatch do
     expect(other_user.reload.salesforce_contact_id).to eq("new-contact")
     expect(collection).to have_been_requested.once
     expect(create).to have_been_requested.once
-    expect(Salesforce::GuidedSyncConfiguration.status_for(configuration)["error"]).to be_nil
+    expect(configuration.reload.sync_status["error"]).to be_nil
   end
 
   ["not JSON", { unexpected: "response" }.to_json].each do |response_body|
@@ -563,17 +525,11 @@ RSpec.describe Jobs::SyncSalesforceUserBatch do
   end
 
   it "records invalid mappings without retrying the batch" do
-    configuration["mappings"] = []
-    PluginStore.set(
-      Salesforce::PLUGIN_NAME,
-      Salesforce::GuidedSyncConfiguration::STORE_KEY,
-      [configuration],
-    )
+    configuration.update!(mappings: [])
 
     expect { run_batch }.not_to raise_error
 
-    status = PluginStore.get(Salesforce::PLUGIN_NAME, "configuration_status:batch")
-    expect(status.dig("batch_error", "error")).to eq("Discourse::InvalidParameters")
+    expect(configuration.reload.last_error).to eq("Discourse::InvalidParameters")
     expect(a_request(:get, query_path)).not_to have_been_made
   end
 
@@ -584,11 +540,8 @@ RSpec.describe Jobs::SyncSalesforceUserBatch do
     )
 
     expect { run_batch }.to raise_error(Salesforce::InvalidApiResponse)
-    status = PluginStore.get(Salesforce::PLUGIN_NAME, "configuration_status:batch")
-    expect(status).to include(
-      "batch_error" => hash_including("error" => "Salesforce::InvalidApiResponse"),
-    )
-    expect(status["user_errors"]).to be_empty
+    expect(configuration.reload.last_error).to eq("Salesforce::InvalidApiResponse")
+    expect(configuration.sync_states.where.not(error: nil)).to be_empty
     expect(Jobs::SyncSalesforceUser.jobs).to be_empty
     expect(a_request(:post, collection_url)).not_to have_been_made
   end

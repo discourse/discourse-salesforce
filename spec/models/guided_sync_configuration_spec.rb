@@ -7,102 +7,113 @@ RSpec.describe Salesforce::GuidedSyncConfiguration do
   fab!(:user) { Fabricate(:user, active: true) }
   fab!(:other_user) { Fabricate(:user, active: true) }
 
-  it "selects current-account configurations without querying group display names" do
+  before do
     SiteSetting.salesforce_enabled = true
     SiteSetting.enable_guided_sync_configuration = true
     SiteSetting.salesforce_instance_url = "https://current.salesforce.com"
-    current = {
-      "id" => "current",
-      "kind" => "users",
-      "active" => true,
-      "provider" => "salesforce",
-      "instance_url" => SiteSetting.salesforce_instance_url,
-      "group_ids" => [group.id],
-    }
-    records = [
-      current,
-      current.merge("id" => "stale", "instance_url" => "https://previous.salesforce.com"),
-      current.merge("id" => "other", "provider" => "hubspot"),
-    ]
-    PluginStore.set(Salesforce::PLUGIN_NAME, described_class::STORE_KEY, records)
+  end
 
-    active = nil
-    queries = track_sql_queries { active = described_class.active }
+  let!(:configuration) { Fabricate(:guided_sync_configuration, groups: [group]) }
 
-    expect(active).to eq([current])
-    expect(queries.grep(/FROM "groups"/)).to be_empty
-    displayed = nil
-    queries = track_sql_queries { displayed = described_class.all }
-    expect(queries.grep(/FROM "groups"/).size).to eq(1)
-    expect(displayed.map { |record| record["groups"] }).to eq(
-      [[group.name], [group.name], [group.name]],
-    )
-    expect(displayed.find { |record| record["id"] == "stale" }["connection_changed"]).to eq(true)
-    expect(displayed.first).not_to have_key("connection_changed")
+  it "selects only active current-account configurations" do
+    stale =
+      Fabricate(
+        :guided_sync_configuration,
+        account: "https://previous.salesforce.com",
+        groups: [group],
+      )
+    inactive = Fabricate(:guided_sync_configuration, active: false, groups: [group])
+
+    expect(described_class.active).to eq([configuration])
+    expect(stale.connection_changed?).to eq(true)
+    expect(configuration.connection_changed?).to eq(false)
+    expect(described_class.for_current_account).to contain_exactly(configuration, inactive)
+    SiteSetting.enable_guided_sync_configuration = false
+    expect(described_class.active).to be_empty
   end
 
   it "rejects unsupported providers before contacting Salesforce" do
     expect {
-      described_class.save!({ provider: "hubspot" }, id: nil, guardian: Fabricate(:admin).guardian)
+      described_class.create_or_update!(
+        { provider: "hubspot" },
+        id: nil,
+        guardian: Fabricate(:admin).guardian,
+      )
     }.to raise_error(Discourse::InvalidParameters, /provider/)
+  end
+
+  it "removes group scopes and sync states together with the configuration" do
+    Salesforce::SyncState.store(configuration.id, user.id, fingerprint: "abc")
+
+    described_class.remove!(configuration.id, guardian: Fabricate(:admin).guardian)
+
+    expect(
+      Salesforce::GuidedSyncConfigurationGroup.where(configuration_id: configuration.id),
+    ).to be_empty
+    expect(Salesforce::SyncState.where(configuration_id: configuration.id)).to be_empty
+    expect {
+      described_class.remove!(configuration.id, guardian: Fabricate(:admin).guardian)
+    }.to raise_error(Discourse::NotFound)
   end
 
   it "keeps unresolved user errors when another user syncs successfully" do
     group.add(user)
     group.add(other_user)
-    configuration = { "id" => "sync", "group_ids" => [group.id] }
 
-    described_class.record_result("sync", user.id, error: Salesforce::InvalidApiResponse.new)
-    described_class.record_result("sync", other_user.id)
-
-    expect(described_class.status_for(configuration)["error"]).to eq(
-      "Salesforce::InvalidApiResponse",
+    described_class.record_result(
+      configuration.id,
+      user.id,
+      error: Salesforce::InvalidApiResponse.new,
     )
-    expect(
-      PluginStore.get(Salesforce::PLUGIN_NAME, "configuration_status:sync")["user_errors"].keys,
-    ).to contain_exactly(user.id.to_s)
+    described_class.record_result(configuration.id, other_user.id)
+
+    expect(configuration.reload.sync_status["error"]).to eq("Salesforce::InvalidApiResponse")
+    expect(configuration.sync_states.where.not(error: nil).pluck(:user_id)).to eq([user.id])
+    expect(configuration.last_synced_at).to be_present
   end
 
-  it "clears user errors when they are no longer eligible members" do
+  it "hides user errors once they are no longer eligible members" do
     group.add(user)
-    configuration = { "id" => "sync", "group_ids" => [group.id] }
-    described_class.record_result("sync", user.id, error: Salesforce::InvalidApiResponse.new)
+    described_class.record_result(
+      configuration.id,
+      user.id,
+      error: Salesforce::InvalidApiResponse.new,
+    )
 
     group.remove(user)
 
-    expect(described_class.status_for(configuration)).not_to have_key("error")
-    expect(
-      PluginStore.get(Salesforce::PLUGIN_NAME, "configuration_status:sync")["user_errors"],
-    ).to be_empty
+    expect(configuration.reload.sync_status).not_to have_key("error")
   end
 
-  it "reads unchanged status without rewriting it or checking eligibility when there are no errors" do
-    configuration = { "id" => "sync", "group_ids" => [group.id] }
-    described_class.record_result("sync", user.id)
+  it "reads status without writing" do
+    described_class.record_result(configuration.id, user.id)
 
-    queries = track_sql_queries { described_class.status_for(configuration) }
+    queries = track_sql_queries { configuration.reload.sync_status }
 
-    expect(queries.grep(/(?:INSERT INTO|UPDATE|DELETE FROM).*plugin_store_rows/i)).to be_empty
-    expect(queries.grep(/FROM "users"/)).to be_empty
+    expect(queries.grep(/(?:INSERT INTO|UPDATE|DELETE FROM)/i)).to be_empty
 
     group.add(user)
-    described_class.record_result("sync", user.id, error: Salesforce::InvalidApiResponse.new)
+    described_class.record_result(
+      configuration.id,
+      user.id,
+      error: Salesforce::InvalidApiResponse.new,
+    )
     status = nil
-    queries = track_sql_queries { status = described_class.status_for(configuration) }
+    queries = track_sql_queries { status = configuration.reload.sync_status }
 
     expect(status["error"]).to eq("Salesforce::InvalidApiResponse")
-    expect(queries.grep(/(?:INSERT INTO|UPDATE|DELETE FROM).*plugin_store_rows/i)).to be_empty
+    expect(status["last_error_at"]).to be_present
+    expect(queries.grep(/(?:INSERT INTO|UPDATE|DELETE FROM)/i)).to be_empty
   end
 
   it "stores batch errors separately from user errors and clears them on batch success" do
-    described_class.record_result("sync", error: Salesforce::InvalidApiResponse.new)
+    described_class.record_result(configuration.id, error: Salesforce::InvalidApiResponse.new)
 
-    expect(PluginStore.get(Salesforce::PLUGIN_NAME, "configuration_status:sync")).to include(
-      "batch_error" => hash_including("error" => "Salesforce::InvalidApiResponse"),
-    )
+    expect(configuration.reload.last_error).to eq("Salesforce::InvalidApiResponse")
+    expect(configuration.sync_status["error"]).to eq("Salesforce::InvalidApiResponse")
 
-    described_class.record_batch_success("sync")
+    described_class.record_batch_success(configuration.id)
 
-    expect(described_class.status_for("id" => "sync")).not_to have_key("error")
+    expect(configuration.reload.sync_status).not_to have_key("error")
   end
 end

@@ -72,18 +72,16 @@ module ::Salesforce
         account: SiteSetting.salesforce_instance_url,
         user_id: user.id,
       }
-      contact_link = Salesforce::RecordLink.new(**scope, object: "Contact").read
-      if contact_link &&
-           (contact_link["account"] != scope[:account] || contact_link["id"] != contact_id)
+      contact_link = Salesforce::RecordLink.find_by(**scope, object: "Contact")
+      if contact_link && contact_link.external_id != contact_id
         Rails.logger.warn(
           "Skipping converted Salesforce Lead reconciliation for Discourse user #{user.id}: an existing Contact link conflicts",
         )
         return true
       end
 
-      lead_link = Salesforce::RecordLink.new(**scope, object: "Lead").read
-      if lead_link &&
-           (lead_link["account"] != scope[:account] || lead_link["id"] != converted_lead["Id"])
+      lead_link = Salesforce::RecordLink.find_by(**scope, object: "Lead")
+      if lead_link && lead_link.external_id != converted_lead["Id"]
         Rails.logger.warn(
           "Skipping converted Salesforce Lead reconciliation for Discourse user #{user.id}: an existing Lead link conflicts",
         )
@@ -91,10 +89,18 @@ module ::Salesforce
       end
 
       UserCustomField.transaction do
-        Salesforce::RecordLink.new(**scope, object: "Lead").mark_converted_to(contact_id)
-        Salesforce::RecordLink.new(**scope, object: "Contact").write(
-          contact_id,
-          converted_from_lead_id: converted_lead["Id"],
+        Salesforce::RecordLink.mark_converted!(
+          **scope,
+          object: "Lead",
+          external_id: converted_lead["Id"],
+          to_object: "Contact",
+          to_id: contact_id,
+        )
+        Salesforce::RecordLink.link!(
+          **scope,
+          object: "Contact",
+          external_id: contact_id,
+          converted_from_id: converted_lead["Id"],
         )
         user.salesforce_lead_id = nil if user.salesforce_lead_id == converted_lead["Id"]
         user.salesforce_contact_id = contact_id

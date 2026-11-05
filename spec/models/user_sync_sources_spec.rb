@@ -94,7 +94,7 @@ RSpec.describe Salesforce::UserSyncSources do
       }.map do |name, type|
         { "name" => name, "type" => type, "createable" => true, "updateable" => true }
       end
-    configuration = { "object" => "Contact", "mappings" => mappings }
+    configuration = Salesforce::GuidedSyncConfiguration.new(object: "Contact", mappings: mappings)
     Salesforce::ConfiguredUserSync.validate_mappings!(configuration, fields)
     sync =
       Salesforce::ConfiguredUserSync.new(configuration, user, api: Object.new, source_data: data)
@@ -200,7 +200,7 @@ RSpec.describe Salesforce::UserSyncSources do
       }.map do |name, type|
         { "name" => name, "type" => type, "createable" => true, "updateable" => true }
       end
-    configuration = { "object" => "Contact", "mappings" => mappings }
+    configuration = Salesforce::GuidedSyncConfiguration.new(object: "Contact", mappings: mappings)
     Salesforce::ConfiguredUserSync.validate_mappings!(configuration, fields)
     sync = Salesforce::ConfiguredUserSync.new(configuration, user, api: Object.new)
     expect(sync.mapped_values(fields, nil)).to include(

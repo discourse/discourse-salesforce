@@ -6,36 +6,23 @@ module Jobs
 
     def execute(args)
       configuration =
-        Salesforce::GuidedSyncConfiguration.active.find do |record|
-          record["id"] == args[:configuration_id]
-        end
-      unless configuration &&
-               Salesforce::GuidedSyncConfiguration.reason_enabled?(configuration, args[:reason])
-        return
-      end
+        Salesforce::GuidedSyncConfiguration.active.find_by(id: args[:configuration_id])
+      return unless configuration&.reason_enabled?(args[:reason])
       ids =
         Salesforce::Person
-          .eligible_group_members(Salesforce::GuidedSyncConfiguration.group_ids(configuration))
+          .eligible_group_members(configuration.configuration_groups.select(:group_id))
           .where("users.id > ?", args[:after_user_id].to_i)
           .order(:id)
           .limit(Salesforce::ConfiguredUserBatchSync::BATCH_SIZE)
           .pluck(:id)
       sync_ids = ids
       if args[:reason] == "scheduled"
-        links =
-          Salesforce::RecordLink.read_many(
-            provider: configuration.fetch("provider", "salesforce"),
-            account: configuration.fetch("instance_url"),
-            object: configuration.fetch("object"),
-            user_ids: ids,
-          )
-        sync_ids =
-          ids.select { |user_id| links[user_id]&.[]("account") == configuration["instance_url"] }
+        sync_ids = configuration.record_links.where(user_id: ids).order(:user_id).pluck(:user_id)
       end
       if sync_ids.present?
         Jobs.enqueue(
           :sync_salesforce_user_batch,
-          configuration_id: configuration["id"],
+          configuration_id: configuration.id,
           user_ids: sync_ids,
           reason: args[:reason],
         )
@@ -43,7 +30,7 @@ module Jobs
       if ids.size == Salesforce::ConfiguredUserBatchSync::BATCH_SIZE
         Jobs.enqueue(
           :sync_salesforce_configuration,
-          configuration_id: configuration["id"],
+          configuration_id: configuration.id,
           after_user_id: ids.last,
           reason: args[:reason],
         )

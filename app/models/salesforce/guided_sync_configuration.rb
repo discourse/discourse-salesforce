@@ -1,41 +1,43 @@
 # frozen_string_literal: true
 
 module Salesforce
-  class GuidedSyncConfiguration
-    STORE_KEY = "guided_sync_configurations"
+  class GuidedSyncConfiguration < ActiveRecord::Base
+    self.table_name = "crm_sync_configurations"
 
-    def self.all
-      records = stored_records
-      ids = records.flat_map { |record| group_ids(record) }.uniq
-      names = groups_by_id(ids).to_h { |group| [group.id, group.name] }
-      records.map { |record| display_record(record, names: names) }
+    PROVIDER = "salesforce"
+    KINDS = %w[users].freeze
+    OBJECTS = %w[Lead Contact].freeze
+    SCHEDULES = %w[daily hourly weekly manual].freeze
+    MAX_GROUPS = 100
+    MAX_MAPPINGS = 50
+
+    has_many :configuration_groups,
+             class_name: "Salesforce::GuidedSyncConfigurationGroup",
+             foreign_key: :configuration_id,
+             dependent: :delete_all
+    has_many :groups, through: :configuration_groups
+    has_many :sync_states,
+             class_name: "Salesforce::SyncState",
+             foreign_key: :configuration_id,
+             dependent: :delete_all
+
+    validates :provider, inclusion: { in: [PROVIDER] }
+    validates :name, presence: true, length: { maximum: 60 }
+    validates :kind, inclusion: { in: KINDS }
+    validates :object, inclusion: { in: OBJECTS }
+    validates :schedule, inclusion: { in: SCHEDULES }
+    validate :mappings_shape
+
+    scope :for_current_account,
+          -> { where(provider: PROVIDER, account: SiteSetting.salesforce_instance_url) }
+
+    def self.enabled?
+      SiteSetting.salesforce_enabled && SiteSetting.enable_guided_sync_configuration
     end
 
-    def self.display_record(record, names: nil)
-      names ||= groups_by_id(group_ids(record)).to_h { |group| [group.id, group.name] }
-      display = record.merge("groups" => group_ids(record).filter_map { |id| names[id.to_i] }.sort)
-      display["connection_changed"] = true if record["instance_url"] !=
-        SiteSetting.salesforce_instance_url
-      display
-    end
-
-    def self.group_ids(record)
-      Array(record["group_ids"])
-    end
-
-    def self.resolve_group_ids!(ids)
-      unless ids.is_a?(Array) && ids.present? && ids.size <= 100 &&
-               ids.all? { |id| id.to_s.match?(/\A\d+\z/) }
-        raise Discourse::InvalidParameters.new(:group_ids)
-      end
-      ids = ids.map(&:to_i).uniq
-      groups = groups_by_id(ids)
-      raise Discourse::InvalidParameters.new(:group_ids) if groups.size != ids.size
-      groups
-    end
-
-    def self.groups_by_id(ids)
-      Group.where.not(id: Group::AUTO_GROUPS[:everyone]).where(id: ids).to_a
+    def self.active
+      return none unless enabled?
+      where(active: true, kind: "users").for_current_account
     end
 
     def self.available_groups(query: nil)
@@ -55,158 +57,144 @@ module Salesforce
         .map { |id, name| { id: id, name: name, user_count: counts.fetch(id, 0) } }
     end
 
-    def self.enabled?
-      SiteSetting.salesforce_enabled && SiteSetting.enable_guided_sync_configuration
+    def self.resolve_groups!(ids)
+      unless ids.is_a?(Array) && ids.present? && ids.size <= MAX_GROUPS &&
+               ids.all? { |id| id.to_s.match?(/\A\d+\z/) }
+        raise Discourse::InvalidParameters.new(:group_ids)
+      end
+      ids = ids.map(&:to_i).uniq
+      groups = Group.where.not(id: Group::AUTO_GROUPS[:everyone]).where(id: ids).to_a
+      raise Discourse::InvalidParameters.new(:group_ids) if groups.size != ids.size
+      groups
     end
 
-    def self.active
-      return [] unless enabled?
-      stored_records.select do |record|
-        record["active"] && record["kind"] == "users" && record["provider"] == "salesforce" &&
-          record["instance_url"] == SiteSetting.salesforce_instance_url
+    def self.create_or_update!(params, id:, guardian:)
+      raise Discourse::InvalidAccess unless guardian.is_admin?
+
+      params = params.deep_stringify_keys
+      provider = params.fetch("provider", PROVIDER)
+      raise Discourse::InvalidParameters.new(:provider) if provider != PROVIDER
+      groups = resolve_groups!(params["group_ids"])
+
+      record = id ? find_by(id: id) : new(provider: PROVIDER)
+      raise Discourse::NotFound if id && !record
+      if record.persisted? && record.object != params["object"]
+        raise Discourse::InvalidParameters.new(:object)
+      end
+      record.assign_attributes(
+        name: params["name"],
+        kind: params.fetch("kind", "users"),
+        object: params["object"],
+        schedule: params["schedule"],
+        backfill: ActiveModel::Type::Boolean.new.cast(params["backfill"]),
+        mappings: params["mappings"],
+        active: true,
+      )
+      raise Discourse::InvalidParameters.new(:configuration) if record.invalid?
+
+      ConfiguredUserSync.validate_mappings!(
+        record,
+        Api.cached_writable_fields(record.object, refresh: true),
+      )
+      record.account = SiteSetting.salesforce_instance_url
+
+      previous_group_ids = record.persisted? ? record.group_ids.sort : []
+      new_group_ids = groups.map(&:id).sort
+      transaction do
+        record.save!
+        if previous_group_ids != new_group_ids
+          record.configuration_groups.delete_all
+          record.configuration_groups.insert_all(new_group_ids.map { |group_id| { group_id: } })
+        end
+      end
+      ConfigurationScheduler.configuration_saved(
+        record,
+        group_ids_changed: previous_group_ids != new_group_ids,
+      )
+      record
+    end
+
+    def self.remove!(id, guardian:)
+      raise Discourse::InvalidAccess unless guardian.is_admin?
+
+      record = find_by(id: id)
+      raise Discourse::NotFound unless record
+      record.destroy!
+    end
+
+    def self.record_result(id, user_id = nil, error: nil)
+      if user_id
+        if error
+          SyncState.store(id, user_id, error: error.class.name, error_at: Time.zone.now)
+        else
+          SyncState.where(configuration_id: id, user_id: user_id).update_all(
+            error: nil,
+            error_at: nil,
+          )
+          where(id: id).update_all(last_synced_at: Time.zone.now)
+        end
+      elsif error
+        where(id: id).update_all(last_error: error.class.name, last_error_at: Time.zone.now)
+      else
+        where(id: id).update_all(last_synced_at: Time.zone.now)
       end
     end
 
-    def self.reason_enabled?(record, reason)
+    def self.record_batch_success(id)
+      where(id: id).update_all(last_error: nil, last_error_at: nil)
+    end
+
+    def reason_enabled?(reason)
       case reason
       when "join", "change"
         true
       when "backfill"
-        record["backfill"]
+        backfill
       when "scheduled"
-        record["schedule"] != "manual"
+        schedule != "manual"
       else
         false
       end
     end
 
-    def self.record_result(id, user_id = nil, error: nil)
-      DistributedMutex.synchronize("salesforce_configuration_status_#{id}") do
-        key = "configuration_status:#{id}"
-        status = PluginStore.get(PLUGIN_NAME, key) || { "user_errors" => {} }
-        if error
-          error_info = { "at" => Time.now.utc.iso8601, "error" => error.class.name }
-          if user_id
-            status["user_errors"][user_id.to_s] = error_info
-          else
-            status["batch_error"] = error_info
-          end
-        else
-          status["last_synced_at"] = Time.now.utc.iso8601
-          status["user_errors"].delete(user_id.to_s) if user_id
-        end
-        PluginStore.set(PLUGIN_NAME, key, status)
-      end
+    def connection_changed?
+      account != SiteSetting.salesforce_instance_url
     end
 
-    def self.record_batch_success(id)
-      DistributedMutex.synchronize("salesforce_configuration_status_#{id}") do
-        key = "configuration_status:#{id}"
-        status = PluginStore.get(PLUGIN_NAME, key) || { "user_errors" => {} }
-        status.delete("batch_error")
-        PluginStore.set(PLUGIN_NAME, key, status)
-      end
+    def record_links
+      RecordLink.within(provider:, account:, object:)
     end
 
-    def self.status_for(record)
-      id = record.fetch("id")
-      DistributedMutex.synchronize("salesforce_configuration_status_#{id}") do
-        key = "configuration_status:#{id}"
-        stored_status = PluginStore.get(PLUGIN_NAME, key)
-        next unless stored_status
-        status = stored_status
-        errors = status["user_errors"]
-        if errors.present?
-          eligible_ids =
-            Person
-              .eligible_group_members(group_ids(record))
-              .where(id: status["user_errors"].keys.map(&:to_i))
-              .pluck(:id)
-              .map(&:to_s)
-          if errors.select! { |user_id, _| eligible_ids.include?(user_id) }
-            PluginStore.set(PLUGIN_NAME, key, status)
-          end
-        end
-        errors = status["user_errors"].values
-        displayed_error = status["batch_error"] || errors.first
-        display_status = status.except("user_errors", "batch_error")
-        if displayed_error
-          display_status["error"] = displayed_error["error"]
-          display_status["last_error_at"] = displayed_error["at"]
-        end
-        display_status
-      end
+    def record_link_for(user_id)
+      record_links.find_by(user_id:)
     end
 
-    def self.destroy!(id:, guardian:)
-      raise Discourse::InvalidAccess unless guardian.is_admin?
-
-      DistributedMutex.synchronize("salesforce_guided_sync_configurations") do
-        records = stored_records
-        raise Discourse::NotFound unless records.any? { |record| record["id"] == id }
-        PluginStore.set(PLUGIN_NAME, STORE_KEY, records.reject { |record| record["id"] == id })
-        PluginStore.remove(PLUGIN_NAME, "configuration_status:#{id}")
-        PluginStore.remove(PLUGIN_NAME, "configuration_scheduled_at:#{id}")
-        PluginStoreRow
-          .where(plugin_name: PLUGIN_NAME)
-          .where("key LIKE ?", "configuration_user_fingerprint:#{id}:%")
-          .delete_all
+    def sync_status
+      status = { "last_synced_at" => last_synced_at&.utc&.iso8601 }
+      error_name, error_at = last_error ? [last_error, last_error_at] : first_user_error
+      if error_name
+        status["error"] = error_name
+        status["last_error_at"] = error_at&.utc&.iso8601
       end
+      status
     end
 
-    def self.save!(configuration, id:, guardian:)
-      raise Discourse::InvalidAccess unless guardian.is_admin?
+    private
 
-      configuration = configuration.deep_stringify_keys
-      configuration["kind"] ||= "users"
-      configuration["provider"] ||= "salesforce"
-      unless configuration["provider"] == "salesforce"
-        raise Discourse::InvalidParameters.new(:provider)
-      end
-      groups = resolve_group_ids!(configuration["group_ids"])
-      valid_object = %w[Lead Contact].include?(configuration["object"])
-      unless configuration["name"].present? && configuration["name"].length <= 60 &&
-               configuration["kind"] == "users" && valid_object &&
-               %w[daily hourly weekly manual].include?(configuration["schedule"]) &&
-               configuration["mappings"].is_a?(Array) && configuration["mappings"].size <= 50
-        raise Discourse::InvalidParameters.new(:configuration)
-      end
-
-      ConfiguredUserSync.validate_mappings!(
-        configuration,
-        Api.cached_writable_fields(configuration["object"], refresh: true),
-      )
-      configuration["group_ids"] = groups.sort_by(&:name).map(&:id)
-
-      configuration["backfill"] = ActiveModel::Type::Boolean.new.cast(configuration["backfill"])
-
-      DistributedMutex.synchronize("salesforce_guided_sync_configurations") do
-        records = stored_records
-        previous = id ? records.find { |record| record["id"] == id } : nil
-        raise Discourse::NotFound if id && !previous
-        if previous && previous["object"] != configuration["object"]
-          raise Discourse::InvalidParameters.new(:object)
-        end
-        record_id = previous&.dig("id") || SecureRandom.uuid
-        record =
-          configuration.merge(
-            "id" => record_id,
-            "active" => true,
-            "instance_url" => SiteSetting.salesforce_instance_url,
-          )
-        PluginStore.set(
-          PLUGIN_NAME,
-          STORE_KEY,
-          records.reject { |entry| entry["id"] == record_id } + [record],
-        )
-        ConfigurationScheduler.configuration_saved(record, previous: previous)
-        record
-      end
+    def first_user_error
+      sync_states
+        .where.not(error: nil)
+        .where(user_id: Person.eligible_group_members(group_ids).select(:id))
+        .order(:error_at, :id)
+        .pick(:error, :error_at)
     end
 
-    def self.stored_records
-      PluginStore.get(PLUGIN_NAME, STORE_KEY) || []
+    def mappings_shape
+      if mappings.is_a?(Array) && mappings.size <= MAX_MAPPINGS &&
+           mappings.all? { |mapping| mapping.is_a?(Hash) }
+        return
+      end
+      errors.add(:mappings, :invalid)
     end
-    private_class_method :stored_records
   end
 end

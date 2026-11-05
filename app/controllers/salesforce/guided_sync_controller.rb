@@ -7,11 +7,9 @@ module Salesforce
     prepend_before_action :ensure_configurations_enabled
 
     def configurations
+      records = GuidedSyncConfiguration.includes(:groups).order(:id)
       render json: {
-               configurations:
-                 GuidedSyncConfiguration.all.map { |record|
-                   record.merge("sync_status" => GuidedSyncConfiguration.status_for(record))
-                 },
+               configurations: serialize_data(records, GuidedSyncConfigurationSerializer),
                credentials_configured: Api.has_credentials?,
                groups: GuidedSyncConfiguration.available_groups,
              }
@@ -50,12 +48,15 @@ module Salesforce
             mappings: %i[id source destination policy value],
           )
           .to_h
-      record = GuidedSyncConfiguration.save!(configuration, id: params[:id], guardian: guardian)
+      record =
+        GuidedSyncConfiguration.create_or_update!(
+          configuration,
+          id: params[:id],
+          guardian: guardian,
+        )
       render json: {
                configuration:
-                 GuidedSyncConfiguration.display_record(record).merge(
-                   "sync_status" => GuidedSyncConfiguration.status_for(record),
-                 ),
+                 serialize_data(record, GuidedSyncConfigurationSerializer, root: false),
              },
              status: params[:id] ? :ok : :created
     rescue Salesforce::InvalidCredentials,
@@ -66,7 +67,7 @@ module Salesforce
     end
 
     def destroy_configuration
-      GuidedSyncConfiguration.destroy!(id: params[:id], guardian: guardian)
+      GuidedSyncConfiguration.remove!(params[:id], guardian: guardian)
       head :no_content
     end
 

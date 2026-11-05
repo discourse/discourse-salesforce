@@ -26,7 +26,8 @@ export default class SalesforceSyncConfigurations extends Component {
   constructor() {
     super(...arguments);
     const record = this.records.find(
-      (configuration) => configuration.id === this.args.selectedId
+      (configuration) =>
+        String(configuration.id) === String(this.args.selectedId)
     );
     if (record && record.kind !== "posts") {
       this.selected = { key: record.id, configuration: record };

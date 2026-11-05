@@ -23,11 +23,7 @@ module ::Salesforce
 
       object = person_class::OBJECT_NAME
       account = SiteSetting.salesforce_instance_url
-      configurations =
-        GuidedSyncConfiguration.all.select do |configuration|
-          configuration["provider"] == "salesforce" && configuration["instance_url"] == account &&
-            configuration["object"] == object
-        end
+      configuration_ids = GuidedSyncConfiguration.for_current_account.where(object: object)
 
       each_dead_user_link(api, person_class) do |user, legacy_id, guided_id|
         user_id = user.id
@@ -48,22 +44,21 @@ module ::Salesforce
             removed_link = false
             if guided_id
               removed_link =
-                RecordLink.new(
+                RecordLink.unlink!(
                   provider: "salesforce",
                   account: account,
                   object: object,
                   user_id: user_id,
-                ).remove(guided_id)
+                  external_id: guided_id,
+                )
             end
             next unless removed_fields > 0 || removed_link
 
             count += 1
-            configurations.each do |configuration|
-              PluginStore.remove(
-                PLUGIN_NAME,
-                "configuration_user_fingerprint:#{configuration["id"]}:#{user_id}",
-              )
-            end
+            SyncState.where(
+              configuration_id: configuration_ids.select(:id),
+              user_id: user_id,
+            ).update_all(fingerprint: nil)
             if person_class == Contact && removed_fields > 0 && person_class.group.present? &&
                  !UserCustomField.exists?(user_id: user_id, name: person_class::ID_FIELD)
               person_class.group.bulk_remove([user_id])
@@ -79,11 +74,10 @@ module ::Salesforce
       account = SiteSetting.salesforce_instance_url
       legacy_user_ids = UserCustomField.where(name: person_class::ID_FIELD).select(:user_id)
       configured_ids =
-        RecordLink.user_ids(
-          provider: "salesforce",
-          account: account,
-          object: person_class::OBJECT_NAME,
-        )
+        RecordLink
+          .within(provider: "salesforce", account: account, object: person_class::OBJECT_NAME)
+          .live
+          .select(:user_id)
       linked_users =
         User.where("users.id IN (#{legacy_user_ids.to_sql} UNION #{configured_ids.to_sql})")
       linked_users.in_batches(of: BATCH_SIZE) do |batch|
@@ -104,9 +98,7 @@ module ::Salesforce
           )
         guided_ids =
           links
-            .filter_map do |user_id, link|
-              [user_id, link["id"]] if link && link["account"] == account && link["id"].present?
-            end
+            .filter_map { |user_id, link| [user_id, link.external_id] unless link.converted? }
             .to_h
         dead_values =
           dead_ids(api, person_class::OBJECT_NAME, legacy_ids.values.flatten + guided_ids.values)

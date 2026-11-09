@@ -113,7 +113,7 @@ RSpec.describe ::Salesforce::PersonsController do
       expect(user.reload.salesforce_contact_id).to eq(params[:expected_contact_id])
     end
 
-    it "returns a conflict when the displayed association is stale" do
+    it "returns a conflict when either stored association differs from the displayed ID" do
       sign_in(admin)
       delete "/salesforce/persons/contact.json",
              params: params.merge(expected_contact_id: "older-id")
@@ -123,22 +123,24 @@ RSpec.describe ::Salesforce::PersonsController do
         [I18n.t("salesforce.error.contact_link_changed")],
       )
       expect(user.reload.salesforce_contact_id).to eq(params[:expected_contact_id])
-    end
 
-    it "returns a conflict when the guided association differs from the displayed ID" do
-      sign_in(admin)
-      Salesforce::RecordLink.link!(
-        provider: "salesforce",
-        account: instance_url,
-        object: "Contact",
-        user_id: user.id,
-        external_id: "newer-guided-id",
-      )
+      guided_link =
+        Salesforce::RecordLink.link!(
+          provider: "salesforce",
+          account: instance_url,
+          object: "Contact",
+          user_id: user.id,
+          external_id: "newer-guided-id",
+        )
 
       delete "/salesforce/persons/contact.json", params: params
 
       expect(response.status).to eq(409)
+      expect(response.parsed_body["errors"]).to eq(
+        [I18n.t("salesforce.error.contact_link_changed")],
+      )
       expect(user.reload.salesforce_contact_id).to eq(params[:expected_contact_id])
+      expect(guided_link.reload.external_id).to eq("newer-guided-id")
     end
   end
 

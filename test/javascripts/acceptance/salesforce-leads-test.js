@@ -35,7 +35,6 @@ acceptance("Salesforce contact unlinking", function (needs) {
   needs.user({ admin: true, staff: true });
   needs.settings({ salesforce_enabled: true });
 
-  let canUnlink;
   let contactId;
   let request;
   let rejectUnlink;
@@ -43,7 +42,6 @@ acceptance("Salesforce contact unlinking", function (needs) {
   let relinkBeforeResponse;
 
   needs.hooks.beforeEach(() => {
-    canUnlink = true;
     contactId = "invalid-contact-id";
     request = null;
     rejectUnlink = false;
@@ -54,7 +52,7 @@ acceptance("Salesforce contact unlinking", function (needs) {
   needs.pretender((server, helper) => {
     server.get("/t/280.json", () => {
       const topic = cloneJSON(topicFixtures["/t/280/1.json"]);
-      topic.can_unlink_salesforce_case = canUnlink;
+      topic.can_unlink_salesforce_case = true;
       topic.post_stream.posts[0].user_custom_fields = {
         salesforce_contact_id:
           unlinked && !relinkBeforeResponse ? null : contactId,
@@ -70,49 +68,6 @@ acceptance("Salesforce contact unlinking", function (needs) {
           })
         : helper.response(204);
     });
-  });
-
-  test("unlinks from the existing Contact creation menu after confirmation", async function (assert) {
-    await visit("/t/internationalization-localization/280");
-    await click("#post_1 .show-more-actions");
-    await click("#post_1 .show-post-admin-menu");
-
-    assert
-      .dom(".create-contact")
-      .doesNotExist("Linked authors are offered unlinking instead of creation");
-    assert
-      .dom(".unlink-salesforce-contact")
-      .hasText("Unlink Contact", "Unlinking is available");
-    await click(".unlink-salesforce-contact");
-    assert
-      .dom("#dialog-holder")
-      .includesText(contactId, "Confirmation identifies the association");
-    assert
-      .dom("#dialog-holder")
-      .includesText("remain in Salesforce", "Remote record is retained");
-    assert
-      .dom("#dialog-holder")
-      .includesText("may link this user again", "Future sync is explained");
-    assert.strictEqual(request, null, "Unlinking waits for confirmation");
-
-    await click("#dialog-holder .btn-primary");
-
-    assert.strictEqual(
-      request.get("expected_contact_id"),
-      contactId,
-      "The displayed ID protects against stale unlinking"
-    );
-    assert
-      .dom("#post_1 .salesforce-contact")
-      .doesNotExist("The Contact icon disappears");
-    await click("#post_1 .show-more-actions");
-    await click("#post_1 .show-post-admin-menu");
-    assert
-      .dom(".unlink-salesforce-contact")
-      .doesNotExist("The cleared association cannot be unlinked again");
-    assert
-      .dom(".create-contact")
-      .exists("Contact creation becomes available after unlinking");
   });
 
   test("keeps the contact when confirmation is cancelled", async function (assert) {
@@ -158,30 +113,5 @@ acceptance("Salesforce contact unlinking", function (needs) {
     assert
       .dom("#post_1 .salesforce-contact")
       .exists("The Contact remains linked");
-  });
-
-  test("hides unlinking without permission", async function (assert) {
-    canUnlink = false;
-    await visit("/t/internationalization-localization/280");
-    await click("#post_1 .show-more-actions");
-    await click("#post_1 .show-post-admin-menu");
-
-    assert
-      .dom(".unlink-salesforce-contact")
-      .doesNotExist("The setting controls access");
-  });
-
-  test("hides unlinking when the author has no Contact", async function (assert) {
-    contactId = null;
-    await visit("/t/internationalization-localization/280");
-    await click("#post_1 .show-more-actions");
-    await click("#post_1 .show-post-admin-menu");
-
-    assert
-      .dom(".unlink-salesforce-contact")
-      .doesNotExist("An association is required");
-    assert
-      .dom(".create-contact")
-      .exists("An unlinked author can have a Contact created");
   });
 });

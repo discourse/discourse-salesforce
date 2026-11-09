@@ -29,14 +29,14 @@ module("Unit | Initializer | extend-for-salesforce", function () {
     );
   });
 
-  test("clears Contact fields across the author's loaded posts without changing other fields", function (assert) {
+  test("clears only the confirmed Contact across the author's loaded posts", function (assert) {
     const topic = {
       postStream: {
         posts: [
           {
             user_id: 1,
             user_custom_fields: {
-              salesforce_contact_id: "invalid",
+              salesforce_contact_id: "old",
               salesforce_lead_id: "lead",
             },
           },
@@ -47,37 +47,14 @@ module("Unit | Initializer | extend-for-salesforce", function () {
           {
             user_id: 1,
             user_custom_fields: {
-              salesforce_contact_id: "invalid",
+              salesforce_contact_id: "old",
               existing: "value",
             },
           },
-        ],
-      },
-    };
-
-    updateSalesforcePersonFields(topic, {
-      user_id: 1,
-      field: "salesforce_contact_id",
-      value: null,
-    });
-
-    assert.deepEqual(
-      topic.postStream.posts.map((post) => post.user_custom_fields),
-      [
-        { salesforce_contact_id: null, salesforce_lead_id: "lead" },
-        { salesforce_contact_id: "other" },
-        { salesforce_contact_id: null, existing: "value" },
-      ],
-      "Only the author's Contact association is cleared"
-    );
-  });
-
-  test("an older unlink update preserves a newly linked Contact", function (assert) {
-    const topic = {
-      postStream: {
-        posts: [
-          { user_id: 1, user_custom_fields: { salesforce_contact_id: "old" } },
-          { user_id: 1, user_custom_fields: { salesforce_contact_id: "new" } },
+          {
+            user_id: 1,
+            user_custom_fields: { salesforce_contact_id: "new" },
+          },
         ],
       },
     };
@@ -90,11 +67,14 @@ module("Unit | Initializer | extend-for-salesforce", function () {
     });
 
     assert.deepEqual(
-      topic.postStream.posts.map(
-        (post) => post.user_custom_fields.salesforce_contact_id
-      ),
-      [null, "new"],
-      "Only the association confirmed for unlinking is cleared"
+      topic.postStream.posts.map((post) => post.user_custom_fields),
+      [
+        { salesforce_contact_id: null, salesforce_lead_id: "lead" },
+        { salesforce_contact_id: "other" },
+        { salesforce_contact_id: null, existing: "value" },
+        { salesforce_contact_id: "new" },
+      ],
+      "The update preserves other authors, fields, and newer Contact associations"
     );
   });
 });

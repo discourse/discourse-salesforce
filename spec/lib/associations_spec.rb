@@ -91,7 +91,7 @@ RSpec.describe ::Salesforce::Associations do
       expect(a_request(:any, /salesforce\.com/)).not_to have_been_made
     end
 
-    it "cleans a matching guided-only association on retry" do
+    it "cleans a guided-only association and preserves unrelated state on retry" do
       Salesforce::RecordLink.link!(**scope, external_id: dead_contact_id)
       contacts_group.add(stale_user)
 
@@ -100,9 +100,7 @@ RSpec.describe ::Salesforce::Associations do
       )
       expect(Salesforce::RecordLink.find_by(**scope)).to be_nil
       expect(contacts_group.users.exists?(stale_user.id)).to eq(false)
-    end
 
-    it "leaves unrelated state and converted links untouched when already unlinked" do
       contacts_group.add(stale_user)
       converted =
         Salesforce::RecordLink.mark_converted!(

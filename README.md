@@ -28,8 +28,9 @@ linking and updating the ambiguous records when `fill_blank` or `overwrite` is s
 
 ### Unlinking contacts
 
-Staff allowed by `salesforce_case_unlink_allowed_groups` can choose **Unlink Salesforce contact**
-in the same post admin menu as **Create Contact** when the post author has a linked Contact.
+Staff allowed by `salesforce_case_unlink_allowed_groups` can choose **Unlink Contact**
+in the post admin menu when the post author has a linked Contact. **Create Contact** appears
+instead when the author has no linked Contact.
 Confirmation removes the local association and its
 matching guided-sync link for the connected Salesforce account. The Salesforce record is retained.
 Automatic synchronization may link the user again; unlinking does not opt the user out of sync.

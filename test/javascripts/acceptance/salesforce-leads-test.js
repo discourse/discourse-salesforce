@@ -77,10 +77,12 @@ acceptance("Salesforce contact unlinking", function (needs) {
     await click("#post_1 .show-more-actions");
     await click("#post_1 .show-post-admin-menu");
 
-    assert.dom(".create-contact").exists("Contact creation shares the menu");
+    assert
+      .dom(".create-contact")
+      .doesNotExist("Linked authors are offered unlinking instead of creation");
     assert
       .dom(".unlink-salesforce-contact")
-      .hasText("Unlink Salesforce contact", "Unlinking is available");
+      .hasText("Unlink Contact", "Unlinking is available");
     await click(".unlink-salesforce-contact");
     assert
       .dom("#dialog-holder")
@@ -108,6 +110,9 @@ acceptance("Salesforce contact unlinking", function (needs) {
     assert
       .dom(".unlink-salesforce-contact")
       .doesNotExist("The cleared association cannot be unlinked again");
+    assert
+      .dom(".create-contact")
+      .exists("Contact creation becomes available after unlinking");
   });
 
   test("keeps the contact when confirmation is cancelled", async function (assert) {
@@ -175,5 +180,8 @@ acceptance("Salesforce contact unlinking", function (needs) {
     assert
       .dom(".unlink-salesforce-contact")
       .doesNotExist("An association is required");
+    assert
+      .dom(".create-contact")
+      .exists("An unlinked author can have a Contact created");
   });
 });

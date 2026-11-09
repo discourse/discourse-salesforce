@@ -24,7 +24,7 @@ RSpec.describe "Unlink Salesforce contact" do
     topic_page.visit_topic(post.topic)
     expect(topic_page).to have_contact_for(post)
     topic_page.open_contact_menu(post)
-    expect(topic_page).to have_contact_actions
+    expect(topic_page).to have_contact_unlink_action
     screenshot_marker(label: "salesforce-contact-unlink-menu")
 
     topic_page.unlink_contact
@@ -37,7 +37,7 @@ RSpec.describe "Unlink Salesforce contact" do
     expect(dialog).to be_closed
     expect(topic_page).to have_no_contact_for(post)
     topic_page.open_contact_menu(post)
-    expect(topic_page).to have_no_contact_unlink_action
+    expect(topic_page).to have_contact_creation_action
     screenshot_marker(label: "salesforce-contact-unlink-complete")
 
     page.refresh

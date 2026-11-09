@@ -8,9 +8,14 @@ module PageObjects
         expand_post_admin_actions(post)
       end
 
-      def has_contact_actions?
-        has_css?("[data-identifier='admin-post-menu'] .create-contact") &&
+      def has_contact_unlink_action?
+        has_no_css?("[data-identifier='admin-post-menu'] .create-contact") &&
           has_css?("[data-identifier='admin-post-menu'] .unlink-salesforce-contact")
+      end
+
+      def has_contact_creation_action?
+        has_css?("[data-identifier='admin-post-menu'] .create-contact") &&
+          has_no_contact_unlink_action?
       end
 
       def unlink_contact

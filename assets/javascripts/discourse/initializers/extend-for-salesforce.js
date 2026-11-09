@@ -123,11 +123,15 @@ function initializeWithApi(api, container) {
       });
     }
 
-    api.addPostAdminMenuButton(() => {
+    api.addPostAdminMenuButton((post) => {
+      if (post.user_custom_fields?.salesforce_contact_id) {
+        return;
+      }
+
       return {
         icon: "address-card",
         label: "salesforce.contact.create",
-        action: async (post) => {
+        action: async () => {
           await createPerson("contact", post, toasts);
         },
         className: "create-contact",

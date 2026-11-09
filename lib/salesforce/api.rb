@@ -5,17 +5,6 @@ require "cgi"
 require "digest"
 
 module ::Salesforce
-  class InvalidApiResponse < ::StandardError
-    attr_reader :status
-
-    def initialize(message = nil, status: nil)
-      super(message)
-      @status = status
-    end
-  end
-  class InvalidCredentials < ::StandardError
-  end
-
   class Api
     VERSION = "49.0"
     REQUEST_TIMEOUT = 30

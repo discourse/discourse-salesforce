@@ -3,17 +3,6 @@
 require "json"
 
 module ::Hubspot
-  class InvalidApiResponse < ::StandardError
-    attr_reader :status
-
-    def initialize(message = nil, status: nil)
-      super(message)
-      @status = status
-    end
-  end
-  class InvalidCredentials < ::StandardError
-  end
-
   class Api
     BASE_URL = "https://api.hubapi.com"
     PREFIX = "/crm/v3"

@@ -21,38 +21,96 @@ module ::Salesforce
     def self.prune_user_links(api, person_class)
       count = 0
 
-      UserCustomField
-        .where(name: person_class::ID_FIELD)
-        .in_batches(of: BATCH_SIZE) do |batch|
-          rows = batch.pluck(:id, :user_id, :value)
-          dead_values = dead_ids(api, person_class::OBJECT_NAME, rows.map(&:last))
-          row_ids = rows.filter_map { |id, _, value| id if dead_values.include?(value) }
-          next if row_ids.empty?
+      object = person_class::OBJECT_NAME
+      account = SiteSetting.salesforce_instance_url
+      configuration_ids = SyncConfiguration.for_current_account.where(object: object)
 
-          user_ids = []
+      each_dead_user_link(api, person_class) do |user, legacy_id, guided_id|
+        user_id = user.id
+        DistributedMutex.synchronize(
+          "salesforce_person_create_#{user_id}",
+          validity: ConfiguredUserSync::SYNC_LOCK_VALIDITY,
+        ) do
           UserCustomField.transaction do
-            fields =
-              UserCustomField.lock.where(
-                id: row_ids,
-                name: person_class::ID_FIELD,
-                value: dead_values,
-              )
-            user_ids = fields.pluck(:user_id)
-            count += fields.delete_all
+            removed_fields = 0
+            if legacy_id
+              removed_fields =
+                UserCustomField.where(
+                  user_id: user_id,
+                  name: person_class::ID_FIELD,
+                  value: legacy_id,
+                ).delete_all
+            end
+            removed_link = false
+            if guided_id
+              removed_link =
+                RecordLink.unlink!(
+                  provider: "salesforce",
+                  account: account,
+                  object: object,
+                  user_id: user_id,
+                  external_id: guided_id,
+                )
+            end
+            next unless removed_fields > 0 || removed_link
+
+            count += 1
+            SyncState.where(
+              configuration_id: configuration_ids.select(:id),
+              user_id: user_id,
+            ).update_all(fingerprint: nil)
+            if person_class == Contact && removed_fields > 0 && person_class.group.present? &&
+                 !UserCustomField.exists?(user_id: user_id, name: person_class::ID_FIELD)
+              person_class.group.bulk_remove([user_id])
+            end
           end
-
-          next if person_class == Lead
-          next if user_ids.empty? || person_class.group.blank?
-
-          linked_user_ids =
-            UserCustomField
-              .where(user_id: user_ids, name: person_class::ID_FIELD)
-              .distinct
-              .pluck(:user_id)
-          person_class.group.bulk_remove(user_ids - linked_user_ids)
         end
+      end
 
       count
+    end
+
+    def self.each_dead_user_link(api, person_class)
+      account = SiteSetting.salesforce_instance_url
+      legacy_user_ids = UserCustomField.where(name: person_class::ID_FIELD).select(:user_id)
+      configured_ids =
+        RecordLink
+          .within(provider: "salesforce", account: account, object: person_class::OBJECT_NAME)
+          .live
+          .select(:user_id)
+      linked_users =
+        User.where("users.id IN (#{legacy_user_ids.to_sql} UNION #{configured_ids.to_sql})")
+      linked_users.in_batches(of: BATCH_SIZE) do |batch|
+        users = batch.select(:id, :username).to_a
+        user_ids = users.map(&:id)
+        legacy_ids =
+          UserCustomField
+            .where(user_id: user_ids, name: person_class::ID_FIELD)
+            .pluck(:user_id, :value)
+            .group_by(&:first)
+            .transform_values { |rows| rows.map(&:last).uniq }
+        links =
+          RecordLink.read_many(
+            provider: "salesforce",
+            account: account,
+            object: person_class::OBJECT_NAME,
+            user_ids: user_ids,
+          )
+        guided_ids =
+          links
+            .filter_map { |user_id, link| [user_id, link.external_id] unless link.converted? }
+            .to_h
+        dead_values =
+          dead_ids(api, person_class::OBJECT_NAME, legacy_ids.values.flatten + guided_ids.values)
+        users.each do |user|
+          dead_legacy_ids = Array(legacy_ids[user.id]).select { |id| dead_values.include?(id) }
+          guided_id = dead_values.include?(guided_ids[user.id]) ? guided_ids[user.id] : nil
+          next if dead_legacy_ids.empty? && !guided_id
+
+          yield user, dead_legacy_ids.shift, guided_id
+          dead_legacy_ids.each { |id| yield user, id, nil }
+        end
+      end
     end
 
     def self.prune_default_contact(api)

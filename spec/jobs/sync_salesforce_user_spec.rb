@@ -241,7 +241,7 @@ RSpec.describe Jobs::SyncSalesforceUser do
       expect(
         a_request(:get, query_path).with(
           query: {
-            q: "SELECT Id FROM Lead WHERE Email = '#{user.email}'",
+            q: "SELECT Id FROM Lead WHERE Email = '#{user.email}' AND IsConverted = false",
           },
         ),
       ).not_to have_been_made
@@ -251,13 +251,15 @@ RSpec.describe Jobs::SyncSalesforceUser do
     it "reports unexpected Lead lookup errors" do
       stub_request(:get, query_path).with(
         query: {
-          q: "SELECT Id FROM Lead WHERE Email = '#{user.email}'",
+          q: "SELECT Id FROM Lead WHERE Email = '#{user.email}' AND IsConverted = false",
         },
       ).to_return(status: 400, body: %([{"message":"Invalid query","errorCode":"MALFORMED_QUERY"}]))
 
       logger = track_log_messages { described_class.new.execute(user_id: user.id) }
 
-      expect(logger.warnings.grep(/Invalid response from Salesforce API/).length).to eq(1)
+      expect(logger.warnings).to include(
+        "Salesforce request failed: operation=api category=invalid_response status=400",
+      )
     end
 
     it "links a matching lead instead of creating a contact" do

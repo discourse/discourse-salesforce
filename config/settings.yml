@@ -1,4 +1,14 @@
 discourse_salesforce:
+  enable_guided_sync_configuration:
+    default: false
+    hidden: true
+    client: true
+    refresh: true
+    upcoming_change:
+      status: "experimental"
+      impact: "feature,admins"
+      allow_enabled_for:
+        - everyone
   salesforce_enabled:
     default: false
   salesforce_leads_enabled:

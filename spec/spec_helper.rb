@@ -8,8 +8,10 @@ RSpec.shared_context "with salesforce spec helper" do
 
   before do
     Discourse.redis.del(Salesforce::Api::ACCESS_TOKEN_KEY)
+    Rails.cache.clear
 
     SiteSetting.salesforce_enabled = true
+    SiteSetting.salesforce_instance_url = instance_url
     SiteSetting.salesforce_client_id = "SALESFORCE_CLIENT_ID"
     SiteSetting.salesforce_username = "SALESFORCE_API_USERNAME"
     SiteSetting.salesforce_rsa_private_key = "SALESFORCE_PRIVATE_KEY"
@@ -31,6 +33,15 @@ RSpec.shared_context "with salesforce spec helper" do
     "#{instance_url}services/data/v49.0/query/"
   end
 
+  def stub_salesforce_converted_lead_lookup(email, records: [])
+    stub_request(:get, query_path).with(
+      query: {
+        q:
+          "SELECT Id, IsConverted, ConvertedContactId FROM Lead WHERE Email = '#{email}' AND IsConverted = true",
+      },
+    ).to_return(body: { totalSize: records.size, records: records }.to_json)
+  end
+
   def stub_salesforce_person_lookup(
     object_name,
     email,
@@ -42,10 +53,12 @@ RSpec.shared_context "with salesforce spec helper" do
     record ||= { Id: id } if id.present?
     records ||= record.present? ? [record] : []
     query_fields = ["Id", *fields.map(&:to_s)].uniq.join(",")
+    conditions = ["Email = '#{email}'"]
+    conditions << "IsConverted = false" if object_name == "Lead"
 
     stub_request(:get, query_path).with(
       query: {
-        q: "SELECT #{query_fields} FROM #{object_name} WHERE Email = '#{email}'",
+        q: "SELECT #{query_fields} FROM #{object_name} WHERE #{conditions.join(" AND ")}",
       },
     ).to_return(
       status: 200,

@@ -13,12 +13,12 @@ RSpec.describe Jobs::CreateFeedItem do
     Salesforce.leads_group.add(user)
   end
 
-  it "will not create feed item if user not linked to Salesforce lead" do
+  it "does not create feed item if user not linked to Salesforce lead" do
     ::Salesforce::FeedItem.any_instance.expects(:create!).never
     described_class.new.execute(post_id: post.id)
   end
 
-  it "will not create feed item if post is already linked to one" do
+  it "does not create feed item if post is already linked to one" do
     post.custom_fields[::Salesforce::FeedItem::ID_FIELD] = "feed_123"
     post.save_custom_fields
 
@@ -35,6 +35,30 @@ RSpec.describe Jobs::CreateFeedItem do
 
     ::Salesforce::FeedItem.any_instance.expects(:create!).once
     described_class.new.execute(post_id: post.id)
+  end
+
+  it "propagates a temporary authentication outage and creates the feed item on retry" do
+    user.salesforce_contact_id = "contact_123"
+    user.save_custom_fields
+    stub_request(:post, "https://login.salesforce.com/services/oauth2/token")
+      .to_return(status: 503, body: "Unavailable")
+      .then
+      .to_return(status: 200, body: api_response_body)
+    create =
+      stub_request(:post, "#{api_path}/FeedItem").to_return(
+        status: 201,
+        body: { id: "feed_123" }.to_json,
+      )
+
+    expect { described_class.new.execute(post_id: post.id) }.to raise_error(
+      Salesforce::InvalidApiResponse,
+    ) { |error| expect(error.status).to eq(503) }
+    expect(post.reload.custom_fields[Salesforce::FeedItem::ID_FIELD]).to be_nil
+
+    described_class.new.execute(post_id: post.id)
+
+    expect(create).to have_been_requested.once
+    expect(post.reload.custom_fields[Salesforce::FeedItem::ID_FIELD]).to eq("feed_123")
   end
 
   it "skips Lead feed items when Leads are disabled" do

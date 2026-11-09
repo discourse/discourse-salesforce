@@ -84,6 +84,151 @@ RSpec.describe ::Salesforce::Associations do
       expect(dead_case_post.reload.custom_fields[::Salesforce::CaseComment::ID_FIELD]).to eq(nil)
     end
 
+    it "removes every dead custom field row while preserving a live row for the same user" do
+      contacts_group.add(stale_user)
+      [dead_contact_id, live_contact_id, dead_default_contact_id].each do |id|
+        UserCustomField.create!(user: stale_user, name: Salesforce::Contact::ID_FIELD, value: id)
+      end
+      lookup =
+        stub_request(:get, "#{instance_url}services/data/v49.0/composite/sobjects/Contact").with(
+          query: {
+            fields: "Id",
+            ids: [dead_contact_id, live_contact_id, dead_default_contact_id].join(","),
+          },
+        ).to_return(body: [nil, { Id: live_contact_id }, nil].to_json)
+      candidates = []
+
+      described_class.each_dead_user_link(
+        Salesforce::Api.new,
+        Salesforce::Contact,
+      ) { |user, legacy_id, guided_id| candidates << [user.id, legacy_id, guided_id] }
+      expect(candidates).to contain_exactly(
+        [stale_user.id, dead_contact_id, nil],
+        [stale_user.id, dead_default_contact_id, nil],
+      )
+
+      described_class.prune_dead!
+
+      expect(
+        stale_user.user_custom_fields.where(name: Salesforce::Contact::ID_FIELD).pluck(:value),
+      ).to eq([live_contact_id])
+      expect(contacts_group.users.exists?(stale_user.id)).to eq(true)
+      expect(lookup).to have_been_requested.twice
+    end
+
+    it "prunes guided-only links and fingerprints in the connected account" do
+      scope = { provider: "salesforce", account: instance_url, object: "Contact" }
+      stale_scope = scope.merge(user_id: stale_user.id)
+      live_scope = scope.merge(user_id: linked_user.id)
+      other_account_scope = stale_scope.merge(account: "other-account")
+      lead_scope = stale_scope.merge(object: "Lead")
+      Salesforce::RecordLink.link!(**stale_scope, external_id: dead_contact_id)
+      Salesforce::RecordLink.link!(**live_scope, external_id: live_contact_id)
+      Salesforce::RecordLink.link!(**other_account_scope, external_id: dead_contact_id)
+      Salesforce::RecordLink.mark_converted!(
+        **lead_scope,
+        external_id: dead_lead_id,
+        to_object: "Contact",
+        to_id: dead_contact_id,
+      )
+      configurations = {
+        contact: Fabricate(:sync_configuration, object: "Contact", account: instance_url),
+        lead: Fabricate(:sync_configuration, object: "Lead", account: instance_url),
+        other: Fabricate(:sync_configuration, object: "Contact", account: "other-account"),
+      }
+      configurations.each_value do |configuration|
+        Salesforce::SyncState.store(configuration.id, stale_user.id, fingerprint: "old")
+      end
+      stub_request(:get, "#{instance_url}services/data/v49.0/composite/sobjects/Contact").with(
+        query: {
+          fields: "Id",
+          ids: "#{live_contact_id},#{dead_contact_id}",
+        },
+      ).to_return(body: [{ Id: live_contact_id }, nil].to_json)
+
+      expect(described_class.prune_dead![:users]).to eq(1)
+
+      expect(Salesforce::RecordLink.find_by(**stale_scope)).to be_nil
+      expect(Salesforce::RecordLink.find_by(**live_scope).external_id).to eq(live_contact_id)
+      expect(Salesforce::RecordLink.find_by(**other_account_scope).external_id).to eq(
+        dead_contact_id,
+      )
+      expect(Salesforce::RecordLink.find_by(**lead_scope).converted_to_id).to eq(dead_contact_id)
+      fingerprints =
+        configurations.transform_values do |configuration|
+          Salesforce::SyncState.find_by(
+            configuration: configuration,
+            user_id: stale_user.id,
+          ).fingerprint
+        end
+      expect(fingerprints).to eq(contact: nil, lead: "old", other: "old")
+    end
+
+    it "enumerates linked users without scanning unrelated users" do
+      Salesforce::RecordLink.link!(
+        provider: "salesforce",
+        account: instance_url,
+        object: "Contact",
+        user_id: stale_user.id,
+        external_id: dead_contact_id,
+      )
+      Salesforce::RecordLink.link!(
+        provider: "salesforce",
+        account: "other-account",
+        object: "Contact",
+        user_id: linked_user.id,
+        external_id: live_contact_id,
+      )
+      lookup =
+        stub_request(:get, "#{instance_url}services/data/v49.0/composite/sobjects/Contact").with(
+          query: {
+            fields: "Id",
+            ids: dead_contact_id,
+          },
+        ).to_return(body: [nil].to_json)
+      candidates = []
+      queries = nil
+
+      stub_const(described_class, :BATCH_SIZE, 1) do
+        queries =
+          track_sql_queries do
+            described_class.each_dead_user_link(
+              Salesforce::Api.new,
+              Salesforce::Contact,
+            ) { |user, legacy_id, configured_id| candidates << [user.id, legacy_id, configured_id] }
+          end
+      end
+
+      expect(candidates).to eq([[stale_user.id, nil, dead_contact_id]])
+      expect(lookup).to have_been_requested.once
+      expect(
+        queries.count do |query|
+          query.include?(
+            'SELECT "user_custom_fields"."user_id", "user_custom_fields"."value" FROM "user_custom_fields"',
+          )
+        end,
+      ).to eq(1)
+    end
+
+    it "preserves guided links replaced while Salesforce is responding" do
+      scope = {
+        provider: "salesforce",
+        account: instance_url,
+        object: "Contact",
+        user_id: stale_user.id,
+      }
+      Salesforce::RecordLink.link!(**scope, external_id: dead_contact_id)
+      stub_request(:get, "#{instance_url}services/data/v49.0/composite/sobjects/Contact")
+        .with(query: { fields: "Id", ids: dead_contact_id })
+        .to_return do
+          Salesforce::RecordLink.link!(**scope, external_id: live_contact_id)
+          { status: 200, body: [nil].to_json }
+        end
+
+      expect(described_class.prune_dead![:users]).to eq(0)
+      expect(Salesforce::RecordLink.find_by(**scope).external_id).to eq(live_contact_id)
+    end
+
     it "preserves Lead links while cleaning Contacts and Cases when Leads are disabled" do
       SiteSetting.salesforce_leads_enabled = false
       leads_group.add(stale_user)

@@ -2,6 +2,7 @@
 
 require "json"
 require "cgi"
+require "digest"
 
 module ::Salesforce
   class InvalidApiResponse < ::StandardError
@@ -17,6 +18,9 @@ module ::Salesforce
 
   class Api
     VERSION = "49.0"
+    REQUEST_TIMEOUT = 30
+    OPEN_TIMEOUT = 10
+    WRITABLE_FIELDS_CACHE_TTL = 2.hours
     INVALID_RESPONSE = "salesforce.error.invalid_response"
     ACCESS_TOKEN_KEY = "salesforce_access_token"
     CREDENTIAL_SETTINGS = %i[
@@ -37,8 +41,24 @@ module ::Salesforce
           headers: {
             "Authorization" => "Bearer #{access_token}",
           },
-        )
+        ) do |connection|
+          connection.options.timeout = REQUEST_TIMEOUT
+          connection.options.open_timeout = OPEN_TIMEOUT
+        end
       @prefix = "/services/data/v#{VERSION}"
+    end
+
+    def writable_fields(object)
+      raise Discourse::InvalidParameters.new(:object) if %w[Lead Contact].exclude?(object)
+
+      get("sobjects/#{object}/describe")
+        .fetch("fields")
+        .filter_map do |field|
+          next unless field["createable"] || field["updateable"]
+          next if field["calculated"] || field["autoNumber"]
+
+          field.slice("name", "label", "type", "custom", "createable", "updateable")
+        end
     end
 
     def query(soql)
@@ -73,9 +93,28 @@ module ::Salesforce
             status: response.status,
           )
         e.set_backtrace(caller)
-        Discourse.warn_exception(e, message: I18n.t(INVALID_RESPONSE), env: { api_uri: uri })
+        ConnectionError.log(e, operation: "api")
         raise e
       end
+    end
+
+    def self.cached_writable_fields(object, refresh: false)
+      new.cached_writable_fields(object, refresh: refresh)
+    end
+
+    def cached_writable_fields(object, refresh: false)
+      connection = [
+        RailsMultisite::ConnectionManagement.current_db,
+        SiteSetting.salesforce_authorization_server_url,
+        SiteSetting.salesforce_client_id,
+        SiteSetting.salesforce_username,
+        SiteSetting.salesforce_instance_url,
+      ].join(":")
+      cache_key = "salesforce:writable_fields:v1:#{Digest::SHA256.hexdigest(connection)}:#{object}"
+      Rails.cache.delete(cache_key) if refresh
+      Rails
+        .cache
+        .fetch(cache_key, expires_in: WRITABLE_FIELDS_CACHE_TTL) { writable_fields(object) }
     end
 
     def set_access_token
@@ -88,9 +127,14 @@ module ::Salesforce
 
       return if access_token.present? && SiteSetting.salesforce_instance_url.present?
 
-      connection = Faraday.new(url: SiteSetting.salesforce_authorization_server_url)
+      connection =
+        Faraday.new(url: SiteSetting.salesforce_authorization_server_url) do |faraday|
+          faraday.options.timeout = REQUEST_TIMEOUT
+          faraday.options.open_timeout = OPEN_TIMEOUT
+        end
       response =
         connection.post("/services/oauth2/token") do |req|
+          req.headers["Content-Type"] = "application/x-www-form-urlencoded"
           req.body =
             URI.encode_www_form(
               {
@@ -107,9 +151,15 @@ module ::Salesforce
         ProblemCheckTracker[:salesforce_app_not_approved].problem!
       end
       if status >= 300 && SiteSetting.salesforce_api_error_logs
-        Rails.logger.error("Salesforce API error: #{status} #{body}")
+        Rails.logger.error("Salesforce authentication request failed: status=#{status}")
       end
 
+      if status == 429 || status >= 500
+        raise Salesforce::InvalidApiResponse.new(
+                "Authentication service unavailable",
+                status: status,
+              )
+      end
       if status != 200
         ProblemCheckTracker[:salesforce_invalid_credentials].problem!
         raise Salesforce::InvalidCredentials

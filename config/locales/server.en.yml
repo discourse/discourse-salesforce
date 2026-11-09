@@ -25,6 +25,9 @@ en:
     salesforce_skip_contact_creation_on_case_sync: "Skip creation of Salesforce Contact during Case sync"
     salesforce_default_contact_id_for_case_sync: "Default Salesforce Contact ID to use during Case sync. Useful when 'salesforce_skip_contact_creation_on_case_sync' is enabled."
     salesforce_auth_verbose_logging: "Show verbose Salesforce authentication logs in /logs for troubleshooting"
+    hubspot_enabled: "Enable the HubSpot integration. Requires {{setting:hubspot_portal_id}} and {{setting:hubspot_access_token}}."
+    hubspot_portal_id: "HubSpot portal (hub) ID, found in the HubSpot account settings."
+    hubspot_access_token: "HubSpot private app access token used to authenticate API requests."
   salesforce:
     error:
       connection:
@@ -37,6 +40,9 @@ en:
       ambiguous_email_match: "Multiple Salesforce %{object_name} records have the same email"
       invalid_response: "Invalid response from Salesforce API"
       invalid_client_credentials: "There was an issue with the Salesforce credentials. Please confirm the validity of the Salesforce client id and client secret settings"
+  hubspot:
+    error:
+      invalid_response: "Invalid response from HubSpot API"
   dashboard:
     problem:
       salesforce_invalid_credentials: "There was an issue with the Salesforce credentials. Please confirm the validity of the Salesforce client id and client secret settings"

@@ -109,3 +109,13 @@ discourse_salesforce:
     hidden: true
   salesforce_auth_verbose_logging:
     default: false
+  hubspot_enabled:
+    default: false
+    hidden: true
+  hubspot_portal_id:
+    default: ""
+    hidden: true
+  hubspot_access_token:
+    default: ""
+    secret: true
+    hidden: true

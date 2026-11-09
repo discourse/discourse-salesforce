@@ -150,6 +150,9 @@ en:
       contact:
         create: "Create Contact"
         create_success: "Salesforce contact synced"
+        unlink: "Unlink Salesforce contact"
+        unlink_confirmation: "Unlink Salesforce contact %{id} from @%{username}? The contact will remain in Salesforce. Automatic synchronization may link this user again."
+        unlink_success: "Salesforce contact unlinked"
       poster_icon:
         lead:
           title: "Salesforce Lead"

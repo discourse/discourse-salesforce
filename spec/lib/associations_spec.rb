@@ -22,6 +22,129 @@ RSpec.describe ::Salesforce::Associations do
     SiteSetting.salesforce_leads_group_id = leads_group.id
   end
 
+  describe ".unlink_contact!" do
+    let(:scope) do
+      { provider: "salesforce", account: instance_url, object: "Contact", user_id: stale_user.id }
+    end
+
+    it "removes matching local associations and only their Contact sync state and membership" do
+      stale_user.upsert_custom_fields(
+        Salesforce::Contact::ID_FIELD => dead_contact_id,
+        Salesforce::Lead::ID_FIELD => dead_lead_id,
+        "unrelated" => "retained",
+      )
+      contacts_group.add(stale_user)
+      leads_group.add(stale_user)
+      Salesforce::RecordLink.link!(**scope, external_id: dead_contact_id)
+      other_account =
+        Salesforce::RecordLink.link!(**scope.merge(account: "other"), external_id: dead_contact_id)
+      other_user =
+        Salesforce::RecordLink.link!(
+          **scope.merge(user_id: linked_user.id),
+          external_id: dead_contact_id,
+        )
+      converted_lead =
+        Salesforce::RecordLink.mark_converted!(
+          **scope.merge(object: "Lead"),
+          external_id: dead_lead_id,
+          to_object: "Contact",
+          to_id: dead_contact_id,
+        )
+      salesforce_case = Fabricate(:salesforce_case, uid: dead_case_id)
+      configurations = {
+        contact: Fabricate(:sync_configuration, object: "Contact", account: instance_url),
+        lead: Fabricate(:sync_configuration, object: "Lead", account: instance_url),
+        other: Fabricate(:sync_configuration, object: "Contact", account: "other"),
+      }
+      configurations.each_value do |configuration|
+        Salesforce::SyncState.store(configuration.id, stale_user.id, fingerprint: "old")
+        Salesforce::SyncState.store(configuration.id, linked_user.id, fingerprint: "other-user")
+      end
+
+      expect(described_class.unlink_contact!(user: stale_user, expected_id: dead_contact_id)).to eq(
+        true,
+      )
+
+      expect(stale_user.reload.salesforce_contact_id).to be_nil
+      expect(stale_user.salesforce_lead_id).to eq(dead_lead_id)
+      expect(stale_user.custom_fields["unrelated"]).to eq("retained")
+      expect(Salesforce::RecordLink.find_by(**scope)).to be_nil
+      expect(
+        Salesforce::RecordLink.where(
+          id: [other_account.id, other_user.id, converted_lead.id],
+        ).count,
+      ).to eq(3)
+      expect(Salesforce::Case.exists?(salesforce_case.id)).to eq(true)
+      expect(contacts_group.users.exists?(stale_user.id)).to eq(false)
+      expect(leads_group.users.exists?(stale_user.id)).to eq(true)
+      expect(
+        configurations.transform_values do |configuration|
+          Salesforce::SyncState.find_by(
+            configuration: configuration,
+            user_id: stale_user.id,
+          ).fingerprint
+        end,
+      ).to eq(contact: nil, lead: "old", other: "old")
+      expect(Salesforce::SyncState.where(user_id: linked_user.id).pluck(:fingerprint).uniq).to eq(
+        ["other-user"],
+      )
+      expect(a_request(:any, /salesforce\.com/)).not_to have_been_made
+    end
+
+    it "cleans a matching guided-only association on retry" do
+      Salesforce::RecordLink.link!(**scope, external_id: dead_contact_id)
+      contacts_group.add(stale_user)
+
+      expect(described_class.unlink_contact!(user: stale_user, expected_id: dead_contact_id)).to eq(
+        true,
+      )
+      expect(Salesforce::RecordLink.find_by(**scope)).to be_nil
+      expect(contacts_group.users.exists?(stale_user.id)).to eq(false)
+    end
+
+    it "leaves unrelated state and converted links untouched when already unlinked" do
+      contacts_group.add(stale_user)
+      converted =
+        Salesforce::RecordLink.mark_converted!(
+          **scope,
+          external_id: dead_contact_id,
+          to_object: "Contact",
+          to_id: live_contact_id,
+        )
+      configuration = Fabricate(:sync_configuration, object: "Contact", account: instance_url)
+      Salesforce::SyncState.store(configuration.id, stale_user.id, fingerprint: "old")
+
+      expect(described_class.unlink_contact!(user: stale_user, expected_id: dead_contact_id)).to eq(
+        false,
+      )
+      expect(converted.reload.converted_to_id).to eq(live_contact_id)
+      expect(contacts_group.users.exists?(stale_user.id)).to eq(true)
+      expect(
+        Salesforce::SyncState.find_by(
+          configuration: configuration,
+          user_id: stale_user.id,
+        ).fingerprint,
+      ).to eq("old")
+    end
+
+    it "preserves all associations and sync state if any stored ID differs" do
+      [dead_contact_id, live_contact_id].each do |id|
+        UserCustomField.create!(user: stale_user, name: Salesforce::Contact::ID_FIELD, value: id)
+      end
+      Salesforce::RecordLink.link!(**scope, external_id: dead_contact_id)
+      contacts_group.add(stale_user)
+
+      expect {
+        described_class.unlink_contact!(user: stale_user, expected_id: dead_contact_id)
+      }.to raise_error(described_class::ContactLinkChanged)
+      expect(
+        stale_user.user_custom_fields.where(name: Salesforce::Contact::ID_FIELD).pluck(:value),
+      ).to contain_exactly(dead_contact_id, live_contact_id)
+      expect(Salesforce::RecordLink.find_by(**scope).external_id).to eq(dead_contact_id)
+      expect(contacts_group.users.exists?(stale_user.id)).to eq(true)
+    end
+  end
+
   describe ".prune_dead!" do
     it "removes only references the connected org does not recognize" do
       linked_user.upsert_custom_fields(::Salesforce::Contact::ID_FIELD => live_contact_id)

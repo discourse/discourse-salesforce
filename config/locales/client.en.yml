@@ -141,7 +141,7 @@ en:
         admins: "Admins"
         moderators: "Moderators"
       case:
-        unlink: "Unlink case"
+        unlink: "Unlink Case"
         unlink_confirmation: "Unlink Salesforce case #%{number} from this topic? The case will remain in Salesforce. This also removes the topic’s case and automatic sync tags."
         unlink_success: "Salesforce case unlinked"
       lead:

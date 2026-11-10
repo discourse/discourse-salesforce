@@ -1,8 +1,8 @@
 # frozen_string_literal: true
 
-require_relative "../spec_helper"
+require_relative "../../spec_helper"
 
-RSpec.describe Salesforce::ConnectionError do
+RSpec.describe DiscourseCrm::ConnectionError do
   it "logs only safe diagnostic metadata" do
     error = Salesforce::InvalidApiResponse.new("secret token and private response", status: 403)
     logger = track_log_messages { described_class.log(error, operation: "fields") }

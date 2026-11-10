@@ -5,17 +5,20 @@ module ::Jobs
     sidekiq_options retry: 5
 
     def execute(args)
-      return unless SiteSetting.salesforce_enabled
-
       if args[:configuration_id]
         begin
-          ::Salesforce::ConfiguredUserSync.sync(
+          configuration =
+            ::DiscourseCrm::SyncConfiguration.active.find_by(id: args[:configuration_id])
+          return unless configuration
+          configuration.crm_provider.sync_class.sync(
             args[:configuration_id],
             args[:user_id],
             reason: args[:reason],
           )
+        rescue Hubspot::RateLimitExceeded => error
+          Jobs.enqueue_in(error.retry_after, :sync_salesforce_user, args)
         rescue => error
-          ::Salesforce::SyncConfiguration.record_result(
+          ::DiscourseCrm::SyncConfiguration.record_result(
             args[:configuration_id],
             args[:user_id],
             error: error,
@@ -25,12 +28,13 @@ module ::Jobs
             raise
           end
           Rails.logger.warn(
-            "Salesforce configured sync stopped: configuration_id=#{args[:configuration_id]} user_id=#{args[:user_id]} error=#{error.class.name}",
+            "CRM configured sync stopped: configuration_id=#{args[:configuration_id]} user_id=#{args[:user_id]} error=#{error.class.name}",
           )
         end
         return
       end
 
+      return unless SiteSetting.salesforce_enabled
       user = User.find(args[:user_id])
       return if ::Salesforce::Contact.sync(user)
 
@@ -51,7 +55,7 @@ module ::Jobs
         user.salesforce_lead_id = lead_id
         user.save_custom_fields
       elsif SiteSetting.salesforce_contact_auto_create_on_signup &&
-            ::Salesforce::Person.auto_create_eligible?(user)
+            ::DiscourseCrm::UserEligibility.auto_create_eligible?(user)
         user.create_salesforce_contact
       end
     rescue Salesforce::AmbiguousEmailMatch => error

@@ -25,7 +25,7 @@ module Salesforce
     end
 
     def salesforce_contact_payload
-      first_name, last_name = UserSyncSources.name_parts(self)
+      first_name, last_name = DiscourseCrm::UserSyncSources.name_parts(self)
 
       payload = { Email: self.email, LastName: last_name, Description: full_url }
 

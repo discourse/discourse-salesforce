@@ -1,7 +1,9 @@
 # frozen_string_literal: true
 
-module Salesforce
+module DiscourseCrm
   class ConfigurationScheduler
+    BATCH_SIZE = 100
+
     def self.enqueue_user(user, reason:, group_id: nil, excluding_group_id: nil)
       member_group_ids = GroupUser.where(user_id: user.id).select(:group_id)
       configurations = SyncConfiguration.active.where(id: configuration_ids_for(member_group_ids))

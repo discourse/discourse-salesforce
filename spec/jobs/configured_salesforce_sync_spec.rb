@@ -199,7 +199,7 @@ RSpec.describe Jobs::SyncSalesforceUser do
 
   it "recreates a confirmed deleted Lead and relinks subsequent retries" do
     old_id = "00Qbm00000v6wJpEAI"
-    Salesforce::RecordLink.link!(
+    DiscourseCrm::RecordLink.link!(
       provider: "salesforce",
       account: instance_url,
       object: "Lead",
@@ -240,7 +240,7 @@ RSpec.describe Jobs::SyncSalesforceUser do
 
   it "does not recreate inaccessible or converted Leads" do
     old_id = "00Qbm00000v6wJpEAI"
-    Salesforce::RecordLink.link!(
+    DiscourseCrm::RecordLink.link!(
       provider: "salesforce",
       account: instance_url,
       object: "Lead",
@@ -271,7 +271,7 @@ RSpec.describe Jobs::SyncSalesforceUser do
     lead_id = "00Qbm00000v6wJpEAI"
     lead_scope = { provider: "salesforce", account: instance_url, object: "Lead", user_id: user.id }
     contact_scope = lead_scope.merge(object: "Contact")
-    Salesforce::RecordLink.link!(**lead_scope, external_id: lead_id)
+    DiscourseCrm::RecordLink.link!(**lead_scope, external_id: lead_id)
     linked_lead =
       stub_request(:get, "#{api_path}/Lead/#{lead_id}").to_return(
         body: { Id: lead_id, IsConverted: true, ConvertedContactId: "contact-123" }.to_json,
@@ -281,8 +281,8 @@ RSpec.describe Jobs::SyncSalesforceUser do
     run_sync
 
     expect(linked_lead).to have_been_requested.once
-    expect(Salesforce::RecordLink.find_by(**lead_scope).converted_to_id).to eq("contact-123")
-    expect(Salesforce::RecordLink.find_by(**contact_scope).external_id).to eq("contact-123")
+    expect(DiscourseCrm::RecordLink.find_by(**lead_scope).converted_to_id).to eq("contact-123")
+    expect(DiscourseCrm::RecordLink.find_by(**contact_scope).external_id).to eq("contact-123")
     expect(user.reload.salesforce_lead_id).to be_nil
     expect(user.salesforce_contact_id).to eq("contact-123")
     expect(a_request(:post, "#{api_path}/Lead")).not_to have_been_made
@@ -311,7 +311,7 @@ RSpec.describe Jobs::SyncSalesforceUser do
     expect(user.salesforce_contact_id).to eq("contact-456")
     expect(a_request(:post, "#{api_path}/Lead")).not_to have_been_made
     expect(
-      Salesforce::RecordLink.find_by(
+      DiscourseCrm::RecordLink.find_by(
         provider: "salesforce",
         account: instance_url,
         object: "Lead",
@@ -560,7 +560,7 @@ RSpec.describe Jobs::SyncSalesforceUser do
   it "limits scheduled refreshes to members with a linked Salesforce record" do
     existing = Fabricate(:user)
     group.add(existing)
-    Salesforce::RecordLink.link!(
+    DiscourseCrm::RecordLink.link!(
       provider: "salesforce",
       account: instance_url,
       object: "Lead",

@@ -12,6 +12,10 @@ module(
   function (hooks) {
     setupRenderingTest(hooks);
     hooks.beforeEach(function () {
+      this.targets = [
+        { provider: "salesforce", object: "Lead" },
+        { provider: "salesforce", object: "Contact" },
+      ];
       pretender.get("/salesforce/admin/guided-sync/groups.json", (request) => [
         200,
         { "Content-Type": "application/json" },
@@ -46,12 +50,13 @@ module(
       await render(
         <template>
           <SalesforceSyncConfigurations
+            @targets={{this.targets}}
             @credentialsConfigured={{true}}
             @selectedId="new-posts"
           />
         </template>
       );
-      assert.dom("[data-test-sync-users]").hasText("Send users to Salesforce");
+      assert.dom("[data-test-sync-users]").hasText("Send users to CRM");
       assert
         .dom("[data-test-sync-posts]")
         .isDisabled("shows the disabled choice");
@@ -84,6 +89,7 @@ module(
       await render(
         <template>
           <SalesforceSyncConfigurations
+            @targets={{this.targets}}
             @credentialsConfigured={{true}}
             @groups={{this.groups}}
             @onClose={{this.close}}
@@ -135,6 +141,7 @@ module(
       await render(
         <template>
           <SalesforceSyncConfigurations
+            @targets={{this.targets}}
             @groups={{this.groups}}
             @credentialsConfigured={{true}}
             @records={{this.records}}
@@ -151,8 +158,8 @@ module(
       await click(".dialog-footer .btn-danger");
       await click('[data-test-configuration="contact"] button');
       assert
-        .dom('[data-name="object"] .form-kit__control-menu-trigger')
-        .hasText("Contact", "loads the Contact target");
+        .dom('[data-name="target"] .form-kit__control-menu-trigger')
+        .hasText("Salesforce - Contacts", "loads the Contact target");
       assert
         .dom('[data-name="group_ids"]')
         .includesText("customers", "preserves the independent Contact group");
@@ -163,8 +170,8 @@ module(
       await click(".dialog-footer .btn-danger");
       await click("[data-test-sync-users]");
       assert
-        .dom('[data-name="object"] .form-kit__control-menu-trigger')
-        .hasText("Lead", "starts a new Lead configuration");
+        .dom('[data-name="target"] .form-kit__control-menu-trigger')
+        .hasText("Salesforce - Leads", "starts a new Lead configuration");
       assert
         .dom(".salesforce-sync-configuration__heading")
         .includesText("Send users", "provides a default configuration name");
@@ -182,6 +189,7 @@ module(
       await render(
         <template>
           <SalesforceSyncConfigurations
+            @targets={{this.targets}}
             @groups={{this.groups}}
             @credentialsConfigured={{false}}
           />
@@ -202,6 +210,7 @@ module(
       await render(
         <template>
           <SalesforceSyncConfigurations
+            @targets={{this.targets}}
             @groups={{this.groups}}
             @credentialsConfigured={{true}}
           /><DialogHolder />
@@ -241,6 +250,7 @@ module(
       await render(
         <template>
           <SalesforceSyncConfigurations
+            @targets={{this.targets}}
             @groups={{this.groups}}
             @credentialsConfigured={{true}}
             @records={{this.records}}
@@ -254,8 +264,8 @@ module(
         .dom(".salesforce-sync-configuration__heading")
         .includesText("Contact sync");
       assert
-        .dom('[data-name="object"] .form-kit__control-menu-trigger')
-        .hasText("Contact");
+        .dom('[data-name="target"] .form-kit__control-menu-trigger')
+        .hasText("Salesforce - Contacts");
       await click("[data-test-configurations-back]");
       await click(".dialog-footer .btn-danger");
       assert.true(closed, "clears the deep link when closing the editor");
@@ -296,6 +306,7 @@ module(
       await render(
         <template>
           <SalesforceSyncConfigurations
+            @targets={{this.targets}}
             @groups={{this.groups}}
             @credentialsConfigured={{true}}
             @records={{this.records}}
@@ -320,7 +331,7 @@ module(
           '[data-test-configuration="stale-connection"] .salesforce-sync-configurations__status'
         )
         .hasText(
-          "Salesforce connection changed. Configure and save again to resume sending."
+          "CRM connection changed. Configure and save again to resume sending."
         );
       await click('[data-test-delete-configuration="lead"]');
       assert

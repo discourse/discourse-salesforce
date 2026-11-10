@@ -1,8 +1,8 @@
 # frozen_string_literal: true
 
-require_relative "../spec_helper"
+require_relative "../../spec_helper"
 
-RSpec.describe Salesforce::SyncConfigurationController do
+RSpec.describe DiscourseCrm::SyncConfigurationController do
   fab!(:admin)
   fab!(:user)
   fab!(:sync_group) { Fabricate(:group, name: "community-members") }
@@ -38,7 +38,7 @@ RSpec.describe Salesforce::SyncConfigurationController do
       expect(response).to have_http_status(:not_found)
       delete "/salesforce/admin/guided-sync/configurations/#{record.id}.json"
       expect(response).to have_http_status(:not_found)
-      expect(Salesforce::SyncConfiguration.pluck(:id, :name)).to eq(
+      expect(DiscourseCrm::SyncConfiguration.pluck(:id, :name)).to eq(
         [[record.id, "Saved configuration"]],
       )
     end
@@ -51,10 +51,10 @@ RSpec.describe Salesforce::SyncConfigurationController do
       get "/admin/plugins/discourse-salesforce/configurations"
 
       expect(response).to have_http_status(:ok)
-      expect(response.headers["X-Discourse-Route"]).to eq("salesforce/sync_configuration/index")
+      expect(response.headers["X-Discourse-Route"]).to eq("discourse_crm/sync_configuration/index")
       get "/admin/plugins/discourse-salesforce/configurations"
       expect(response).to have_http_status(:ok)
-      expect(response.headers["X-Discourse-Route"]).to eq("salesforce/sync_configuration/index")
+      expect(response.headers["X-Discourse-Route"]).to eq("discourse_crm/sync_configuration/index")
     end
 
     it "rejects non-admin users" do
@@ -250,10 +250,10 @@ RSpec.describe Salesforce::SyncConfigurationController do
 
         expect(response).to have_http_status(method == "post" ? :created : :ok)
         record_id = response.parsed_body.dig("configuration", "id")
-        record = Salesforce::SyncConfiguration.find(record_id)
+        record = DiscourseCrm::SyncConfiguration.find(record_id)
         expect(record.account).to eq(instance_url)
         expect(record.connection_changed?).to eq(false)
-        expect(Salesforce::SyncConfiguration.active).to include(record)
+        expect(DiscourseCrm::SyncConfiguration.active).to include(record)
       end
     end
 
@@ -329,7 +329,7 @@ RSpec.describe Salesforce::SyncConfigurationController do
            },
            as: :json
       expect(response).to have_http_status(:bad_request)
-      expect(Salesforce::SyncConfiguration.active).to be_empty
+      expect(DiscourseCrm::SyncConfiguration.active).to be_empty
       post "/salesforce/admin/guided-sync/configurations.json",
            params: {
              configuration: configuration,
@@ -373,7 +373,7 @@ RSpec.describe Salesforce::SyncConfigurationController do
              as: :json
         expect(response).to have_http_status(:bad_request)
       end
-      expect(Salesforce::SyncConfiguration.all).to be_empty
+      expect(DiscourseCrm::SyncConfiguration.all).to be_empty
     end
 
     it "stores independent Lead and Contact configurations" do
@@ -418,7 +418,7 @@ RSpec.describe Salesforce::SyncConfigurationController do
 
       delete "/salesforce/admin/guided-sync/configurations/#{lead.fetch("id")}.json"
       expect(response).to have_http_status(:no_content)
-      expect(Salesforce::SyncConfiguration.pluck(:id)).to eq([contact.fetch("id")])
+      expect(DiscourseCrm::SyncConfiguration.pluck(:id)).to eq([contact.fetch("id")])
       delete "/salesforce/admin/guided-sync/configurations/#{lead.fetch("id")}.json"
       expect(response).to have_http_status(:not_found)
     end
@@ -431,7 +431,7 @@ RSpec.describe Salesforce::SyncConfigurationController do
            },
            as: :json
       expect(response).to have_http_status(:bad_request)
-      expect(Salesforce::SyncConfiguration.all).to be_empty
+      expect(DiscourseCrm::SyncConfiguration.all).to be_empty
     end
 
     it "rejects invalid configurations and changes to the target object" do
@@ -442,7 +442,7 @@ RSpec.describe Salesforce::SyncConfigurationController do
            },
            as: :json
       expect(response).to have_http_status(:bad_request)
-      expect(Salesforce::SyncConfiguration.all).to be_empty
+      expect(DiscourseCrm::SyncConfiguration.all).to be_empty
       post "/salesforce/admin/guided-sync/configurations.json",
            params: {
              configuration: configuration,
@@ -455,7 +455,7 @@ RSpec.describe Salesforce::SyncConfigurationController do
           },
           as: :json
       expect(response).to have_http_status(:bad_request)
-      expect(Salesforce::SyncConfiguration.pluck(:id, :object)).to eq(
+      expect(DiscourseCrm::SyncConfiguration.pluck(:id, :object)).to eq(
         [[record.fetch("id"), "Lead"]],
       )
     end
@@ -485,9 +485,186 @@ RSpec.describe Salesforce::SyncConfigurationController do
       expect(response).to have_http_status(:forbidden)
       delete "/salesforce/admin/guided-sync/configurations/#{record.fetch("id")}.json"
       expect(response).to have_http_status(:forbidden)
-      expect(Salesforce::SyncConfiguration.pluck(:id, :name)).to eq(
+      expect(DiscourseCrm::SyncConfiguration.pluck(:id, :name)).to eq(
         [[record.fetch("id"), "Lead sync"]],
       )
+    end
+  end
+  describe "#configurations with multiple CRM providers" do
+    include_context "with hubspot spec helper"
+
+    it "offers only enabled providers with credentials, without exposing credentials" do
+      sign_in(admin)
+      SiteSetting.salesforce_enabled = false
+      get "/salesforce/admin/guided-sync/configurations.json"
+      expect(response).to have_http_status(:ok)
+      expect(response.parsed_body.slice("targets", "credentials_configured")).to eq(
+        "targets" => [{ "provider" => "hubspot", "object" => "Contact" }],
+        "credentials_configured" => true,
+      )
+      SiteSetting.salesforce_enabled = true
+      SiteSetting.salesforce_client_id = "client"
+      SiteSetting.salesforce_username = "user"
+      SiteSetting.salesforce_rsa_private_key = "key"
+      get "/salesforce/admin/guided-sync/configurations.json"
+      expect(response.parsed_body.fetch("targets")).to eq(
+        [
+          { "provider" => "salesforce", "object" => "Lead" },
+          { "provider" => "salesforce", "object" => "Contact" },
+          { "provider" => "hubspot", "object" => "Contact" },
+        ],
+      )
+      SiteSetting.hubspot_access_token = ""
+      get "/salesforce/admin/guided-sync/configurations.json"
+      expect(
+        response.parsed_body.fetch("targets").map { |target| target.fetch("provider") }.uniq,
+      ).to eq(["salesforce"])
+      SiteSetting.hubspot_access_token = "HUBSPOT_ACCESS_TOKEN"
+      SiteSetting.hubspot_enabled = false
+      get "/salesforce/admin/guided-sync/configurations.json"
+      expect(
+        response.parsed_body.fetch("targets").map { |target| target.fetch("provider") }.uniq,
+      ).to eq(["salesforce"])
+    end
+  end
+
+  describe "#fields for HubSpot" do
+    include_context "with hubspot spec helper"
+
+    it "loads HubSpot contact fields when Salesforce is disabled and rejects unsupported targets" do
+      sign_in(admin)
+      SiteSetting.salesforce_enabled = false
+      get "/salesforce/admin/guided-sync/fields.json",
+          params: {
+            provider: "hubspot",
+            object: "Contact",
+          }
+      expect(response).to have_http_status(:ok)
+      expect(response.parsed_body.fetch("fields").map { |field| field.fetch("name") }).to eq(
+        hubspot_properties.pluck(:name),
+      )
+      get "/salesforce/admin/guided-sync/fields.json",
+          params: {
+            provider: "hubspot",
+            object: "Lead",
+          }
+      expect(response).to have_http_status(:bad_request)
+      get "/salesforce/admin/guided-sync/fields.json",
+          params: {
+            provider: "unknown",
+            object: "Contact",
+          }
+      expect(response).to have_http_status(:bad_request)
+      SiteSetting.hubspot_access_token = ""
+      get "/salesforce/admin/guided-sync/fields.json",
+          params: {
+            provider: "hubspot",
+            object: "Contact",
+          }
+      expect(response).to have_http_status(:bad_request)
+    end
+
+    it "returns actionable HubSpot errors without including upstream bodies" do
+      sign_in(admin)
+      stub_request(:get, "#{hubspot_url}/properties/contacts").to_return(
+        status: 403,
+        body: "private details",
+      )
+      get "/salesforce/admin/guided-sync/fields.json",
+          params: {
+            provider: "hubspot",
+            object: "Contact",
+          }
+      expect(response).to have_http_status(:bad_gateway)
+      expect(response.parsed_body).to eq(
+        "error_type" => "permissions",
+        "errors" => [I18n.t("hubspot.error.connection.permissions")],
+      )
+    end
+  end
+
+  describe "#save_configuration for HubSpot" do
+    include_context "with hubspot spec helper"
+
+    let(:hubspot_configuration) do
+      {
+        name: "HubSpot contacts",
+        provider: "hubspot",
+        object: "Contact",
+        schedule: "daily",
+        group_ids: [sync_group.id],
+        backfill: true,
+        mappings: [{ source: "last", destination: "lastname", policy: "keep" }],
+      }
+    end
+
+    it "saves a provider-scoped configuration with Salesforce disabled and keeps its provider immutable" do
+      sign_in(admin)
+      SiteSetting.salesforce_enabled = false
+      post "/salesforce/admin/guided-sync/configurations.json",
+           params: {
+             configuration: hubspot_configuration,
+           },
+           as: :json
+      expect(response).to have_http_status(:created)
+      record = DiscourseCrm::SyncConfiguration.find(response.parsed_body.dig("configuration", "id"))
+      expect(record.attributes.slice("provider", "object", "account")).to eq(
+        "provider" => "hubspot",
+        "object" => "Contact",
+        "account" => "12345",
+      )
+      expect(
+        Jobs::SyncSalesforceConfiguration.jobs.map { |job| job["args"].first["configuration_id"] },
+      ).to include(record.id)
+      SiteSetting.hubspot_portal_id = "67890"
+      SiteSetting.hubspot_access_token = "NEW_PORTAL_TOKEN"
+      stub_request(
+        :post,
+        "https://api.hubapi.com/oauth/v2/private-apps/get/access-token-info",
+      ).with(body: { tokenKey: "NEW_PORTAL_TOKEN" }).to_return(
+        body: { hubId: 67_890, appId: 6789 }.to_json,
+      )
+      expect(record.connection_changed?).to eq(true)
+      put "/salesforce/admin/guided-sync/configurations/#{record.id}.json",
+          params: {
+            configuration: hubspot_configuration,
+          },
+          as: :json
+      expect(response).to have_http_status(:ok)
+      expect(record.reload.account).to eq("67890")
+      SiteSetting.salesforce_enabled = true
+      SiteSetting.salesforce_client_id = "client"
+      SiteSetting.salesforce_username = "user"
+      SiteSetting.salesforce_rsa_private_key = "key"
+      put "/salesforce/admin/guided-sync/configurations/#{record.id}.json",
+          params: {
+            configuration: hubspot_configuration.merge(provider: "salesforce"),
+          },
+          as: :json
+      expect(response).to have_http_status(:bad_request)
+      expect(record.reload.provider).to eq("hubspot")
+    end
+
+    it "rejects disabled HubSpot and incompatible mappings before persisting" do
+      sign_in(admin)
+      SiteSetting.hubspot_enabled = false
+      post "/salesforce/admin/guided-sync/configurations.json",
+           params: {
+             configuration: hubspot_configuration,
+           },
+           as: :json
+      expect(response).to have_http_status(:bad_request)
+      SiteSetting.hubspot_enabled = true
+      post "/salesforce/admin/guided-sync/configurations.json",
+           params: {
+             configuration:
+               hubspot_configuration.merge(
+                 mappings: [{ source: "last", destination: "community_posts", policy: "keep" }],
+               ),
+           },
+           as: :json
+      expect(response).to have_http_status(:bad_request)
+      expect(DiscourseCrm::SyncConfiguration.count).to eq(0)
     end
   end
 end

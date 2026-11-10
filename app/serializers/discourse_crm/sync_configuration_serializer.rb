@@ -1,6 +1,6 @@
 # frozen_string_literal: true
 
-module Salesforce
+module DiscourseCrm
   class SyncConfigurationSerializer < ApplicationSerializer
     attributes :id,
                :name,

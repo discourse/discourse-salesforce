@@ -1,8 +1,8 @@
 # frozen_string_literal: true
 
-require_relative "../spec_helper"
+require_relative "../../spec_helper"
 
-RSpec.describe Salesforce::SyncConfiguration do
+RSpec.describe DiscourseCrm::SyncConfiguration do
   fab!(:group)
   fab!(:user) { Fabricate(:user, active: true) }
   fab!(:other_user) { Fabricate(:user, active: true) }
@@ -31,7 +31,7 @@ RSpec.describe Salesforce::SyncConfiguration do
   it "rejects unsupported providers before contacting Salesforce" do
     expect {
       described_class.create_or_update!(
-        { provider: "hubspot" },
+        { provider: "unsupported" },
         id: nil,
         guardian: Fabricate(:admin).guardian,
       )
@@ -39,12 +39,14 @@ RSpec.describe Salesforce::SyncConfiguration do
   end
 
   it "removes group scopes and sync states together with the configuration" do
-    Salesforce::SyncState.store(configuration.id, user.id, fingerprint: "abc")
+    DiscourseCrm::SyncState.store(configuration.id, user.id, fingerprint: "abc")
 
     described_class.remove!(configuration.id, guardian: Fabricate(:admin).guardian)
 
-    expect(Salesforce::SyncConfigurationGroup.where(configuration_id: configuration.id)).to be_empty
-    expect(Salesforce::SyncState.where(configuration_id: configuration.id)).to be_empty
+    expect(
+      DiscourseCrm::SyncConfigurationGroup.where(configuration_id: configuration.id),
+    ).to be_empty
+    expect(DiscourseCrm::SyncState.where(configuration_id: configuration.id)).to be_empty
     expect {
       described_class.remove!(configuration.id, guardian: Fabricate(:admin).guardian)
     }.to raise_error(Discourse::NotFound)

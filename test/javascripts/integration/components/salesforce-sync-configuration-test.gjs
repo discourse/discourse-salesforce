@@ -2,6 +2,7 @@ import {
   click,
   fillIn as fillInput,
   find,
+  findAll,
   render,
   triggerKeyEvent,
 } from "@ember/test-helpers";
@@ -21,6 +22,10 @@ module(
   function (hooks) {
     setupRenderingTest(hooks);
     hooks.beforeEach(function () {
+      this.targets = [
+        { provider: "salesforce", object: "Lead" },
+        { provider: "salesforce", object: "Contact" },
+      ];
       pretender.get("/salesforce/admin/guided-sync/groups.json", (request) => [
         200,
         { "Content-Type": "application/json" },
@@ -56,11 +61,141 @@ module(
       ];
     });
 
+    test("offers configured CRM targets and resets mappings when switching providers", async function (assert) {
+      this.targets.push({ provider: "hubspot", object: "Contact" });
+      const requests = [];
+      pretender.get("/salesforce/admin/guided-sync/fields.json", (request) => {
+        requests.push({ ...request.queryParams });
+        return [
+          200,
+          { "Content-Type": "application/json" },
+          JSON.stringify({
+            fields: (request.queryParams.provider === "hubspot"
+              ? ["email", "firstname", "lastname"]
+              : ["Email", "FirstName", "LastName", "Description", "Company"]
+            ).map((name) => ({ name, type: "string" })),
+          }),
+        ];
+      });
+      const saved = [];
+      this.save = (configuration) => saved.push(structuredClone(configuration));
+      await render(
+        <template>
+          <SalesforceSyncConfiguration
+            @targets={{this.targets}}
+            @groups={{this.groups}}
+            @onSave={{this.save}}
+          />
+        </template>
+      );
+      await selectSyncGroups("customers");
+      await click('[data-name="target"] .form-kit__control-menu-trigger');
+      assert
+        .dom('.form-kit__control-menu-item[data-value="salesforce:Lead"]')
+        .hasText("Salesforce - Leads", "labels Salesforce Leads");
+      assert
+        .dom('.form-kit__control-menu-item[data-value="salesforce:Contact"]')
+        .hasText("Salesforce - Contacts", "labels Salesforce Contacts");
+      assert
+        .dom('.form-kit__control-menu-item[data-value="hubspot:Contact"]')
+        .hasText("HubSpot - Contacts", "offers HubSpot Contacts");
+      await click(
+        '.form-kit__control-menu-item[data-value="hubspot:Contact"] button'
+      );
+      assert.strictEqual(
+        requests.at(-1).provider,
+        "hubspot",
+        "loads the selected provider's metadata"
+      );
+      assert
+        .dom(".salesforce-sync-configuration__locked-mapping code")
+        .hasText("email", "uses HubSpot's email property");
+      assert
+        .dom('[data-name="mappings.0.policy"]')
+        .includesText(
+          "HubSpot",
+          "names the selected CRM in the ownership menu"
+        );
+      await click("[data-test-save]");
+      assert.strictEqual(saved.length, 1, "saves the HubSpot guide");
+      assert.strictEqual(saved[0].provider, "hubspot", "persists the provider");
+      assert.strictEqual(saved[0].object, "Contact", "persists the object");
+      assert.deepEqual(
+        saved[0].mappings.map((mapping) => mapping.destination),
+        ["firstname", "lastname"],
+        "uses HubSpot defaults without Salesforce fields"
+      );
+      await formKit().field("target").select("salesforce:Lead");
+      assert
+        .dom('[data-name="mappings.3.value"] input')
+        .hasValue("Unknown", "restores Salesforce Lead defaults");
+    });
+
+    test("starts with HubSpot when it is the only configured provider", async function (assert) {
+      this.targets = [{ provider: "hubspot", object: "Contact" }];
+      pretender.get("/salesforce/admin/guided-sync/fields.json", () => [
+        200,
+        { "Content-Type": "application/json" },
+        JSON.stringify({
+          fields: ["email", "firstname", "lastname"].map((name) => ({
+            name,
+            type: "string",
+          })),
+        }),
+      ]);
+      await render(
+        <template>
+          <SalesforceSyncConfiguration
+            @targets={{this.targets}}
+            @groups={{this.groups}}
+          />
+        </template>
+      );
+      assert
+        .dom('[data-name="target"] .form-kit__control-menu-trigger')
+        .hasText("HubSpot - Contacts", "defaults to the available provider");
+      await click('[data-name="target"] .form-kit__control-menu-trigger');
+      assert
+        .dom(".form-kit__control-menu-item")
+        .exists({ count: 1 }, "hides unconfigured provider targets");
+      assert
+        .dom('.form-kit__control-menu-item[data-value="hubspot:Contact"]')
+        .exists("retains the configured target");
+    });
+
+    test("keeps mapping rows distinct when returning to Salesforce Leads", async function (assert) {
+      await render(
+        <template>
+          <SalesforceSyncConfiguration
+            @targets={{this.targets}}
+            @groups={{this.groups}}
+          />
+        </template>
+      );
+      await formKit().field("target").select("salesforce:Contact");
+      for (let index = 0; index < 3; index++) {
+        await click("[data-test-add-mapping]");
+      }
+      await formKit().field("target").select("salesforce:Lead");
+      const rows = findAll("[data-test-mapping]");
+      assert.strictEqual(
+        rows.length,
+        7,
+        "preserves custom rows and restores Company"
+      );
+      assert.strictEqual(
+        new Set(rows.map((row) => row.dataset.testMapping)).size,
+        rows.length,
+        "uses a distinct ID for every row"
+      );
+    });
+
     test("configuration naming is optional and edited from the heading", async function (assert) {
       this.save = () => {};
       await render(
         <template>
           <SalesforceSyncConfiguration
+            @targets={{this.targets}}
             @groups={{this.groups}}
             @onSave={{this.save}}
           />
@@ -155,8 +290,10 @@ module(
       });
       await render(
         <template>
-          <SalesforceSyncConfiguration @groups={{this.groups}} /><ModalContainer
-          />
+          <SalesforceSyncConfiguration
+            @targets={{this.targets}}
+            @groups={{this.groups}}
+          /><ModalContainer />
         </template>
       );
       await selectSyncGroups("customers", "partners");
@@ -191,8 +328,10 @@ module(
       ]);
       await render(
         <template>
-          <SalesforceSyncConfiguration @groups={{this.groups}} /><ModalContainer
-          />
+          <SalesforceSyncConfiguration
+            @targets={{this.targets}}
+            @groups={{this.groups}}
+          /><ModalContainer />
         </template>
       );
       await selectSyncGroups("customers");
@@ -227,6 +366,7 @@ module(
       await render(
         <template>
           <SalesforceSyncConfiguration
+            @targets={{this.targets}}
             @groups={{this.groups}}
             @onSave={{this.save}}
           />
@@ -247,6 +387,7 @@ module(
       await render(
         <template>
           <SalesforceSyncConfiguration
+            @targets={{this.targets}}
             @groups={{this.groups}}
             @onCancel={{this.cancel}}
           /><DialogHolder />
@@ -284,6 +425,7 @@ module(
       await render(
         <template>
           <SalesforceSyncConfiguration
+            @targets={{this.targets}}
             @groups={{this.groups}}
             @onSave={{this.save}}
           />
@@ -309,7 +451,7 @@ module(
       await click("[data-test-save]");
       assert
         .dom(".form-kit__errors-summary")
-        .includesText("Salesforce field", "identifies the unfinished row");
+        .includesText("CRM field", "identifies the unfinished row");
       assert.strictEqual(saved, undefined, "does not save unfinished mappings");
       await click("[data-test-remove-mapping='7']");
       await click("[data-test-save]");
@@ -321,6 +463,7 @@ module(
       await render(
         <template>
           <SalesforceSyncConfiguration
+            @targets={{this.targets}}
             @groups={{this.groups}}
             @record={{this.record}}
           />
@@ -342,6 +485,7 @@ module(
       await render(
         <template>
           <SalesforceSyncConfiguration
+            @targets={{this.targets}}
             @groups={{this.groups}}
             @record={{this.record}}
           />
@@ -371,7 +515,10 @@ module(
       ];
       await render(
         <template>
-          <SalesforceSyncConfiguration @groups={{this.groups}} />
+          <SalesforceSyncConfiguration
+            @targets={{this.targets}}
+            @groups={{this.groups}}
+          />
         </template>
       );
       await selectSyncGroups("customers");
@@ -442,6 +589,7 @@ module(
       await render(
         <template>
           <SalesforceSyncConfiguration
+            @targets={{this.targets}}
             @groups={{this.groups}}
             @onSave={{this.save}}
           />
@@ -491,6 +639,7 @@ module(
       await render(
         <template>
           <SalesforceSyncConfiguration
+            @targets={{this.targets}}
             @groups={{this.groups}}
             @onSave={{this.save}}
           />
@@ -531,6 +680,7 @@ module(
       await render(
         <template>
           <SalesforceSyncConfiguration
+            @targets={{this.targets}}
             @groups={{this.groups}}
             @onSave={{this.save}}
           />
@@ -566,11 +716,11 @@ module(
         destination: "Company",
         policy: "keep",
       });
-      await formKit().field("object").select("Contact");
+      await formKit().field("target").select("salesforce:Contact");
       assert
         .dom('[data-name="mappings.3.source"]')
         .doesNotExist("Contacts do not require Company");
-      await formKit().field("object").select("Lead");
+      await formKit().field("target").select("salesforce:Lead");
       assert
         .dom('[data-name="mappings.3.value"] input')
         .hasValue("Unknown", "restores the explicit Lead default");
@@ -584,7 +734,10 @@ module(
       ];
       await render(
         <template>
-          <SalesforceSyncConfiguration @groups={{this.groups}} />
+          <SalesforceSyncConfiguration
+            @targets={{this.targets}}
+            @groups={{this.groups}}
+          />
         </template>
       );
       assert.dom("[data-test-save]").hasText("Save and send");
@@ -630,13 +783,14 @@ module(
       await render(
         <template>
           <SalesforceSyncConfiguration
+            @targets={{this.targets}}
             @groups={{this.groups}}
             @onSave={{this.save}}
           />
         </template>
       );
       await selectSyncGroups("customers");
-      await formKit().field("object").select("Contact");
+      await formKit().field("target").select("salesforce:Contact");
       await click("[data-test-save]");
       assert.strictEqual(
         saved.length,
@@ -663,6 +817,7 @@ module(
       await render(
         <template>
           <SalesforceSyncConfiguration
+            @targets={{this.targets}}
             @groups={{this.groups}}
             @record={{this.record}}
             @onSave={{this.save}}
@@ -673,12 +828,12 @@ module(
       assert
         .dom(".form-kit__errors-summary")
         .includesText(
-          "Unavailable Salesforce fields: Company",
+          "Unavailable CRM fields: Company",
           "names missing saved destinations without removing them"
         );
       assert
         .dom(".form-kit__errors-summary")
-        .includesText("Unavailable Salesforce fields: Posts_Created__c");
+        .includesText("Unavailable CRM fields: Posts_Created__c");
       assert.strictEqual(
         saved.length,
         1,
@@ -692,7 +847,10 @@ module(
     test("reloads metadata when the target changes and allows retrying failures", async function (assert) {
       await render(
         <template>
-          <SalesforceSyncConfiguration @groups={{this.groups}} />
+          <SalesforceSyncConfiguration
+            @targets={{this.targets}}
+            @groups={{this.groups}}
+          />
         </template>
       );
       await selectSyncGroups("customers");
@@ -702,10 +860,10 @@ module(
         {},
         "",
       ]);
-      await formKit().field("object").select("Contact");
+      await formKit().field("target").select("salesforce:Contact");
       assert
         .dom(".salesforce-sync-configuration")
-        .includesText("Could not load Salesforce fields");
+        .includesText("Could not load CRM fields");
       await click("[data-test-save]");
       assert
         .dom(".form-kit__errors-summary")
@@ -724,7 +882,7 @@ module(
       assert.strictEqual(this.requestedObject, "Contact");
       assert
         .dom(".salesforce-sync-configuration")
-        .doesNotIncludeText("Could not load Salesforce fields");
+        .doesNotIncludeText("Could not load CRM fields");
       await click("[data-test-save]");
       assert
         .dom(".form-kit__errors-summary")
@@ -741,7 +899,10 @@ module(
       ]);
       await render(
         <template>
-          <SalesforceSyncConfiguration @groups={{this.groups}} />
+          <SalesforceSyncConfiguration
+            @targets={{this.targets}}
+            @groups={{this.groups}}
+          />
         </template>
       );
       assert
@@ -759,6 +920,7 @@ module(
       await render(
         <template>
           <SalesforceSyncConfiguration
+            @targets={{this.targets}}
             @groups={{this.groups}}
             @onSave={{this.save}}
           />

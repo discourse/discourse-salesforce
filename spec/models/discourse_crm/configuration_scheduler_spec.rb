@@ -1,8 +1,8 @@
 # frozen_string_literal: true
 
-require_relative "../spec_helper"
+require_relative "../../spec_helper"
 
-RSpec.describe Salesforce::ConfigurationScheduler do
+RSpec.describe DiscourseCrm::ConfigurationScheduler do
   before do
     SiteSetting.salesforce_enabled = true
     SiteSetting.enable_guided_sync_configuration = true

@@ -13,7 +13,7 @@ end
 
 Fabricator(:verified_user, from: :user) { after_create { |user| user.activate } }
 
-Fabricator(:sync_configuration, class_name: ::Salesforce::SyncConfiguration) do
+Fabricator(:sync_configuration, class_name: ::DiscourseCrm::SyncConfiguration) do
   transient :groups
 
   provider "salesforce"

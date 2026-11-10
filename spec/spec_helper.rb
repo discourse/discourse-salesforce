@@ -68,3 +68,36 @@ RSpec.shared_context "with salesforce spec helper" do
     )
   end
 end
+
+RSpec.shared_context "with hubspot spec helper" do
+  let(:hubspot_url) { "https://api.hubapi.com/crm/v3" }
+  let(:hubspot_properties) do
+    [
+      { name: "email", label: "Email", type: "string" },
+      { name: "firstname", label: "First name", type: "string" },
+      { name: "lastname", label: "Last name", type: "string" },
+      { name: "community_posts", label: "Community posts", type: "number", hubspotDefined: false },
+      {
+        name: "community_source",
+        label: "Community source",
+        type: "string",
+        hubspotDefined: false,
+      },
+    ]
+  end
+
+  before do
+    SiteSetting.hubspot_enabled = true
+    SiteSetting.hubspot_portal_id = "12345"
+    SiteSetting.hubspot_access_token = "HUBSPOT_ACCESS_TOKEN"
+    stub_request(
+      :post,
+      "https://api.hubapi.com/oauth/v2/private-apps/get/access-token-info",
+    ).to_return(body: { hubId: 12_345, appId: 6789 }.to_json)
+    Rails.cache.clear
+    stub_request(:get, "#{hubspot_url}/properties/contacts").to_return(
+      body: { results: hubspot_properties }.to_json,
+    )
+  end
+  after { Discourse.redis.without_namespace.del("hubspot_api:12345:6789:cooldown") }
+end

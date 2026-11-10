@@ -1,8 +1,8 @@
 # frozen_string_literal: true
 
-require_relative "../spec_helper"
+require_relative "../../spec_helper"
 
-RSpec.describe Salesforce::UserSyncSources do
+RSpec.describe DiscourseCrm::UserSyncSources do
   fab!(:user)
   fab!(:other_user, :user)
 
@@ -94,7 +94,7 @@ RSpec.describe Salesforce::UserSyncSources do
       }.map do |name, type|
         { "name" => name, "type" => type, "createable" => true, "updateable" => true }
       end
-    configuration = Salesforce::SyncConfiguration.new(object: "Contact", mappings: mappings)
+    configuration = DiscourseCrm::SyncConfiguration.new(object: "Contact", mappings: mappings)
     Salesforce::ConfiguredUserSync.validate_mappings!(configuration, fields)
     sync =
       Salesforce::ConfiguredUserSync.new(configuration, user, api: Object.new, source_data: data)
@@ -200,7 +200,7 @@ RSpec.describe Salesforce::UserSyncSources do
       }.map do |name, type|
         { "name" => name, "type" => type, "createable" => true, "updateable" => true }
       end
-    configuration = Salesforce::SyncConfiguration.new(object: "Contact", mappings: mappings)
+    configuration = DiscourseCrm::SyncConfiguration.new(object: "Contact", mappings: mappings)
     Salesforce::ConfiguredUserSync.validate_mappings!(configuration, fields)
     sync = Salesforce::ConfiguredUserSync.new(configuration, user, api: Object.new)
     expect(sync.mapped_values(fields, nil)).to include(
@@ -219,5 +219,36 @@ RSpec.describe Salesforce::UserSyncSources do
     expect {
       Salesforce::ConfiguredUserSync.validate_mappings!(configuration, fields)
     }.to raise_error(Discourse::InvalidParameters)
+  end
+  describe "#fingerprint" do
+    it "preserves stored provider hashes with static and repeated mapping sources" do
+      user.name = "Alex Morgan"
+      user.email = "alex@example.com"
+      mappings = [
+        { "source" => "last", "destination" => "lastname", "policy" => "keep" },
+        {
+          "source" => "static",
+          "value" => "Discourse",
+          "destination" => "source",
+          "policy" => "keep",
+        },
+        { "source" => "last", "destination" => "display_name", "policy" => "overwrite" },
+      ]
+      sources = described_class.new(mappings, [user])
+      contexts = [
+        [
+          { instance: "https://crm.example.com", object: "Contact", mappings: mappings },
+          "0c1232fd3e4533c1a8e7ba0e3a24893fc63b7e7afaeaab2db9aca34c32804189",
+        ],
+        [
+          { account: "12345", mappings: mappings },
+          "1e5b948d8b076cdcad76a9fd9350c5766c1a23977e1f68fe1cc89c960c772190",
+        ],
+      ]
+
+      contexts.each do |context, stored_fingerprint|
+        expect(sources.fingerprint(user, context: context)).to eq(stored_fingerprint)
+      end
+    end
   end
 end

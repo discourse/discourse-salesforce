@@ -20,7 +20,7 @@ RSpec.describe Jobs::SyncSalesforceUsers do
       user1.save_custom_fields
       user2.salesforce_contact_id = "contact_123"
       user2.save_custom_fields
-      Salesforce::RecordLink.link!(
+      DiscourseCrm::RecordLink.link!(
         provider: "salesforce",
         account: "another-account",
         object: "Contact",
@@ -41,7 +41,7 @@ RSpec.describe Jobs::SyncSalesforceUsers do
       expect(user1.reload.salesforce_contact_id).to eq("missing_contact")
       expect(user2.reload.salesforce_contact_id).to eq("contact_456")
       expect(
-        Salesforce::RecordLink.find_by(
+        DiscourseCrm::RecordLink.find_by(
           provider: "salesforce",
           account: instance_url,
           object: "Contact",
@@ -49,7 +49,7 @@ RSpec.describe Jobs::SyncSalesforceUsers do
         ),
       ).to be_nil
       foreign_link =
-        Salesforce::RecordLink.find_by(
+        DiscourseCrm::RecordLink.find_by(
           provider: "salesforce",
           account: "another-account",
           object: "Contact",
@@ -83,7 +83,7 @@ RSpec.describe Jobs::SyncSalesforceUsers do
       expect(user2.reload.salesforce_lead_id).to be_nil
       expect(user2.salesforce_contact_id).to eq("contact_456")
       expect(
-        Salesforce::RecordLink.find_by(
+        DiscourseCrm::RecordLink.find_by(
           provider: "salesforce",
           account: instance_url,
           object: "Lead",
@@ -102,16 +102,16 @@ RSpec.describe Jobs::SyncSalesforceUsers do
         object: "Contact",
         user_id: user2.id,
       }
-      Salesforce::RecordLink.link!(**scope, external_id: "contact_123")
+      DiscourseCrm::RecordLink.link!(**scope, external_id: "contact_123")
       stub_request(:get, "#{path}/Contact?fields=MasterRecordId&ids=contact_123").to_return(
         body: [{ Id: "contact_123", MasterRecordId: "contact_456" }].to_json,
       )
-      Salesforce::RecordLink.stubs(:link!).raises(ActiveRecord::StatementInvalid)
+      DiscourseCrm::RecordLink.stubs(:link!).raises(ActiveRecord::StatementInvalid)
 
       described_class.new.execute({})
 
       expect(user2.reload.salesforce_contact_id).to eq("contact_123")
-      expect(Salesforce::RecordLink.find_by(**scope).external_id).to eq("contact_123")
+      expect(DiscourseCrm::RecordLink.find_by(**scope).external_id).to eq("contact_123")
     end
 
     it "skips existing Lead links when Leads are disabled" do
@@ -153,18 +153,18 @@ RSpec.describe Jobs::SyncSalesforceUsers do
         user_id: user1.id,
       }
       contact_scope = lead_scope.merge(object: "Contact", user_id: user2.id)
-      Salesforce::RecordLink.link!(**lead_scope, external_id: "lead_123")
-      Salesforce::RecordLink.link!(**contact_scope, external_id: "contact_123")
+      DiscourseCrm::RecordLink.link!(**lead_scope, external_id: "lead_123")
+      DiscourseCrm::RecordLink.link!(**contact_scope, external_id: "contact_123")
       described_class.new.execute({})
 
-      lead_link = Salesforce::RecordLink.find_by(**lead_scope)
+      lead_link = DiscourseCrm::RecordLink.find_by(**lead_scope)
       expect(lead_link.slice(:external_id, :converted_to_object, :converted_to_id)).to eq(
         "external_id" => "lead_123",
         "converted_to_object" => "Contact",
         "converted_to_id" => "contact_456",
       )
-      expect(Salesforce::RecordLink.find_by(**contact_scope).external_id).to eq("contact_789")
-      converted_contact = Salesforce::RecordLink.find_by(**lead_scope.merge(object: "Contact"))
+      expect(DiscourseCrm::RecordLink.find_by(**contact_scope).external_id).to eq("contact_789")
+      converted_contact = DiscourseCrm::RecordLink.find_by(**lead_scope.merge(object: "Contact"))
       expect(converted_contact.slice(:external_id, :converted_from_id)).to eq(
         "external_id" => "contact_456",
         "converted_from_id" => "lead_123",

@@ -1,38 +1,44 @@
 # frozen_string_literal: true
 
-module Salesforce
+module DiscourseCrm
   class SyncConfiguration < ActiveRecord::Base
     self.table_name = "crm_sync_configurations"
 
     PROVIDER = "salesforce"
+    PROVIDERS = Provider::NAMES
     KINDS = %w[users].freeze
-    OBJECTS = %w[Lead Contact].freeze
     SCHEDULES = %w[daily hourly weekly manual].freeze
     MAX_GROUPS = 100
     MAX_MAPPINGS = 50
 
     has_many :configuration_groups,
-             class_name: "Salesforce::SyncConfigurationGroup",
+             class_name: "DiscourseCrm::SyncConfigurationGroup",
              foreign_key: :configuration_id,
              dependent: :delete_all
     has_many :groups, through: :configuration_groups
     has_many :sync_states,
-             class_name: "Salesforce::SyncState",
+             class_name: "DiscourseCrm::SyncState",
              foreign_key: :configuration_id,
              dependent: :delete_all
 
-    validates :provider, inclusion: { in: [PROVIDER] }
+    validates :provider, inclusion: { in: PROVIDERS }
     validates :name, presence: true, length: { maximum: 60 }
     validates :kind, inclusion: { in: KINDS }
-    validates :object, inclusion: { in: OBJECTS }
+    validate :supported_object
     validates :schedule, inclusion: { in: SCHEDULES }
     validate :mappings_shape
 
     scope :for_current_account,
-          -> { where(provider: PROVIDER, account: SiteSetting.salesforce_instance_url) }
+          -> do
+            PROVIDERS.reduce(none) do |records, name|
+              crm = Provider.new(name)
+              crm.enabled? ? records.or(where(provider: name, account: crm.account)) : records
+            end
+          end
 
     def self.enabled?
-      SiteSetting.salesforce_enabled && SiteSetting.enable_guided_sync_configuration
+      SiteSetting.enable_guided_sync_configuration &&
+        (SiteSetting.salesforce_enabled || SiteSetting.hubspot_enabled)
     end
 
     def self.active
@@ -48,7 +54,7 @@ module Salesforce
       end
       counts =
         GroupUser
-          .where(group_id: groups.select(:id), user_id: Person.eligible_users.select(:id))
+          .where(group_id: groups.select(:id), user_id: UserEligibility.eligible_users.select(:id))
           .group(:group_id)
           .count
       groups
@@ -73,11 +79,15 @@ module Salesforce
 
       params = params.deep_stringify_keys
       provider = params.fetch("provider", PROVIDER)
-      raise Discourse::InvalidParameters.new(:provider) if provider != PROVIDER
+      crm = Provider.new(provider)
+      raise Discourse::InvalidParameters.new(:provider) unless crm.configured?
       groups = resolve_groups!(params["group_ids"])
 
-      record = id ? find_by(id: id) : new(provider: PROVIDER)
+      record = id ? find_by(id: id) : new(provider: provider)
       raise Discourse::NotFound if id && !record
+      if record.persisted? && record.provider != provider
+        raise Discourse::InvalidParameters.new(:provider)
+      end
       if record.persisted? && record.object != params["object"]
         raise Discourse::InvalidParameters.new(:object)
       end
@@ -92,11 +102,11 @@ module Salesforce
       )
       raise Discourse::InvalidParameters.new(:configuration) if record.invalid?
 
-      ConfiguredUserSync.validate_mappings!(
+      crm.sync_class.validate_mappings!(
         record,
-        Api.cached_writable_fields(record.object, refresh: true),
+        crm.api_class.cached_writable_fields(record.object, refresh: true),
       )
-      record.account = SiteSetting.salesforce_instance_url
+      record.account = crm.account
 
       previous_group_ids = record.persisted? ? record.group_ids.sort : []
       new_group_ids = groups.map(&:id).sort
@@ -157,8 +167,12 @@ module Salesforce
       end
     end
 
+    def crm_provider
+      Provider.new(provider)
+    end
+
     def connection_changed?
-      account != SiteSetting.salesforce_instance_url
+      account != crm_provider.account
     end
 
     def record_links
@@ -184,9 +198,15 @@ module Salesforce
     def first_user_error
       sync_states
         .where.not(error: nil)
-        .where(user_id: Person.eligible_group_members(group_ids).select(:id))
+        .where(user_id: UserEligibility.eligible_group_members(group_ids).select(:id))
         .order(:error_at, :id)
         .pick(:error, :error_at)
+    end
+
+    def supported_object
+      if PROVIDERS.exclude?(provider) || crm_provider.objects.exclude?(object)
+        errors.add(:object, :invalid)
+      end
     end
 
     def mappings_shape

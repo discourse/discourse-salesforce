@@ -12,7 +12,10 @@ import DPageSubheader from "discourse/ui-kit/d-page-subheader";
 import { i18n } from "discourse-i18n";
 import SalesforceDeleteSyncConfirmation from "discourse/plugins/discourse-salesforce/discourse/components/salesforce-delete-sync-confirmation";
 import SalesforceSyncConfiguration from "discourse/plugins/discourse-salesforce/discourse/components/salesforce-sync-configuration";
-import { createSyncConfiguration } from "discourse/plugins/discourse-salesforce/discourse/lib/sync-configuration";
+import {
+  createSyncConfiguration,
+  targetLabel,
+} from "discourse/plugins/discourse-salesforce/discourse/lib/sync-configuration";
 
 export default class SalesforceSyncConfigurations extends Component {
   @service a11y;
@@ -43,6 +46,7 @@ export default class SalesforceSyncConfigurations extends Component {
   get displayRecords() {
     return this.records.map((record) => ({
       ...record,
+      targetLabel: targetLabel(record.provider || "salesforce", record.object),
       scope:
         record.kind === "posts"
           ? record.category
@@ -62,7 +66,7 @@ export default class SalesforceSyncConfigurations extends Component {
     this.selected = {
       key: "new-users",
       configuration: {
-        ...createSyncConfiguration(),
+        ...createSyncConfiguration(this.args.targets?.[0]),
         kind: "users",
         name: i18n("salesforce.guided_sync.default_users_name"),
       },
@@ -162,6 +166,7 @@ export default class SalesforceSyncConfigurations extends Component {
       {{#each this.editors key="key" as |editor|}}
         <SalesforceSyncConfiguration
           @groups={{@groups}}
+          @targets={{@targets}}
           @record={{editor.configuration}}
           @onCancel={{this.close}}
           @onSave={{this.save}}
@@ -239,7 +244,7 @@ export default class SalesforceSyncConfigurations extends Component {
                       class="d-table__mobile-label"
                     >{{i18n
                         "salesforce.guided_sync.salesforce_object"
-                      }}</div>{{record.object}}</td>
+                      }}</div>{{record.targetLabel}}</td>
                   <td class="d-table__cell --detail"><div
                       class="d-table__mobile-label"
                     >{{i18n

@@ -85,14 +85,14 @@ RSpec.describe Jobs::SyncSalesforceUserBatch do
       }.to_json,
     )
     stub_request(:patch, collection_url).to_timeout
-    Salesforce::SyncState.store(configuration.id, user.id, fingerprint: "previous")
+    DiscourseCrm::SyncState.store(configuration.id, user.id, fingerprint: "previous")
 
     run_batch
 
     expect(configuration.record_link_for(user.id).external_id).to eq("contact1")
     expect(user.reload.salesforce_contact_id).to be_nil
     expect(
-      Salesforce::SyncState.find_by(configuration: configuration, user_id: user.id).fingerprint,
+      DiscourseCrm::SyncState.find_by(configuration: configuration, user_id: user.id).fingerprint,
     ).to eq("previous")
     user.primary_email.update!(email: "changed@example.com")
     user.reload.activate
@@ -253,7 +253,7 @@ RSpec.describe Jobs::SyncSalesforceUserBatch do
   end
 
   it "defers ambiguous matches and missing linked records to individual jobs" do
-    Salesforce::RecordLink.link!(
+    DiscourseCrm::RecordLink.link!(
       provider: "salesforce",
       account: instance_url,
       object: "Contact",
@@ -292,7 +292,7 @@ RSpec.describe Jobs::SyncSalesforceUserBatch do
       end
     stub_request(:get, "#{api_path}/Lead/describe").to_return(body: { fields: lead_fields }.to_json)
     lead_id = "00Qbm00000v6wJpEAI"
-    Salesforce::RecordLink.link!(
+    DiscourseCrm::RecordLink.link!(
       provider: "salesforce",
       account: instance_url,
       object: "Lead",
@@ -339,7 +339,7 @@ RSpec.describe Jobs::SyncSalesforceUserBatch do
   it "skips Lead batches with only already-converted users without contacting Salesforce" do
     configuration.update!(object: "Lead")
     [user, other_user].each do |member|
-      Salesforce::RecordLink.mark_converted!(
+      DiscourseCrm::RecordLink.mark_converted!(
         provider: "salesforce",
         account: instance_url,
         object: "Lead",
@@ -370,7 +370,7 @@ RSpec.describe Jobs::SyncSalesforceUserBatch do
   end
 
   it "follows query pages and uses saved IDs after an email change" do
-    Salesforce::RecordLink.link!(
+    DiscourseCrm::RecordLink.link!(
       provider: "salesforce",
       account: instance_url,
       object: "Contact",

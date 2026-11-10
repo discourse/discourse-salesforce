@@ -4,65 +4,30 @@ module Salesforce
   class ConfiguredUserSync
     SYNC_LOCK_VALIDITY = 5.minutes
 
-    def self.field_type(type)
-      return "number" if %w[int double currency percent].include?(type)
-      return "date" if %w[date datetime].include?(type)
-      if %w[
-           string
-           textarea
-           email
-           phone
-           url
-           picklist
-           multipicklist
-           combobox
-           encryptedstring
-         ].include?(type)
-        return "text"
-      end
-      type
-    end
-
     def self.validate_mappings!(configuration, fields)
-      mappings = configuration.mappings
-      unless mappings.is_a?(Array) && mappings.all? { |mapping| mapping.is_a?(Hash) }
-        raise Discourse::InvalidParameters.new(:mappings)
-      end
-      source_types =
-        UserSyncSources::SOURCE_TYPES.merge(
-          UserSyncSources.custom_sources.to_h { |source| [source[:id], source[:type]] },
-        )
-      destinations = mappings.map { |mapping| mapping["destination"] }
-      valid = destinations.uniq.size == destinations.size && !destinations.include?("Email")
-      person = Person.for_object(configuration.object)
-      valid &&= (person::REQUIRED_MAPPING_FIELDS - destinations).empty?
-      valid &&= fields.any? { |field| field["name"] == "Email" && field["createable"] }
-      valid &&=
-        mappings.all? do |mapping|
-          field = fields.find { |item| item["name"] == mapping["destination"] }
-          static_value_valid =
-            mapping["source"] != "static" ||
-              (
-                mapping["value"].is_a?(String) && mapping["value"].present? &&
-                  mapping["value"].length <= 1000
-              )
-          static_value_valid && field && source_types[mapping["source"]].present? &&
-            source_types[mapping["source"]] == field_type(field["type"]) &&
-            %w[keep overwrite].include?(mapping["policy"])
-        end
-      raise Discourse::InvalidParameters.new(:mappings) unless valid
+      DiscourseCrm::FieldMapping.validate!(
+        configuration.mappings,
+        fields,
+        email_field: "Email",
+        required_fields: Person.for_object(configuration.object)::REQUIRED_MAPPING_FIELDS,
+      )
     end
 
     def self.sync(configuration_id, user_id, reason: nil)
-      return unless SyncConfiguration.enabled?
+      return unless DiscourseCrm::SyncConfiguration.enabled?
       DistributedMutex.synchronize(
         "salesforce_person_create_#{user_id}",
         validity: SYNC_LOCK_VALIDITY,
       ) do
-        configuration = SyncConfiguration.active.find_by(id: configuration_id)
-        return unless configuration&.reason_enabled?(reason)
+        configuration = DiscourseCrm::SyncConfiguration.active.find_by(id: configuration_id)
+        unless configuration&.provider == "salesforce" && configuration.reason_enabled?(reason)
+          return
+        end
         user = User.find_by(id: user_id)
-        return unless user && Person.auto_create_eligible?(user) && Person.email_verified?(user)
+        unless user && DiscourseCrm::UserEligibility.auto_create_eligible?(user) &&
+                 DiscourseCrm::UserEligibility.email_verified?(user)
+          return
+        end
         unless GroupUser.exists?(
                  group_id: configuration.configuration_groups.select(:group_id),
                  user_id: user.id,
@@ -106,17 +71,18 @@ module Salesforce
           ).fetch("id")
       end
       complete(id)
-      SyncState.store(@configuration.id, @user.id, fingerprint: fingerprint)
+      DiscourseCrm::SyncState.store(@configuration.id, @user.id, fingerprint: fingerprint)
     end
 
     def complete(id)
       save_link(id)
       @user.custom_fields[@person::ID_FIELD] = id
       @user.save_custom_fields
-      SyncState.where(configuration_id: @configuration.id, user_id: @user.id).update_all(
-        fingerprint: nil,
-      )
-      SyncConfiguration.record_result(@configuration.id, @user.id)
+      DiscourseCrm::SyncState.where(
+        configuration_id: @configuration.id,
+        user_id: @user.id,
+      ).update_all(fingerprint: nil)
+      DiscourseCrm::SyncConfiguration.record_result(@configuration.id, @user.id)
     end
 
     def reconcile_converted_lead(record)
@@ -138,13 +104,13 @@ module Salesforce
       end
 
       UserCustomField.transaction do
-        RecordLink.mark_converted!(
+        DiscourseCrm::RecordLink.mark_converted!(
           **link_scope(object: "Lead"),
           external_id: record["Id"],
           to_object: "Contact",
           to_id: contact_id,
         )
-        RecordLink.link!(
+        DiscourseCrm::RecordLink.link!(
           **link_scope(object: "Contact"),
           external_id: contact_id,
           converted_from_id: record["Id"],
@@ -153,18 +119,18 @@ module Salesforce
         @user.salesforce_contact_id = contact_id
         @user.save_custom_fields
       end
-      SyncConfiguration.record_result(@configuration.id, @user.id)
+      DiscourseCrm::SyncConfiguration.record_result(@configuration.id, @user.id)
       true
     end
 
     def mapped_values(fields, record)
-      FieldMapping
+      DiscourseCrm::FieldMapping
         .new(@configuration.mappings, fields) { |source| source_value(source) }
         .values(record)
     end
 
     def save_link(id)
-      RecordLink.link!(**link_scope, external_id: id)
+      DiscourseCrm::RecordLink.link!(**link_scope, external_id: id)
     end
 
     private
@@ -179,19 +145,17 @@ module Salesforce
     end
 
     def sync_state
-      SyncState.find_by(configuration_id: @configuration.id, user_id: @user.id)
+      DiscourseCrm::SyncState.find_by(configuration_id: @configuration.id, user_id: @user.id)
     end
 
     def source_fingerprint
-      sources = @configuration.mappings.map { |mapping| mapping["source"] }.uniq - %w[static]
-      Digest::SHA256.hexdigest(
-        {
+      source_data.fingerprint(
+        @user,
+        context: {
           instance: SiteSetting.salesforce_instance_url,
           object: @configuration.object,
           mappings: @configuration.mappings,
-          email: @user.email,
-          values: sources.to_h { |source| [source, source_value(source, fingerprint: true)] },
-        }.to_json,
+        },
       )
     end
 
@@ -216,7 +180,7 @@ module Salesforce
       return false unless @person == Lead
       return false unless @configuration.record_link_for(@user.id)&.converted?
 
-      SyncConfiguration.record_result(@configuration.id, @user.id)
+      DiscourseCrm::SyncConfiguration.record_result(@configuration.id, @user.id)
       true
     end
 
@@ -243,8 +207,8 @@ module Salesforce
     end
 
     def conversion_link_conflict?(record, contact_id)
-      current_lead = RecordLink.find_by(**link_scope(object: "Lead"))
-      current_contact = RecordLink.find_by(**link_scope(object: "Contact"))
+      current_lead = DiscourseCrm::RecordLink.find_by(**link_scope(object: "Lead"))
+      current_contact = DiscourseCrm::RecordLink.find_by(**link_scope(object: "Contact"))
       legacy_lead_id = @user.salesforce_lead_id
       legacy_contact_id = @user.salesforce_contact_id
 
@@ -259,14 +223,20 @@ module Salesforce
       Rails.logger.warn(
         "Skipping converted Salesforce Lead reconciliation for Discourse user #{@user.id}: #{message}",
       )
-      SyncConfiguration.record_result(@configuration.id, @user.id, error: @conversion_error)
+      DiscourseCrm::SyncConfiguration.record_result(
+        @configuration.id,
+        @user.id,
+        error: @conversion_error,
+      )
       false
     end
 
-    def source_value(source, fingerprint: false)
-      @source_data ||= UserSyncSources.new(@configuration.mappings, [@user])
-      return @source_data.fingerprint_value(source, @user) if fingerprint
-      @source_data.value(source, @user)
+    def source_data
+      @source_data ||= DiscourseCrm::UserSyncSources.new(@configuration.mappings, [@user])
+    end
+
+    def source_value(source)
+      source_data.value(source, @user)
     end
   end
 end

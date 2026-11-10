@@ -8,6 +8,8 @@ module Salesforce
   class AdminController < ::Admin::AdminController
     requires_plugin PLUGIN_NAME
 
+    before_action { raise Discourse::NotFound unless SiteSetting.salesforce_enabled }
+
     skip_before_action :check_xhr, :preload_json
 
     def authorize

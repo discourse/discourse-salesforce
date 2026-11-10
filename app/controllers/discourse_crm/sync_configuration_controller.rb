@@ -1,8 +1,8 @@
 # frozen_string_literal: true
 
-module Salesforce
+module DiscourseCrm
   class SyncConfigurationController < ::Admin::AdminController
-    requires_plugin PLUGIN_NAME
+    requires_plugin "discourse-salesforce"
 
     prepend_before_action :ensure_configurations_enabled
 
@@ -10,21 +10,27 @@ module Salesforce
       records = SyncConfiguration.includes(:groups).order(:id)
       render json: {
                configurations: serialize_data(records, SyncConfigurationSerializer),
-               credentials_configured: Api.has_credentials?,
+               credentials_configured: Provider.available_targets.present?,
+               targets: Provider.available_targets,
                groups: SyncConfiguration.available_groups,
              }
     end
 
     def fields
       object = params.require(:object)
-      raise Discourse::InvalidParameters.new(:object) if %w[Lead Contact].exclude?(object)
+      crm = Provider.new(params.fetch(:provider, "salesforce"))
+      raise Discourse::InvalidParameters.new(:provider) unless crm.configured?
+      raise Discourse::InvalidParameters.new(:object) if crm.objects.exclude?(object)
 
       render json: {
-               fields: Api.cached_writable_fields(object, refresh: params[:refresh] == "true"),
+               fields:
+                 crm.api_class.cached_writable_fields(object, refresh: params[:refresh] == "true"),
                custom_sources: UserSyncSources.custom_sources,
              }
     rescue Salesforce::InvalidCredentials,
            Salesforce::InvalidApiResponse,
+           Hubspot::InvalidCredentials,
+           Hubspot::InvalidApiResponse,
            Faraday::Error,
            OpenSSL::PKey::RSAError => error
       render_connection_error(error)
@@ -40,6 +46,7 @@ module Salesforce
           .require(:configuration)
           .permit(
             :name,
+            :provider,
             :kind,
             :object,
             :schedule,
@@ -56,6 +63,8 @@ module Salesforce
              status: params[:id] ? :ok : :created
     rescue Salesforce::InvalidCredentials,
            Salesforce::InvalidApiResponse,
+           Hubspot::InvalidCredentials,
+           Hubspot::InvalidApiResponse,
            Faraday::Error,
            OpenSSL::PKey::RSAError => error
       render_connection_error(error)
@@ -73,9 +82,18 @@ module Salesforce
     private
 
     def render_connection_error(error)
-      ConnectionError.log(error, operation: action_name)
+      provider =
+        (
+          if error.is_a?(Hubspot::InvalidCredentials) || error.is_a?(Hubspot::InvalidApiResponse)
+            "hubspot"
+          else
+            params[:provider] || params.dig(:configuration, :provider) || "salesforce"
+          end
+        )
+      provider = "salesforce" if Provider::NAMES.exclude?(provider)
+      ConnectionError.log(error, operation: action_name, provider: provider)
       render json: {
-               errors: [I18n.t("salesforce.error.connection.#{ConnectionError.category(error)}")],
+               errors: [I18n.t("#{provider}.error.connection.#{ConnectionError.category(error)}")],
                error_type: ConnectionError.category(error),
              },
              status: :bad_gateway

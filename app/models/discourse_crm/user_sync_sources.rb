@@ -1,6 +1,8 @@
 # frozen_string_literal: true
 
-module Salesforce
+require "digest"
+
+module DiscourseCrm
   class UserSyncSources
     SOURCE_TYPES = {
       "first" => "text",
@@ -53,6 +55,7 @@ module Salesforce
 
     def initialize(mappings, users)
       sources = mappings.map { |mapping| mapping["source"] }
+      @fingerprint_sources = sources.uniq - %w[static]
       user_ids = users.map(&:id)
       @recent_reads =
         if sources.include?("posts_read30")
@@ -182,6 +185,17 @@ module Salesforce
     rescue Date::Error
       raise Discourse::InvalidParameters.new(:user_fields)
     end
+
+    def fingerprint(user, context:)
+      Digest::SHA256.hexdigest(
+        context.merge(
+          email: user.email,
+          values: @fingerprint_sources.to_h { |source| [source, fingerprint_value(source, user)] },
+        ).to_json,
+      )
+    end
+
+    private
 
     def fingerprint_value(source, user)
       return @custom_values.dig(user.id, source) if @field_types[source] == "date"

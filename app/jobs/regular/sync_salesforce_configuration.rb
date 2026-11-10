@@ -5,14 +5,14 @@ module Jobs
     sidekiq_options retry: 5
 
     def execute(args)
-      configuration = Salesforce::SyncConfiguration.active.find_by(id: args[:configuration_id])
+      configuration = DiscourseCrm::SyncConfiguration.active.find_by(id: args[:configuration_id])
       return unless configuration&.reason_enabled?(args[:reason])
       ids =
-        Salesforce::Person
+        DiscourseCrm::UserEligibility
           .eligible_group_members(configuration.configuration_groups.select(:group_id))
           .where("users.id > ?", args[:after_user_id].to_i)
           .order(:id)
-          .limit(Salesforce::ConfiguredUserBatchSync::BATCH_SIZE)
+          .limit(DiscourseCrm::ConfigurationScheduler::BATCH_SIZE)
           .pluck(:id)
       sync_ids = ids
       if args[:reason] == "scheduled"
@@ -26,7 +26,7 @@ module Jobs
           reason: args[:reason],
         )
       end
-      if ids.size == Salesforce::ConfiguredUserBatchSync::BATCH_SIZE
+      if ids.size == DiscourseCrm::ConfigurationScheduler::BATCH_SIZE
         Jobs.enqueue(
           :sync_salesforce_configuration,
           configuration_id: configuration.id,

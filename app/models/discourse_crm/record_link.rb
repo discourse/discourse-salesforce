@@ -1,6 +1,6 @@
 # frozen_string_literal: true
 
-module Salesforce
+module DiscourseCrm
   class RecordLink < ActiveRecord::Base
     self.table_name = "crm_record_links"
 

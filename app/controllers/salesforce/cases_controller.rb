@@ -5,6 +5,8 @@ module Salesforce
     requires_login
     requires_plugin PLUGIN_NAME
 
+    before_action { raise Discourse::NotFound unless SiteSetting.salesforce_enabled }
+
     before_action(only: :sync) { guardian.ensure_can_sync_salesforce_cases! }
     before_action(only: :destroy) { guardian.ensure_can_unlink_salesforce_cases! }
 

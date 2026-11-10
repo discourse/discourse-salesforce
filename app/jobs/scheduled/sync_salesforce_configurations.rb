@@ -5,7 +5,7 @@ module Jobs
     every 1.hour
 
     def execute(args)
-      Salesforce::ConfigurationScheduler.enqueue_due
+      DiscourseCrm::ConfigurationScheduler.enqueue_due
     end
   end
 end

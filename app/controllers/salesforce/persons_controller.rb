@@ -4,6 +4,8 @@ module Salesforce
   class PersonsController < ::Admin::AdminController
     requires_plugin PLUGIN_NAME
 
+    before_action { raise Discourse::NotFound unless SiteSetting.salesforce_enabled }
+
     before_action :find_user
     before_action :find_post
     attr_accessor :user, :sync_post

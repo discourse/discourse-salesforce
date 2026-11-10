@@ -21,8 +21,8 @@ RSpec.describe Salesforce::Lead do
       expect(user.reload.salesforce_lead_id).to eq("live-lead")
       expect(user.salesforce_contact_id).to be_nil
       scope = { provider: "salesforce", account: instance_url, user_id: user.id }
-      expect(Salesforce::RecordLink.find_by(**scope, object: "Lead")).to be_nil
-      expect(Salesforce::RecordLink.find_by(**scope, object: "Contact")).to be_nil
+      expect(DiscourseCrm::RecordLink.find_by(**scope, object: "Lead")).to be_nil
+      expect(DiscourseCrm::RecordLink.find_by(**scope, object: "Contact")).to be_nil
     end
   end
 
@@ -62,10 +62,10 @@ RSpec.describe Salesforce::Lead do
       expect(user.reload.salesforce_contact_id).to eq("contact1")
       expect(user.salesforce_lead_id).to be_nil
       scope = { provider: "salesforce", account: instance_url, user_id: user.id }
-      expect(Salesforce::RecordLink.find_by(**scope, object: "Lead").converted_to_id).to eq(
+      expect(DiscourseCrm::RecordLink.find_by(**scope, object: "Lead").converted_to_id).to eq(
         "contact1",
       )
-      expect(Salesforce::RecordLink.find_by(**scope, object: "Contact").external_id).to eq(
+      expect(DiscourseCrm::RecordLink.find_by(**scope, object: "Contact").external_id).to eq(
         "contact1",
       )
       expect(a_request(:post, "#{api_path}/Lead")).not_to have_been_made
@@ -81,7 +81,7 @@ RSpec.describe Salesforce::Lead do
       scope = { provider: "salesforce", account: instance_url, user_id: user.id }
       lead_scope = scope.merge(object: "Lead")
       contact_scope = scope.merge(object: "Contact")
-      Salesforce::RecordLink.link!(**lead_scope, external_id: "converted-lead")
+      DiscourseCrm::RecordLink.link!(**lead_scope, external_id: "converted-lead")
       allow(user).to receive(:save_custom_fields).and_wrap_original do |original, *args, **kwargs|
         original.call(*args, **kwargs)
         raise ActiveRecord::StatementInvalid, "Simulated persistence failure"
@@ -89,15 +89,15 @@ RSpec.describe Salesforce::Lead do
 
       expect { described_class.create!(user) }.to raise_error(ActiveRecord::StatementInvalid)
 
-      expect(Salesforce::RecordLink.find_by(**lead_scope)).not_to be_converted
-      expect(Salesforce::RecordLink.find_by(**contact_scope)).to be_nil
+      expect(DiscourseCrm::RecordLink.find_by(**lead_scope)).not_to be_converted
+      expect(DiscourseCrm::RecordLink.find_by(**contact_scope)).to be_nil
       expect(user.reload.salesforce_contact_id).to be_nil
       allow(user).to receive(:save_custom_fields).and_call_original
 
       expect(described_class.create!(user)).to be_nil
 
-      expect(Salesforce::RecordLink.find_by(**lead_scope).converted_to_id).to eq("contact1")
-      expect(Salesforce::RecordLink.find_by(**contact_scope).external_id).to eq("contact1")
+      expect(DiscourseCrm::RecordLink.find_by(**lead_scope).converted_to_id).to eq("contact1")
+      expect(DiscourseCrm::RecordLink.find_by(**contact_scope).external_id).to eq("contact1")
       expect(user.reload.salesforce_contact_id).to eq("contact1")
       expect(a_request(:post, "#{api_path}/Lead")).not_to have_been_made
     end

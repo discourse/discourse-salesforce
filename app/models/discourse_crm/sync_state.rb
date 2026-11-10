@@ -1,10 +1,10 @@
 # frozen_string_literal: true
 
-module Salesforce
+module DiscourseCrm
   class SyncState < ActiveRecord::Base
     self.table_name = "crm_sync_states"
 
-    belongs_to :configuration, class_name: "Salesforce::SyncConfiguration"
+    belongs_to :configuration, class_name: "DiscourseCrm::SyncConfiguration"
 
     def self.store(configuration_id, user_id, **attributes)
       now = Time.zone.now

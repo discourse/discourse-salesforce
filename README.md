@@ -61,14 +61,15 @@ When `salesforce_leads_enabled` is disabled, the task skips Lead reporting and c
 existing Lead links. Pruning stale Lead links preserves Leads group membership. Contact group
 memberships are still removed when their Contact links are pruned. Guided sync links are also
 checked, including links without a legacy user custom field. Removing a dead guided association
-clears its configuration fingerprints for the connected account and object; links in other
-accounts and converted-Lead markers are preserved. `DRY_RUN=1` reports the same legacy and guided
+clears its configuration fingerprints for the connected account and object, including when
+`salesforce_enabled` is disabled; links in other accounts and converted-Lead markers are preserved.
+`DRY_RUN=1` reports the same legacy and guided
 user links that cleanup checks, without deleting links or fingerprints. If a user has multiple
 legacy ID rows, each ID is checked; live rows and their Contact group membership are preserved.
 
-### Experimental configurations: send users to Salesforce
+### Experimental configurations: send users to CRM
 
-Guided sync only creates or updates Salesforce records for users whose current email address
+Guided sync only creates or updates CRM records for users whose current email address
 passes Discourse's email-verification check. Active accounts with an unconfirmed address are skipped;
 confirming the address queues a sync for their selected groups, including manual configurations.
 
@@ -76,7 +77,7 @@ Enable `salesforce_enabled` and opt into `enable_guided_sync_configuration` unde
 Admin → Upcoming changes. Configure the existing JWT API credentials, then open
 `/admin/plugins/discourse-salesforce/configurations`.
 
-Choose **Send users to Salesforce** to create or update Salesforce leads and contacts using
+Choose **Send users to CRM** to create or update Salesforce leads/contacts or HubSpot contacts using
 Discourse user data. New configurations default to **Send users**. These configurations send data
 from Discourse to Salesforce; they do not import Salesforce fields into Discourse user profiles.
 Saving validates the fields against Salesforce and activates updates for members of any selected
@@ -94,9 +95,9 @@ the action is **Save configuration**.
   configuration jobs. An already-running HTTP request may finish. Salesforce records
   and stable record links are never deleted.
 
-`Jobs::SyncSalesforceUser` dispatches configuration jobs to
-`Salesforce::ConfiguredUserSync`, reusing the API client, Person email lookup, and
-Lead/Contact definitions. It does not change legacy global sync settings or case jobs.
+`Jobs::SyncSalesforceUser` dispatches configuration jobs through `DiscourseCrm::Provider`
+to the selected provider’s `ConfiguredUserSync`. Salesforce reuses its API client,
+Person email lookup, and Lead/Contact definitions. It does not change legacy global sync settings or case jobs.
 There is no Workflows dependency. The group picker uses the optional core `DMultiSelect`
 footer slot for group creation. Sync posts is Coming soon.
 
@@ -219,13 +220,23 @@ configured custom user field.
 
 ### Provider boundaries
 
+Shared infrastructure lives under `DiscourseCrm`: provider selection (`Provider`),
+configurations and scheduling, user eligibility, field mappings, source data, record links,
+sync state, configuration endpoints/serialization, and connection diagnostics. Both CRM
+providers depend on this namespace. `Salesforce` owns Salesforce authentication, objects,
+matching, bulk writes, and Lead conversion; `Hubspot` owns its API, errors, and contact sync.
+
+Existing `/salesforce/admin/guided-sync` URLs, plugin admin URLs, `crm_*` tables, and
+`sync_salesforce_*` job names are retained for compatibility with clients and queued jobs.
+
 Configurations persist an explicit `provider` identity.
-Only Salesforce configurations are handled by the current jobs. Authentication, object
-requirements, field conversion, matching and API batching remain Salesforce-specific.
+Configuration jobs dispatch to the selected provider. Authentication, object requirements,
+matching and API batching remain provider-specific. Salesforce uses its bulk API; HubSpot
+backfills process contacts sequentially with resumable batches.
 
 `UserSyncSources` loads Discourse values independently of destination field names and
 formats. It batches profile, statistics, custom field, group membership and recent post
-queries. Salesforce serialization lives in `FieldMapping`,
+queries. CRM payload conversion lives in `FieldMapping`,
 which belongs to sync execution rather than the source loader.
 
 `RecordLink` rows scope a remote ID by provider, account, object and Discourse user, with a
@@ -239,14 +250,18 @@ Salesforce features, not the provider-independent link store.
 Reconciliation updates configured Contact links after merges and replaces converted Lead
 links with a conversion marker. Configured Lead syncs skip converted users instead of retrying
 an impossible update or creating a replacement Lead. Contact links retain the converted Lead
-ID as provenance. These boundaries prepare for another provider without defining a shared API
-adapter prematurely.
+ID as provenance. HubSpot reuses the Discourse source loader, normalized field mappings, group scheduler,
+and provider-scoped record links while keeping contact API behavior separate.
 
 `ConfigurationScheduler` owns event-triggered enqueueing, activation backfills and periodic
 refresh scheduling. `SyncConfiguration` retains validation and persistence. Scheduling
 continues to use the existing timestamps and locks, so extracting it does not reset due dates.
 
-`FieldMapping` evaluates payloads, including ownership rules, writable fields, and type conversion.
+`FieldMapping` validates mappings and evaluates payloads for both providers, including
+source/destination type compatibility, static values, ownership rules, writable fields,
+and type conversion. Each provider supplies its fixed email field and required mappings.
+`UserSyncSources` builds source fingerprints from the loaded values and provider-supplied
+connection/mapping context, preserving the existing stored fingerprints.
 
 Reconciliation reloads user custom fields under the same per-user lock as sync jobs, then
 updates the legacy ID and configured link within one database transaction. A failed link
@@ -255,3 +270,39 @@ write rolls back the legacy update, and stale responses cannot overwrite a newer
 Configuration endpoints return translated authentication, permission, request-limit,
 temporary-connection or unexpected-response errors. Diagnostic logs include the operation,
 category and HTTP status, excluding upstream bodies, credentials and request headers.
+
+### HubSpot guided sync
+
+The Configurations tab supports **Send users to CRM** with Salesforce Leads, Salesforce
+Contacts, and HubSpot Contacts. A target appears only when its provider is enabled and has
+credentials. Salesforce uses its existing JWT settings; HubSpot requires `hubspot_enabled`,
+`hubspot_portal_id` (Hub ID), and `hubspot_access_token`. These HubSpot settings are hidden
+and can be set in the Rails console. Enable the experimental
+`enable_guided_sync_configuration` setting to use the guide. HubSpot can run with
+`salesforce_enabled` disabled.
+
+Use a HubSpot service key or existing private app token with `crm.objects.contacts.read`
+and `crm.objects.contacts.write`. Contact properties are loaded from the HubSpot API and
+read-only/calculated properties are excluded. New HubSpot guides map first and last names;
+email is the fixed matching field. Choosing a different provider resets mappings to that
+provider’s defaults. The provider and object cannot change after saving.
+
+HubSpot uses the same group eligibility, email-verification checks, ownership policies,
+backfill and refresh schedules as Salesforce. HubSpot backfill batches process contacts sequentially. Contacts are matched by email, then linked by provider, Hub ID, object and
+Discourse user. Later email changes retain the existing link and do not overwrite the CRM
+email. Missing linked contacts fail rather than creating a replacement. Changing the Hub ID
+stops old configurations until they are explicitly saved for the new connection.
+
+HubSpot guides do not populate legacy Salesforce user fields or synchronize posts/cases.
+
+HubSpot clients verify the access token’s Hub ID before making CRM requests. Verified
+identity is cached by token; changing the token forces verification again, and a mismatch
+with `hubspot_portal_id` stops synchronization. Each client retains its original token/account.
+
+HubSpot requests share a Redis limiter per app/account across workers and multisite databases,
+allowing 90 CRM requests per 10 seconds. Upstream 429 responses share a cooldown and honor
+numeric Retry-After values (10 seconds by default). Throttled jobs defer without consuming
+normal failure retries. HubSpot backfills process users in sequence and resume the unprocessed
+portion after throttling. Batch errors clear after processing completes; user errors stay
+visible and retry independently. Expected email-lookup 404s are quiet; missing linked IDs
+remain errors. Numeric and boolean comparisons account for HubSpot’s string responses.

@@ -1,8 +1,8 @@
 # frozen_string_literal: true
 
-require_relative "../spec_helper"
+require_relative "../../spec_helper"
 
-RSpec.describe Salesforce::RecordLink do
+RSpec.describe DiscourseCrm::RecordLink do
   let(:scope) do
     {
       provider: "salesforce",

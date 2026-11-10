@@ -1,3 +1,5 @@
+import { i18n } from "discourse-i18n";
+
 export const USER_SYNC_SOURCES = [
   { id: "first", type: "text" },
   { id: "last", type: "text" },
@@ -28,19 +30,47 @@ export function createCompanyMapping(id) {
   };
 }
 
-export function createSyncConfiguration() {
+export function targetLabel(provider, object) {
+  return i18n(`salesforce.guided_sync.targets.${provider}.${object}`);
+}
+
+export function createSyncConfiguration(
+  target = { provider: "salesforce", object: "Lead" }
+) {
   return {
     group_ids: [],
     groups: [],
-    object: "Lead",
+    provider: target.provider,
+    object: target.object,
     schedule: "daily",
     backfill: true,
-    mappings: [
-      { id: 1, source: "first", destination: "FirstName", policy: "keep" },
-      { id: 2, source: "last", destination: "LastName", policy: "keep" },
-      { id: 3, source: "profile", destination: "Description", policy: "keep" },
-      createCompanyMapping(6),
-    ],
+    mappings:
+      target.provider === "hubspot"
+        ? [
+            {
+              id: 1,
+              source: "first",
+              destination: "firstname",
+              policy: "keep",
+            },
+            { id: 2, source: "last", destination: "lastname", policy: "keep" },
+          ]
+        : [
+            {
+              id: 1,
+              source: "first",
+              destination: "FirstName",
+              policy: "keep",
+            },
+            { id: 2, source: "last", destination: "LastName", policy: "keep" },
+            {
+              id: 3,
+              source: "profile",
+              destination: "Description",
+              policy: "keep",
+            },
+            ...(target.object === "Lead" ? [createCompanyMapping(6)] : []),
+          ],
   };
 }
 

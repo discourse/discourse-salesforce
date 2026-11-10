@@ -1,6 +1,6 @@
 import Component from "@glimmer/component";
 import { tracked } from "@glimmer/tracking";
-import { concat, fn } from "@ember/helper";
+import { fn } from "@ember/helper";
 import { on } from "@ember/modifier";
 import { action } from "@ember/object";
 import { cancel, next } from "@ember/runloop";
@@ -22,6 +22,7 @@ import SalesforceSourceMenu from "discourse/plugins/discourse-salesforce/discour
 import {
   createCompanyMapping,
   createSyncConfiguration,
+  targetLabel,
   updateMapping,
   USER_SYNC_SOURCES,
 } from "discourse/plugins/discourse-salesforce/discourse/lib/sync-configuration";
@@ -34,17 +35,20 @@ export default class SalesforceSyncConfiguration extends Component {
   @service modal;
 
   @tracked configuration = structuredClone(
-    this.args.record || createSyncConfiguration()
+    this.args.record || createSyncConfiguration(this.args.targets?.[0])
   );
   @tracked createdGroups = [];
   @tracked nameFormData;
   @tracked saving = false;
-  @tracked salesforceFields = [];
+  @tracked crmFields = [];
   @tracked customSources = [];
-  @tracked fieldsObject;
+  @tracked fieldsTarget;
   @tracked loadingFields = false;
   @tracked fieldsError;
-  formData = this.configuration;
+  formData = {
+    ...this.configuration,
+    target: `${this.configuration.provider || "salesforce"}:${this.configuration.object}`,
+  };
 
   #fieldsRequest = 0;
 
@@ -109,8 +113,35 @@ export default class SalesforceSyncConfiguration extends Component {
       : i18n(`${PREFIX}.backfill_without_count`);
   }
 
+  get emailField() {
+    return this.configuration.provider === "hubspot" ? "email" : "Email";
+  }
+
+  get providerName() {
+    return this.configuration.provider === "hubspot" ? "HubSpot" : "Salesforce";
+  }
+
+  get target() {
+    return `${this.configuration.provider || "salesforce"}:${this.configuration.object}`;
+  }
+
+  get targets() {
+    return (this.args.targets || []).map((target) => ({
+      ...target,
+      id: `${target.provider}:${target.object}`,
+      label: targetLabel(target.provider, target.object),
+    }));
+  }
+
+  get selectedTargetLabel() {
+    return targetLabel(
+      this.configuration.provider || "salesforce",
+      this.configuration.object
+    );
+  }
+
   get fields() {
-    return this.salesforceFields.filter((field) => field.id !== "Email");
+    return this.crmFields.filter((field) => field.id !== this.emailField);
   }
 
   get sources() {
@@ -213,16 +244,20 @@ export default class SalesforceSyncConfiguration extends Component {
     if (
       this.fieldsError ||
       this.loadingFields ||
-      this.fieldsObject !== data.object
+      this.fieldsTarget !== this.target
     ) {
-      addError("object", {
+      addError("target", {
         title: i18n(`${PREFIX}.target`),
         message: this.fieldsError || i18n(`${PREFIX}.errors.loading_fields`),
       });
       return;
     }
     const required =
-      data.object === "Lead" ? ["LastName", "Company"] : ["LastName"];
+      this.configuration.provider === "hubspot"
+        ? []
+        : data.object === "Lead"
+          ? ["LastName", "Company"]
+          : ["LastName"];
     for (const field of required) {
       if (!data.mappings.some((mapping) => mapping.destination === field)) {
         addError("mappings", {
@@ -248,9 +283,7 @@ export default class SalesforceSyncConfiguration extends Component {
     if (!value || this.loadingFields || this.fieldsError) {
       return;
     }
-    const field = this.salesforceFields.find(
-      (candidate) => candidate.id === value
-    );
+    const field = this.crmFields.find((candidate) => candidate.id === value);
     let message;
     if (!field) {
       message = i18n(`${PREFIX}.errors.unavailable`, { fields: value });
@@ -321,27 +354,30 @@ export default class SalesforceSyncConfiguration extends Component {
   @action
   async refreshFields(force = false) {
     const object = this.configuration.object;
+    const provider = this.configuration.provider || "salesforce";
+    const target = this.target;
     const request = ++this.#fieldsRequest;
     this.loadingFields = true;
     this.fieldsError = null;
-    this.salesforceFields = [];
-    this.fieldsObject = null;
+    this.crmFields = [];
+    this.fieldsTarget = null;
     try {
       const result = await ajax("/salesforce/admin/guided-sync/fields.json", {
-        data: { object, refresh: force },
+        data: { provider, object, refresh: force },
       });
       if (
         this.isDestroying ||
         this.isDestroyed ||
         request !== this.#fieldsRequest ||
-        object !== this.configuration.object
+        target !== this.target
       ) {
         return;
       }
       this.customSources = result.custom_sources || [];
-      this.salesforceFields = result.fields.map((field) => ({
+      this.crmFields = result.fields.map((field) => ({
         id: field.name,
         label: field.name,
+        custom: field.custom,
         type: ["int", "double", "currency", "percent"].includes(field.type)
           ? "number"
           : ["date", "datetime"].includes(field.type)
@@ -360,9 +396,9 @@ export default class SalesforceSyncConfiguration extends Component {
               ? "text"
               : field.type,
       }));
-      this.fieldsObject = object;
-      this.#form.removeError("object");
-      if (this.salesforceFields.length === 0) {
+      this.fieldsTarget = target;
+      this.#form.removeError("target");
+      if (this.crmFields.length === 0) {
         this.fieldsError = i18n(`${PREFIX}.fields_not_writable`);
       }
     } catch (error) {
@@ -438,27 +474,47 @@ export default class SalesforceSyncConfiguration extends Component {
   setConfiguration(value, { name, set }) {
     set(name, value);
     this.configuration = { ...this.configuration, [name]: value };
-    if (
-      name === "object" &&
-      value === "Lead" &&
-      !this.args.record?.id &&
-      !this.configuration.mappings.some(
-        (mapping) => mapping.destination === "Company"
-      )
-    ) {
-      this.#setMappings([
-        ...this.configuration.mappings,
-        createCompanyMapping(this.#nextMappingId++),
-      ]);
-    }
-    if (name === "object" && value === "Contact" && !this.args.record?.id) {
-      this.#setMappings(
-        this.configuration.mappings.filter(
-          (mapping) => mapping.destination !== "Company"
+    if (name === "target") {
+      const target = this.targets.find((item) => item.id === value);
+      if (!target) {
+        return;
+      }
+      const providerChanged =
+        target.provider !== (this.configuration.provider || "salesforce");
+      this.#form.set("provider", target.provider);
+      this.#form.set("object", target.object);
+      this.configuration = {
+        ...this.configuration,
+        provider: target.provider,
+        object: target.object,
+      };
+      if (providerChanged) {
+        this.#setMappings(createSyncConfiguration(target).mappings);
+        this.#nextMappingId =
+          Math.max(
+            0,
+            ...this.configuration.mappings.map((mapping) => Number(mapping.id))
+          ) + 1;
+      } else if (
+        target.object === "Contact" &&
+        target.provider === "salesforce"
+      ) {
+        this.#setMappings(
+          this.configuration.mappings.filter(
+            (mapping) => mapping.destination !== "Company"
+          )
+        );
+      } else if (
+        target.object === "Lead" &&
+        !this.configuration.mappings.some(
+          (mapping) => mapping.destination === "Company"
         )
-      );
-    }
-    if (name === "object") {
+      ) {
+        this.#setMappings([
+          ...this.configuration.mappings,
+          createCompanyMapping(this.#nextMappingId++),
+        ]);
+      }
       this.refreshFields();
     }
   }
@@ -591,20 +647,17 @@ export default class SalesforceSyncConfiguration extends Component {
             </form.Field>
             <form.Field
               @disabled={{@record.id}}
-              @name="object"
+              @name="target"
               @onSet={{this.setConfiguration}}
               @title={{i18n "salesforce.guided_sync.target"}}
               @type="menu"
               @validation="required"
               as |field|
             >
-              <field.Control @selection={{this.configuration.object}} as |menu|>
-                <menu.Item @value="Lead">{{i18n
-                    "salesforce.guided_sync.leads"
-                  }}</menu.Item>
-                <menu.Item @value="Contact">{{i18n
-                    "salesforce.guided_sync.contacts"
-                  }}</menu.Item>
+              <field.Control @selection={{this.selectedTargetLabel}} as |menu|>
+                {{#each this.targets key="id" as |target|}}
+                  <menu.Item @value={{target.id}}>{{target.label}}</menu.Item>
+                {{/each}}
               </field.Control>
             </form.Field>
 
@@ -714,7 +767,7 @@ export default class SalesforceSyncConfiguration extends Component {
                 <span
                   class="salesforce-sync-configuration__mapping-arrow"
                 >{{dIcon "arrow-right"}}</span>
-                <code>Email</code>
+                <code>{{this.emailField}}</code>
                 <span>{{i18n "salesforce.guided_sync.fixed_mapping"}}</span>
                 <p class="salesforce-sync-configuration__email-help">{{i18n
                     "salesforce.guided_sync.matching_help"
@@ -809,14 +862,16 @@ export default class SalesforceSyncConfiguration extends Component {
                         aria-label={{i18n
                           "salesforce.guided_sync.existing_value"
                         }}
-                        @selection={{i18n
-                          (concat "salesforce.guided_sync." mapping.policy)
+                        @selection={{if
+                          (eq mapping.policy "keep")
+                          this.providerName
+                          (i18n "salesforce.guided_sync.overwrite")
                         }}
                         as |menu|
                       >
-                        <menu.Item @value="keep">{{i18n
-                            "salesforce.guided_sync.keep"
-                          }}</menu.Item>
+                        <menu.Item
+                          @value="keep"
+                        >{{this.providerName}}</menu.Item>
                         <menu.Item @value="overwrite">{{i18n
                             "salesforce.guided_sync.overwrite"
                           }}</menu.Item>

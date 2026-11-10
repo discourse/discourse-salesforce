@@ -10,7 +10,10 @@ export default class SalesforceFieldMenu extends Component {
   @tracked filter = "";
 
   get customSelection() {
-    return this.selection.endsWith("__c");
+    return (
+      this.args.fields.find((field) => field.id === this.args.value)?.custom ||
+      this.selection.endsWith("__c")
+    );
   }
 
   get selection() {
@@ -40,7 +43,7 @@ export default class SalesforceFieldMenu extends Component {
           ...field,
           selected: field.id === this.args.value,
           label: field.label || field.id,
-          custom: (field.label || field.id).endsWith("__c"),
+          custom: field.custom || (field.label || field.id).endsWith("__c"),
           description: assigned
             ? i18n("salesforce.guided_sync.mapped_to", {
                 source: source?.label || assigned.source,

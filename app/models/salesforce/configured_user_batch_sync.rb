@@ -2,22 +2,22 @@
 
 module Salesforce
   class ConfiguredUserBatchSync
-    BATCH_SIZE = 100
+    BATCH_SIZE = DiscourseCrm::ConfigurationScheduler::BATCH_SIZE
 
     def self.sync(configuration_id, user_ids, reason:)
-      return unless SyncConfiguration.enabled?
+      return unless DiscourseCrm::SyncConfiguration.enabled?
       ids = Array(user_ids).map(&:to_i).uniq.sort
       raise Discourse::InvalidParameters.new(:user_ids) if ids.size > BATCH_SIZE
       with_user_locks(ids) do
-        configuration = SyncConfiguration.active.find_by(id: configuration_id)
-        next unless configuration&.reason_enabled?(reason)
+        configuration = DiscourseCrm::SyncConfiguration.active.find_by(id: configuration_id)
+        next unless configuration&.provider == "salesforce" && configuration.reason_enabled?(reason)
         users =
-          Person
+          DiscourseCrm::UserEligibility
             .eligible_group_members(configuration.configuration_groups.select(:group_id))
             .where(id: ids)
             .order(:id)
             .includes(:primary_email, :email_tokens, :single_sign_on_record)
-            .select { |user| Person.email_verified?(user) }
+            .select { |user| DiscourseCrm::UserEligibility.email_verified?(user) }
         next if users.empty?
         new(configuration, users, reason).sync
       end
@@ -48,7 +48,7 @@ module Salesforce
       users =
         @users.reject do |user|
           converted = @object == "Lead" && links[user.id]&.converted?
-          SyncConfiguration.record_result(@configuration.id, user.id) if converted
+          DiscourseCrm::SyncConfiguration.record_result(@configuration.id, user.id) if converted
           converted
         end
       return if users.empty?
@@ -71,7 +71,7 @@ module Salesforce
       creates = []
       updates = []
       used_ids = Set.new
-      source_data = UserSyncSources.new(@configuration.mappings, users)
+      source_data = DiscourseCrm::UserSyncSources.new(@configuration.mappings, users)
       users.each do |user|
         link = links[user.id]
         if link && !by_id[link.external_id]
@@ -108,7 +108,7 @@ module Salesforce
         begin
           values = sync.mapped_values(fields, record)
         rescue Discourse::InvalidParameters => error
-          SyncConfiguration.record_result(@configuration.id, user.id, error: error)
+          DiscourseCrm::SyncConfiguration.record_result(@configuration.id, user.id, error: error)
           next
         end
         if record && values.empty?
@@ -196,7 +196,9 @@ module Salesforce
     end
 
     def retry_user(user, error = nil)
-      SyncConfiguration.record_result(@configuration.id, user.id, error: error) if error
+      if error
+        DiscourseCrm::SyncConfiguration.record_result(@configuration.id, user.id, error: error)
+      end
       Jobs.enqueue(
         :sync_salesforce_user,
         configuration_id: @configuration.id,

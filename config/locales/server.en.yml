@@ -1,7 +1,7 @@
 en:
   site_settings:
     salesforce_leads_enabled: "Enable Salesforce Lead lookups, creation, conversion sync, feed items, and association cleanup. Disable for Salesforce organizations where the integration user cannot access Leads. Contact operations continue and existing Lead links are retained."
-    enable_guided_sync_configuration: "Send Discourse user data to Salesforce using configurable field mappings, group membership, and a refresh schedule."
+    enable_guided_sync_configuration: "Send Discourse user data to Salesforce or HubSpot using configurable field mappings, group membership, and a refresh schedule."
     salesforce_enabled: 'Enable the discourse-salesforce plugin'
     salesforce_login_enabled: 'Enable Salesforce Social Login'
     salesforce_client_id: "Salesforce connected app's client id"
@@ -27,7 +27,7 @@ en:
     salesforce_auth_verbose_logging: "Show verbose Salesforce authentication logs in /logs for troubleshooting"
     hubspot_enabled: "Enable the HubSpot integration. Requires {{setting:hubspot_portal_id}} and {{setting:hubspot_access_token}}."
     hubspot_portal_id: "HubSpot portal (hub) ID, found in the HubSpot account settings."
-    hubspot_access_token: "HubSpot private app access token used to authenticate API requests."
+    hubspot_access_token: "HubSpot service key or private app access token used to authenticate API requests. Requires contact read and write scopes for guided sync."
   salesforce:
     error:
       connection:
@@ -42,6 +42,12 @@ en:
       invalid_client_credentials: "There was an issue with the Salesforce credentials. Please confirm the validity of the Salesforce client id and client secret settings"
   hubspot:
     error:
+      connection:
+        authentication: "HubSpot authentication failed. Check the access token and confirm that the portal ID matches its account, then retry."
+        permissions: "HubSpot denied access. Check the token’s contact read and write scopes, then retry."
+        rate_limit: "HubSpot’s API request limit was reached. Try again later."
+        temporary: "HubSpot could not be reached or is temporarily unavailable. Try again shortly."
+        invalid_response: "HubSpot returned an unexpected response. Check the server logs for details, then retry."
       invalid_response: "Invalid response from HubSpot API"
   dashboard:
     problem:

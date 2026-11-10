@@ -23,7 +23,12 @@ module ::Salesforce
 
       object = person_class::OBJECT_NAME
       account = SiteSetting.salesforce_instance_url
-      configuration_ids = SyncConfiguration.for_current_account.where(object: object)
+      configuration_ids =
+        DiscourseCrm::SyncConfiguration.where(
+          provider: "salesforce",
+          account: account,
+          object: object,
+        )
 
       each_dead_user_link(api, person_class) do |user, legacy_id, guided_id|
         user_id = user.id
@@ -44,7 +49,7 @@ module ::Salesforce
             removed_link = false
             if guided_id
               removed_link =
-                RecordLink.unlink!(
+                DiscourseCrm::RecordLink.unlink!(
                   provider: "salesforce",
                   account: account,
                   object: object,
@@ -55,7 +60,7 @@ module ::Salesforce
             next unless removed_fields > 0 || removed_link
 
             count += 1
-            SyncState.where(
+            DiscourseCrm::SyncState.where(
               configuration_id: configuration_ids.select(:id),
               user_id: user_id,
             ).update_all(fingerprint: nil)
@@ -74,7 +79,7 @@ module ::Salesforce
       account = SiteSetting.salesforce_instance_url
       legacy_user_ids = UserCustomField.where(name: person_class::ID_FIELD).select(:user_id)
       configured_ids =
-        RecordLink
+        DiscourseCrm::RecordLink
           .within(provider: "salesforce", account: account, object: person_class::OBJECT_NAME)
           .live
           .select(:user_id)
@@ -90,7 +95,7 @@ module ::Salesforce
             .group_by(&:first)
             .transform_values { |rows| rows.map(&:last).uniq }
         links =
-          RecordLink.read_many(
+          DiscourseCrm::RecordLink.read_many(
             provider: "salesforce",
             account: account,
             object: person_class::OBJECT_NAME,

@@ -1,10 +1,10 @@
 # frozen_string_literal: true
 
-module Salesforce
+module DiscourseCrm
   class SyncConfigurationGroup < ActiveRecord::Base
     self.table_name = "crm_sync_configuration_groups"
 
-    belongs_to :configuration, class_name: "Salesforce::SyncConfiguration"
+    belongs_to :configuration, class_name: "DiscourseCrm::SyncConfiguration"
     belongs_to :group
   end
 end

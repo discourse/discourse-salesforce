@@ -1,8 +1,8 @@
 # frozen_string_literal: true
 
-require_relative "../spec_helper"
+require_relative "../../spec_helper"
 
-RSpec.describe Salesforce::Person do
+RSpec.describe DiscourseCrm::UserEligibility do
   describe ".email_verified?" do
     it "preserves core verification rules without queries when associations are preloaded" do
       confirmed = Fabricate(:user)

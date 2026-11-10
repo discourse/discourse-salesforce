@@ -1,9 +1,10 @@
 # frozen_string_literal: true
 
-module Salesforce
+module DiscourseCrm
   class ConnectionError
     def self.category(error)
-      if error.is_a?(InvalidCredentials) || error.is_a?(OpenSSL::PKey::RSAError)
+      if error.is_a?(Salesforce::InvalidCredentials) || error.is_a?(Hubspot::InvalidCredentials) ||
+           error.is_a?(OpenSSL::PKey::RSAError)
         return "authentication"
       end
       return "temporary" if error.is_a?(Faraday::Error)
@@ -21,10 +22,11 @@ module Salesforce
       end
     end
 
-    def self.log(error, operation:)
+    def self.log(error, operation:, provider: "salesforce")
       status = error.respond_to?(:status) ? error.status : nil
+      label = provider == "hubspot" ? "HubSpot" : "Salesforce"
       Rails.logger.warn(
-        "Salesforce request failed: operation=#{operation} category=#{category(error)} status=#{status || "unknown"}",
+        "#{label} request failed: operation=#{operation} category=#{category(error)} status=#{status || "unknown"}",
       )
     end
   end

@@ -6,6 +6,7 @@ export default <template>
     <SalesforceSyncConfigurations
       @credentialsConfigured={{model.credentials_configured}}
       @groups={{model.groups}}
+      @targets={{model.targets}}
       @onClose={{@controller.clearConfiguration}}
       @onSelect={{@controller.selectConfiguration}}
       @records={{model.configurations}}

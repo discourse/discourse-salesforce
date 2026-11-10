@@ -26,6 +26,15 @@ operations continue. Lead enablement is independent of Leads group membership an
 Leads are linked but never updated. If multiple Contacts have the same email, the plugin skips
 linking and updating the ambiguous records when `fill_blank` or `overwrite` is selected.
 
+### Unlinking contacts
+
+Staff allowed by `salesforce_case_unlink_allowed_groups` can choose **Unlink Contact**
+in the post admin menu when the post author has a linked Contact. **Create Contact** appears
+instead when the author has no linked Contact.
+Confirmation removes the local association and its
+matching guided-sync link for the connected Salesforce account. The Salesforce record is retained.
+Automatic synchronization may link the user again; unlinking does not opt the user out of sync.
+
 ### Creating and syncing cases
 
 Only admins can create and manually sync Salesforce cases by default. Enable
@@ -37,8 +46,8 @@ Contact/Lead creation.
 
 ### Unlinking cases
 
-`salesforce_case_unlink_allowed_groups` controls who can unlink cases. It defaults to empty,
-which disables unlinking for everyone, including admins. The fixed list offers only Admins and
+`salesforce_case_unlink_allowed_groups` controls who can unlink cases and contacts. It defaults
+to empty, which disables unlinking for everyone, including admins. The fixed list offers only Admins and
 Moderators; select either or both to grant access. They must also be able to see the topic.
 
 Open the first post’s **wrench** menu and choose **Unlink case** to remove the Discourse case and

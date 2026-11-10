@@ -8,6 +8,142 @@ RSpec.describe ::Salesforce::PersonsController do
   fab!(:user)
   fab!(:admin)
 
+  describe "#unlink_contact" do
+    fab!(:sync_post) { Fabricate(:post, user: user) }
+    let(:params) do
+      { user_id: user.id, post_id: sync_post.id, expected_contact_id: "invalid-contact-id" }
+    end
+
+    before do
+      SiteSetting.salesforce_case_unlink_allowed_groups = "admins"
+      user.upsert_custom_fields(Salesforce::Contact::ID_FIELD => params[:expected_contact_id])
+    end
+
+    it "rejects anonymous users, ordinary users and unselected moderators" do
+      delete "/salesforce/persons/contact.json", params: params
+      expect(response.status).to eq(403)
+
+      [user, Fabricate(:moderator)].each do |non_admin|
+        sign_in(non_admin)
+        delete "/salesforce/persons/contact.json", params: params
+        expect(response.status).to eq(403)
+      end
+      expect(user.reload.salesforce_contact_id).to eq(params[:expected_contact_id])
+    end
+
+    it "allows selected moderators, while unselected staff and an empty setting are denied" do
+      moderator = Fabricate(:moderator)
+      sign_in(moderator)
+      SiteSetting.salesforce_case_unlink_allowed_groups = "moderators"
+      delete "/salesforce/persons/contact.json", params: params
+      expect(response.status).to eq(204)
+
+      user.upsert_custom_fields(Salesforce::Contact::ID_FIELD => params[:expected_contact_id])
+      SiteSetting.salesforce_case_unlink_allowed_groups = "admins"
+      delete "/salesforce/persons/contact.json", params: params
+      expect(response.status).to eq(403)
+
+      admin.update!(last_seen_at: 1.hour.ago)
+      sign_in(admin)
+      SiteSetting.salesforce_case_unlink_allowed_groups = "moderators"
+      delete "/salesforce/persons/contact.json", params: params
+      expect(response.status).to eq(403)
+
+      SiteSetting.salesforce_case_unlink_allowed_groups = ""
+      delete "/salesforce/persons/contact.json", params: params
+      expect(response.status).to eq(403)
+      expect(user.reload.salesforce_contact_id).to eq(params[:expected_contact_id])
+    end
+
+    it "requires a visible post even for a permitted moderator" do
+      sign_in(Fabricate(:moderator))
+      SiteSetting.salesforce_case_unlink_allowed_groups = "moderators"
+      private_post = Fabricate(:private_message_post, user: user)
+      delete "/salesforce/persons/contact.json", params: params.merge(post_id: private_post.id)
+      expect(response.status).to eq(403)
+      expect(user.reload.salesforce_contact_id).to eq(params[:expected_contact_id])
+    end
+
+    it "unlinks malformed stored IDs and publishes the cleared field only to staff" do
+      sign_in(admin)
+      sync_post = Fabricate(:post, user: user)
+      messages =
+        MessageBus.track_publish("/topic/#{sync_post.topic_id}") do
+          delete "/salesforce/persons/contact.json", params: params.merge(post_id: sync_post.id)
+        end
+
+      expect(response.status).to eq(204)
+      expect(user.reload.salesforce_contact_id).to be_nil
+      expect(messages.map(&:data)).to eq(
+        [
+          {
+            type: "salesforce_person_synced",
+            user_id: user.id,
+            field: "salesforce_contact_id",
+            value: nil,
+            expected_value: params[:expected_contact_id],
+          },
+        ],
+      )
+      expect(messages.first.group_ids).to contain_exactly(
+        Group::AUTO_GROUPS[:admins],
+        Group::AUTO_GROUPS[:moderators],
+      )
+      expect(a_request(:any, /salesforce\.com/)).not_to have_been_made
+
+      messages =
+        MessageBus.track_publish("/topic/#{sync_post.topic_id}") do
+          delete "/salesforce/persons/contact.json", params: params.merge(post_id: sync_post.id)
+        end
+      expect(response.status).to eq(204)
+      expect(messages).to be_empty
+    end
+
+    it "requires the expected ID and validates post ownership before unlinking" do
+      sign_in(admin)
+      delete "/salesforce/persons/contact.json", params: params.except(:expected_contact_id)
+      expect(response.status).to eq(400)
+
+      delete "/salesforce/persons/contact.json", params: params.except(:post_id)
+      expect(response.status).to eq(400)
+
+      other_post = Fabricate(:post)
+      delete "/salesforce/persons/contact.json", params: params.merge(post_id: other_post.id)
+      expect(response.status).to eq(400)
+      expect(user.reload.salesforce_contact_id).to eq(params[:expected_contact_id])
+    end
+
+    it "returns a conflict when either stored association differs from the displayed ID" do
+      sign_in(admin)
+      delete "/salesforce/persons/contact.json",
+             params: params.merge(expected_contact_id: "older-id")
+
+      expect(response.status).to eq(409)
+      expect(response.parsed_body["errors"]).to eq(
+        [I18n.t("salesforce.error.contact_link_changed")],
+      )
+      expect(user.reload.salesforce_contact_id).to eq(params[:expected_contact_id])
+
+      guided_link =
+        Salesforce::RecordLink.link!(
+          provider: "salesforce",
+          account: instance_url,
+          object: "Contact",
+          user_id: user.id,
+          external_id: "newer-guided-id",
+        )
+
+      delete "/salesforce/persons/contact.json", params: params
+
+      expect(response.status).to eq(409)
+      expect(response.parsed_body["errors"]).to eq(
+        [I18n.t("salesforce.error.contact_link_changed")],
+      )
+      expect(user.reload.salesforce_contact_id).to eq(params[:expected_contact_id])
+      expect(guided_link.reload.external_id).to eq("newer-guided-id")
+    end
+  end
+
   describe "#create" do
     before do
       sign_in(admin)

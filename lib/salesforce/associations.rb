@@ -6,6 +6,44 @@ module ::Salesforce
     ID_PATTERN = /\A[A-Za-z0-9]{15}(?:[A-Za-z0-9]{3})?\z/
     ID_PREFIXES = { "Case" => "500", "Contact" => "003", "Lead" => "00Q" }.freeze
 
+    class ContactLinkChanged < StandardError
+    end
+
+    def self.unlink_contact!(user:, expected_id:)
+      DistributedMutex.synchronize(
+        "salesforce_person_create_#{user.id}",
+        validity: ConfiguredUserSync::SYNC_LOCK_VALIDITY,
+      ) do
+        UserCustomField.transaction do
+          fields = UserCustomField.where(user_id: user.id, name: Contact::ID_FIELD)
+          scope = {
+            provider: "salesforce",
+            account: SiteSetting.salesforce_instance_url,
+            object: Contact::OBJECT_NAME,
+            user_id: user.id,
+          }
+          link = RecordLink.where(**scope).live.first
+          if fields.where.not(value: expected_id).exists? ||
+               (link && link.external_id != expected_id)
+            raise ContactLinkChanged
+          end
+
+          removed_fields = fields.where(value: expected_id).delete_all
+          removed_link = RecordLink.unlink!(**scope, external_id: expected_id)
+          next false unless removed_fields > 0 || removed_link
+
+          configuration_ids =
+            SyncConfiguration.for_current_account.where(object: Contact::OBJECT_NAME)
+          SyncState.where(
+            configuration_id: configuration_ids.select(:id),
+            user_id: user.id,
+          ).update_all(fingerprint: nil)
+          Contact.group.presence&.bulk_remove([user.id])
+          true
+        end
+      end
+    end
+
     def self.prune_dead!(api: Api.new)
       counts = { users: 0, posts: 0, cases: 0, settings: 0 }
 

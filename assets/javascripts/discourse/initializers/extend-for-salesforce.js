@@ -6,7 +6,11 @@ import PostSalesforceCase from "../components/post-salesforce-case";
 
 export function updateSalesforcePersonFields(topic, message) {
   topic.postStream.posts.forEach((post) => {
-    if (post.user_id === message.user_id) {
+    if (
+      post.user_id === message.user_id &&
+      (message.expected_value === undefined ||
+        post.user_custom_fields?.[message.field] === message.expected_value)
+    ) {
       post.user_custom_fields = {
         ...(post.user_custom_fields || {}),
         [message.field]: message.value,
@@ -28,6 +32,43 @@ async function createPerson(type, post, toasts) {
       data: {
         message: i18n(`salesforce.${type}.create_success`),
       },
+    });
+  } catch (error) {
+    popupAjaxError(error);
+  }
+}
+
+async function unlinkContact(post, dialog, toasts) {
+  const expectedId = post.user_custom_fields.salesforce_contact_id;
+  const confirmed = await dialog.confirm({
+    message: i18n("salesforce.contact.unlink_confirmation", {
+      id: expectedId,
+      username: post.username,
+    }),
+    confirmButtonLabel: "salesforce.contact.unlink",
+  });
+  if (!confirmed) {
+    return;
+  }
+
+  try {
+    await ajax("/salesforce/persons/contact", {
+      type: "DELETE",
+      data: {
+        user_id: post.user_id,
+        post_id: post.id,
+        expected_contact_id: expectedId,
+      },
+    });
+    updateSalesforcePersonFields(post.topic, {
+      user_id: post.user_id,
+      field: "salesforce_contact_id",
+      value: null,
+      expected_value: expectedId,
+    });
+    await post.topic.postStream.refresh({ forceLoad: true });
+    toasts.success({
+      data: { message: i18n("salesforce.contact.unlink_success") },
     });
   } catch (error) {
     popupAjaxError(error);
@@ -82,14 +123,35 @@ function initializeWithApi(api, container) {
       });
     }
 
-    api.addPostAdminMenuButton(() => {
+    api.addPostAdminMenuButton((post) => {
+      if (post.user_custom_fields?.salesforce_contact_id) {
+        return;
+      }
+
       return {
         icon: "address-card",
         label: "salesforce.contact.create",
-        action: async (post) => {
+        action: async () => {
           await createPerson("contact", post, toasts);
         },
         className: "create-contact",
+      };
+    });
+
+    api.addPostAdminMenuButton((post) => {
+      if (
+        !post.topic?.can_unlink_salesforce_case ||
+        !post.user_custom_fields?.salesforce_contact_id
+      ) {
+        return;
+      }
+
+      return {
+        icon: "link-slash",
+        label: "salesforce.contact.unlink",
+        className: "unlink-salesforce-contact",
+        action: () =>
+          unlinkContact(post, container.lookup("service:dialog"), toasts),
       };
     });
 

@@ -2,6 +2,7 @@
 
 Salesforce::Engine.routes.draw do
   post "/persons/create" => "persons#create"
+  delete "/persons/contact" => "persons#unlink_contact"
   post "/cases/sync" => "cases#sync"
   delete "/cases/:id" => "cases#destroy"
   get "/admin/guided-sync/fields" => "sync_configuration#fields"

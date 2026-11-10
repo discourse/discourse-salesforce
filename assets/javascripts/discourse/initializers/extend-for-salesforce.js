@@ -139,8 +139,13 @@ function initializeWithApi(api, container) {
     });
 
     api.addPostAdminMenuButton((post) => {
+      const groups =
+        siteSettings.salesforce_contact_unlink_allowed_groups.split("|");
+      const canUnlinkContact =
+        (currentUser.admin && groups.includes("admins")) ||
+        (currentUser.moderator && groups.includes("moderators"));
       if (
-        !post.topic?.can_unlink_salesforce_case ||
+        !canUnlinkContact ||
         !post.user_custom_fields?.salesforce_contact_id
       ) {
         return;

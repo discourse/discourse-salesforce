@@ -41,6 +41,12 @@ after_initialize do
       ((is_admin? && groups.include?("admins")) || (is_moderator? && groups.include?("moderators")))
   end
 
+  add_to_class(:guardian, :can_unlink_salesforce_contacts?) do
+    groups = SiteSetting.salesforce_contact_unlink_allowed_groups.split("|")
+    authenticated? &&
+      ((is_admin? && groups.include?("admins")) || (is_moderator? && groups.include?("moderators")))
+  end
+
   add_to_serializer(:topic_view, :can_unlink_salesforce_case) do
     SiteSetting.salesforce_enabled && scope.can_unlink_salesforce_cases?
   end

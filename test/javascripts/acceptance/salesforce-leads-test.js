@@ -32,8 +32,11 @@ acceptance("Salesforce Leads menu when enabled", function (needs) {
 });
 
 acceptance("Salesforce contact unlinking", function (needs) {
-  needs.user({ admin: true, staff: true });
-  needs.settings({ salesforce_enabled: true });
+  needs.user({ admin: false, moderator: true, staff: true });
+  needs.settings({
+    salesforce_enabled: true,
+    salesforce_contact_unlink_allowed_groups: "moderators",
+  });
 
   let contactId;
   let request;
@@ -52,7 +55,6 @@ acceptance("Salesforce contact unlinking", function (needs) {
   needs.pretender((server, helper) => {
     server.get("/t/280.json", () => {
       const topic = cloneJSON(topicFixtures["/t/280/1.json"]);
-      topic.can_unlink_salesforce_case = true;
       topic.post_stream.posts[0].user_custom_fields = {
         salesforce_contact_id:
           unlinked && !relinkBeforeResponse ? null : contactId,

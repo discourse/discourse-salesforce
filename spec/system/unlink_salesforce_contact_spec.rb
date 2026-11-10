@@ -15,7 +15,7 @@ RSpec.describe "Unlink Salesforce contact" do
     enable_current_plugin
     SiteSetting.salesforce_enabled = true
     SiteSetting.external_system_avatars_url = "/images/avatar.png"
-    SiteSetting.salesforce_case_unlink_allowed_groups = "admins"
+    SiteSetting.salesforce_contact_unlink_allowed_groups = "admins"
     user.upsert_custom_fields(Salesforce::Contact::ID_FIELD => contact_id)
     sign_in(admin)
   end

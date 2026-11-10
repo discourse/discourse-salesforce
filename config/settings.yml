@@ -65,6 +65,13 @@ discourse_salesforce:
     enum: "Salesforce::CaseUnlinkAllowedGroupsSiteSetting"
     allow_any: false
     default: ""
+  salesforce_contact_unlink_allowed_groups:
+    type: list
+    list_type: compact
+    enum: "Salesforce::CaseUnlinkAllowedGroupsSiteSetting"
+    allow_any: false
+    default: ""
+    client: true
   salesforce_case_tag_name:
     default: 'salesforce-case'
   salesforce_case_status_tag_enabled:

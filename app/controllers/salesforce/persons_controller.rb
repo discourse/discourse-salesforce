@@ -6,7 +6,7 @@ module Salesforce
     requires_plugin PLUGIN_NAME
 
     before_action :ensure_admin, except: :unlink_contact
-    before_action(only: :unlink_contact) { guardian.ensure_can_unlink_salesforce_cases! }
+    before_action(only: :unlink_contact) { guardian.ensure_can_unlink_salesforce_contacts! }
 
     before_action :find_user
     before_action :find_post

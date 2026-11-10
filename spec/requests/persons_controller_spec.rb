@@ -15,7 +15,7 @@ RSpec.describe ::Salesforce::PersonsController do
     end
 
     before do
-      SiteSetting.salesforce_case_unlink_allowed_groups = "admins"
+      SiteSetting.salesforce_contact_unlink_allowed_groups = "admins"
       user.upsert_custom_fields(Salesforce::Contact::ID_FIELD => params[:expected_contact_id])
     end
 
@@ -34,30 +34,42 @@ RSpec.describe ::Salesforce::PersonsController do
     it "allows selected moderators, while unselected staff and an empty setting are denied" do
       moderator = Fabricate(:moderator)
       sign_in(moderator)
-      SiteSetting.salesforce_case_unlink_allowed_groups = "moderators"
+      SiteSetting.salesforce_contact_unlink_allowed_groups = "moderators"
       delete "/salesforce/persons/contact.json", params: params
       expect(response.status).to eq(204)
 
       user.upsert_custom_fields(Salesforce::Contact::ID_FIELD => params[:expected_contact_id])
-      SiteSetting.salesforce_case_unlink_allowed_groups = "admins"
+      SiteSetting.salesforce_contact_unlink_allowed_groups = "admins"
       delete "/salesforce/persons/contact.json", params: params
       expect(response.status).to eq(403)
 
       admin.update!(last_seen_at: 1.hour.ago)
       sign_in(admin)
-      SiteSetting.salesforce_case_unlink_allowed_groups = "moderators"
+      SiteSetting.salesforce_contact_unlink_allowed_groups = "moderators"
       delete "/salesforce/persons/contact.json", params: params
       expect(response.status).to eq(403)
 
-      SiteSetting.salesforce_case_unlink_allowed_groups = ""
+      SiteSetting.salesforce_contact_unlink_allowed_groups = ""
+      SiteSetting.salesforce_case_unlink_allowed_groups = "admins"
       delete "/salesforce/persons/contact.json", params: params
       expect(response.status).to eq(403)
       expect(user.reload.salesforce_contact_id).to eq(params[:expected_contact_id])
+
+      SiteSetting.salesforce_contact_unlink_allowed_groups = "admins"
+      SiteSetting.salesforce_case_unlink_allowed_groups = ""
+      delete "/salesforce/persons/contact.json", params: params
+      expect(response.status).to eq(204)
+      expect(user.reload.salesforce_contact_id).to be_nil
+
+      salesforce_case = Fabricate(:salesforce_case, topic: sync_post.topic)
+      delete "/salesforce/cases/#{salesforce_case.id}.json"
+      expect(response.status).to eq(403)
+      expect(Salesforce::Case.exists?(salesforce_case.id)).to eq(true)
     end
 
     it "requires a visible post even for a permitted moderator" do
       sign_in(Fabricate(:moderator))
-      SiteSetting.salesforce_case_unlink_allowed_groups = "moderators"
+      SiteSetting.salesforce_contact_unlink_allowed_groups = "moderators"
       private_post = Fabricate(:private_message_post, user: user)
       delete "/salesforce/persons/contact.json", params: params.merge(post_id: private_post.id)
       expect(response.status).to eq(403)

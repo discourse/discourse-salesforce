@@ -7,6 +7,17 @@
 sw:
   js:
     salesforce:
+      guided_sync:
+        cancel_setup: "Ghairi"
+        group_name: "Jina la kikundi"
+        email: "Barua pepe"
+        custom_field: "Binafsi"
+        overwrite: "Discourse"
+        source_groups:
+          activity: "Kitendo"
+        schedules:
+          daily: "Kila siku"
+          weekly: "Kila wiki"
       case_unlink_allowed_groups:
         admins: "Viongozi"
         moderators: "Wasimamizi"

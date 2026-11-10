@@ -7,6 +7,20 @@
 ca:
   js:
     salesforce:
+      guided_sync:
+        cancel_setup: "Cancel·la"
+        group_name: "Nom del grup"
+        email: "Correu electrònic"
+        custom_field: "Personalitzat"
+        overwrite: "Discourse"
+        source_groups:
+          activity: "Activitat"
+        sources:
+          bio: "Biografia"
+          website: "Lloc web"
+        schedules:
+          daily: "Diàriament"
+          weekly: "Setmanalment"
       case_unlink_allowed_groups:
         admins: "Administradors"
         moderators: "Moderadors"

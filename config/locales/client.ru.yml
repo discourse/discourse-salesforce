@@ -17,6 +17,26 @@ ru:
         title: "Вход через Salesforce"
     salesforce:
       title: Salesforce
+      guided_sync:
+        discard_changes: "Отменить изменения"
+        keep_editing: "Продолжить редактирование"
+        cancel_setup: "Нет"
+        configure: "Настроить"
+        group_name: "Название группы"
+        email: "Эл. почта"
+        custom_field: "Другое"
+        keep: "Salesforce"
+        overwrite: "Discourse"
+        retry_fields: "Повторить"
+        source_groups:
+          activity: "Последняя активность"
+        sources:
+          bio: "О себе"
+          website: "Веб-сайт"
+          trust: "Уровень доверия"
+        schedules:
+          daily: "Ежедневно"
+          weekly: "Еженедельно"
       case_unlink_allowed_groups:
         admins: "Администраторы"
         moderators: "Модераторы"

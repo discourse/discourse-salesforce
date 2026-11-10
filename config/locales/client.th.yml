@@ -7,6 +7,18 @@
 th:
   js:
     salesforce:
+      guided_sync:
+        cancel_setup: "ยกเลิก"
+        group_name: "ชื่อกลุ่ม"
+        email: "อีเมล"
+        overwrite: "ดิสคอส"
+        source_groups:
+          activity: "กิจกรรม"
+        sources:
+          website: "เว็บไซต์"
+        schedules:
+          daily: "รายวัน"
+          weekly: "รายสัปดาห์"
       case_unlink_allowed_groups:
         admins: "แอดมิน"
         moderators: "ผู้ดูแลระบบ"

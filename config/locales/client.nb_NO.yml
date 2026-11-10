@@ -7,6 +7,21 @@
 nb_NO:
   js:
     salesforce:
+      guided_sync:
+        keep_editing: "Fortsett å redigere"
+        cancel_setup: "Avbryt"
+        group_name: "Gruppenavn"
+        email: "E-post"
+        custom_field: "Egendefinert"
+        overwrite: "Discourse"
+        source_groups:
+          activity: "Aktivitet"
+        sources:
+          bio: "Biografi"
+          website: "Nettside"
+        schedules:
+          daily: "Daglig"
+          weekly: "Ukentlig"
       case_unlink_allowed_groups:
         admins: "Adminer"
         moderators: "Moderatorer"

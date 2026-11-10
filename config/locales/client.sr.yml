@@ -7,6 +7,21 @@
 sr:
   js:
     salesforce:
+      guided_sync:
+        cancel_setup: "Odustani"
+        configure: "Konfiguriši"
+        email: "Email"
+        custom_field: "Posebna"
+        overwrite: "Discourse"
+        source_groups:
+          activity: "Aktivnosti"
+        sources:
+          bio: "Bio"
+          website: "Website"
+          trust: "Nivo poverenja"
+        schedules:
+          daily: "Top dnevne"
+          weekly: "Top nedeljne"
       case_unlink_allowed_groups:
         admins: "Admini"
         moderators: "Moderatori"

@@ -17,6 +17,26 @@ pt_BR:
         title: "Entrar com Salesforce"
     salesforce:
       title: Salesforce
+      guided_sync:
+        discard_changes: "Descartar alterações"
+        keep_editing: "Continuar editando"
+        cancel_setup: "Cancelar"
+        configure: "Configurar"
+        group_name: "Nome do grupo"
+        email: "E-mail"
+        custom_field: "Personalizadas"
+        keep: "Salesforce"
+        overwrite: "Discourse"
+        retry_fields: "Tentar novamente"
+        source_groups:
+          activity: "Atividade"
+        sources:
+          bio: "Bio"
+          website: "Site"
+          trust: "Nível de confiança"
+        schedules:
+          daily: "A cada dia"
+          weekly: "A cada semana"
       case_unlink_allowed_groups:
         admins: "Administradores(as):"
         moderators: "Moderadores(as)"

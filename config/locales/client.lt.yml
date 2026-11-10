@@ -7,6 +7,25 @@
 lt:
   js:
     salesforce:
+      guided_sync:
+        discard_changes: "Atmesti pakeitimus"
+        keep_editing: "Tęskite redagavimą"
+        cancel_setup: "Atšaukti"
+        save_changes: "Išsaugoti konfigūraciją"
+        group_name: "Grupės pavadinimas"
+        email: "E. paštas"
+        custom_field: "Pasirinktinis"
+        overwrite: "Discourse"
+        retry_fields: "Bandykite dar kartą"
+        source_groups:
+          activity: "Aktyvumas"
+        sources:
+          bio: "Biografija"
+          website: "Interneto svetainė"
+          trust: "Patikimumo lygis"
+        schedules:
+          daily: "Kasdien"
+          weekly: "Kas savaitę"
       case_unlink_allowed_groups:
         admins: "Administratoriai"
         moderators: "Moderatoriai"

@@ -7,6 +7,20 @@
 bg:
   js:
     salesforce:
+      guided_sync:
+        cancel_setup: "Прекрати"
+        group_name: "Име на групата"
+        email: "Имейл "
+        custom_field: "По избор"
+        overwrite: "Discourse"
+        source_groups:
+          activity: "Активност"
+        sources:
+          bio: "Биография"
+          website: "Уебсайт"
+        schedules:
+          daily: "Дневно"
+          weekly: "Седмично"
       case_unlink_allowed_groups:
         admins: "Админи"
         moderators: "Модератори"

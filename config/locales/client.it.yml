@@ -17,6 +17,26 @@ it:
         title: "Accedi con Salesforce"
     salesforce:
       title: Salesforce
+      guided_sync:
+        discard_changes: "Annulla modifiche"
+        keep_editing: "Continua modifica"
+        cancel_setup: "Annulla"
+        configure: "Configura"
+        group_name: "Nome gruppo"
+        email: "E-mail"
+        custom_field: "Personalizzato"
+        keep: "Salesforce"
+        overwrite: "Discourse"
+        retry_fields: "Riprova"
+        source_groups:
+          activity: "Attività"
+        sources:
+          bio: "Biografia"
+          website: "Sito web"
+          trust: "Livello di attendibilità"
+        schedules:
+          daily: "Giornaliero"
+          weekly: "Settimanale"
       case_unlink_allowed_groups:
         admins: "Amministratori"
         moderators: "Moderatori"

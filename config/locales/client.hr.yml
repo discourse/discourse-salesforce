@@ -7,6 +7,21 @@
 hr:
   js:
     salesforce:
+      guided_sync:
+        keep_editing: "Nastavite uređivati"
+        cancel_setup: "Odustani"
+        group_name: "Ime grupe"
+        email: "E-mail"
+        custom_field: "Posebna"
+        overwrite: "Discourse"
+        source_groups:
+          activity: "Aktivnosti"
+        sources:
+          bio: "Biografija"
+          website: "Web stranica"
+        schedules:
+          daily: "Dnevno"
+          weekly: "Tjedno"
       case_unlink_allowed_groups:
         admins: "Admini"
         moderators: "Moderatori"

@@ -12,6 +12,18 @@ id:
         title: "Masuk dengan Salesforce"
     salesforce:
       title: Salesforce
+      guided_sync:
+        cancel_setup: "Batal"
+        group_name: "Nama grup"
+        email: "Surel"
+        keep: "Salesforce"
+        overwrite: "Discourse"
+        source_groups:
+          activity: "Activity"
+        sources:
+          bio: "Bio"
+          website: "Situs web"
+          trust: "Trust level"
       case_unlink_allowed_groups:
         moderators: "Moderator"
       lead:

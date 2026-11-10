@@ -7,6 +7,26 @@
 uk:
   js:
     salesforce:
+      guided_sync:
+        discard_changes: "Скасувати зміни"
+        keep_editing: "Продовжити редагування"
+        cancel_setup: "Скасувати"
+        configure: "Налаштувати"
+        save_changes: "Зберегти конфігурацію"
+        group_name: "Назва групи"
+        email: "E-mail"
+        custom_field: "Користувацька"
+        overwrite: "Discourse"
+        retry_fields: "Повторити спробу"
+        source_groups:
+          activity: "Активність"
+        sources:
+          bio: "Біографія"
+          website: "Вебсайт"
+          trust: "Рівень довіри"
+        schedules:
+          daily: "За день"
+          weekly: "Щотижня"
       case_unlink_allowed_groups:
         admins: "Адміни"
         moderators: "Модератори"

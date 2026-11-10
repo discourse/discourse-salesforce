@@ -12,6 +12,23 @@ sv:
         title: "Logga in med Salesforce"
     salesforce:
       title: Salesforce
+      guided_sync:
+        keep_editing: "Fortsätt redigera"
+        cancel_setup: "Avbryt"
+        group_name: "Gruppnamn"
+        email: "E-postadress"
+        custom_field: "Anpassad"
+        keep: "Salesforce"
+        overwrite: "Discourse"
+        source_groups:
+          activity: "Aktivitet"
+        sources:
+          bio: "Bio"
+          website: "Webbplats"
+          trust: "Förtroendenivå"
+        schedules:
+          daily: "Dagligen"
+          weekly: "Veckovis"
       case_unlink_allowed_groups:
         admins: "Administratörer"
         moderators: "Moderatorer"

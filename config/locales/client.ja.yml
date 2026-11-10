@@ -17,6 +17,26 @@ ja:
         title: "Salesforce でログイン"
     salesforce:
       title: Salesforce
+      guided_sync:
+        discard_changes: "変更を破棄"
+        keep_editing: "編集を続ける"
+        cancel_setup: "キャンセル"
+        configure: "構成"
+        group_name: "グループ名"
+        email: "メール"
+        custom_field: "カスタム"
+        keep: "Salesforce"
+        overwrite: "Discourse"
+        retry_fields: "再試行"
+        source_groups:
+          activity: "アクティビティ"
+        sources:
+          bio: "略歴"
+          website: "ウェブサイト"
+          trust: "信頼レベル"
+        schedules:
+          daily: "毎日"
+          weekly: "毎週"
       case_unlink_allowed_groups:
         admins: "管理者"
         moderators: "モデレーター"

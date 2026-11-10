@@ -12,6 +12,23 @@ fa_IR:
         title: "ورود با سلزفورس"
     salesforce:
       title: سلزفورس
+      guided_sync:
+        keep_editing: "ادامه ویرایش"
+        cancel_setup: "انصراف"
+        group_name: "نام گروه"
+        email: "ایمیل"
+        custom_field: "سفارشی"
+        keep: "سلزفورس"
+        overwrite: "Discourse"
+        source_groups:
+          activity: "فعالیت"
+        sources:
+          bio: "بیوگرافی"
+          website: "وب‌سایت"
+          trust: "سطح اعتماد"
+        schedules:
+          daily: "روزانه"
+          weekly: "هفتگی"
       case_unlink_allowed_groups:
         admins: "مدیران ارشد"
         moderators: "ناظران"

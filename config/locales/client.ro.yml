@@ -7,6 +7,22 @@
 ro:
   js:
     salesforce:
+      guided_sync:
+        discard_changes: "Renunță la modificări"
+        keep_editing: "Continuă editarea"
+        cancel_setup: "Anulare"
+        group_name: "Nume grup"
+        email: "E-mail"
+        custom_field: "Personalizat"
+        overwrite: "Discourse"
+        source_groups:
+          activity: "Activitate"
+        sources:
+          bio: "Bio"
+          website: "Site web"
+        schedules:
+          daily: "Zilnic"
+          weekly: "Săptămânal"
       case_unlink_allowed_groups:
         admins: "Admini"
         moderators: "Moderatori"

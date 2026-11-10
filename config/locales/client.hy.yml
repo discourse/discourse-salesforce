@@ -7,6 +7,21 @@
 hy:
   js:
     salesforce:
+      guided_sync:
+        keep_editing: "Շարունակել խմբագրումը"
+        cancel_setup: "Չեղարկել"
+        group_name: "Խմբի անուն"
+        email: "Էլ. փոստ"
+        custom_field: "Մասնավոր"
+        overwrite: "Discourse"
+        source_groups:
+          activity: "Ակտիվության"
+        sources:
+          bio: "Ձեր մասին"
+          website: "Վեբ կայք"
+        schedules:
+          daily: "Օրվա Ընթացքում"
+          weekly: "Շաբաթվա Ընթացքում"
       case_unlink_allowed_groups:
         moderators: "Մոդերատորներ"
       poster_icon:

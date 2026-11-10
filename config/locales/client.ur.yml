@@ -7,6 +7,25 @@
 ur:
   js:
     salesforce:
+      guided_sync:
+        discard_changes: "تبدیلیوں کو مسترد کریں"
+        keep_editing: "ترمیم کرتے رہیں"
+        cancel_setup: "منسوخ کریں"
+        configure: "ترتیب دیں"
+        group_name: "گروپ کا نام"
+        email: "ای میل"
+        custom_field: "اپنی مرضی کا"
+        overwrite: "Discourse"
+        retry_fields: "دوبارہ کوشش"
+        source_groups:
+          activity: "سرگرمی"
+        sources:
+          bio: "سوانحِ حیات"
+          website: "ویب سائٹ"
+          trust: "فعالیت کا درجہ"
+        schedules:
+          daily: "روزانہ"
+          weekly: "ہفتہ وار"
       case_unlink_allowed_groups:
         admins: "منتظمین"
         moderators: "نگران"

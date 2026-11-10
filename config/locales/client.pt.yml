@@ -17,6 +17,23 @@ pt:
         title: "Iniciar sessão com Salesforce"
     salesforce:
       title: Salesforce
+      guided_sync:
+        keep_editing: "Prosseguir a edição"
+        cancel_setup: "Cancelar"
+        group_name: "Nome do grupo"
+        email: "Email"
+        custom_field: "Personalizar"
+        keep: "Salesforce"
+        overwrite: "Discourse"
+        retry_fields: "Tentar novamente"
+        source_groups:
+          activity: "Atividade"
+        sources:
+          bio: "Biografia"
+          website: "site"
+        schedules:
+          daily: "Diário"
+          weekly: "Semanal"
       case_unlink_allowed_groups:
         admins: "Administradores"
         moderators: "Moderadores"

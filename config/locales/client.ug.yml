@@ -7,6 +7,25 @@
 ug:
   js:
     salesforce:
+      guided_sync:
+        discard_changes: "ئۆزگەرتىشنى تاشلىۋەت"
+        keep_editing: "تەھرىرلەشنى داۋاملاشتۇر"
+        cancel_setup: "ۋاز كەچ"
+        configure: "سەپلە"
+        group_name: "گۇرۇپپا ئىسمى"
+        email: "ئېلخەت"
+        custom_field: "ئىختىيارى"
+        overwrite: "Discourse"
+        retry_fields: "قايتا سىنا"
+        source_groups:
+          activity: "پائالىيەت"
+        sources:
+          bio: "تەرجىمىھال"
+          website: "تور بېكەت"
+          trust: "ئىشەنچ دەرىجىسى"
+        schedules:
+          daily: "كۈندىلىك"
+          weekly: "ھەپتىلىك"
       case_unlink_allowed_groups:
         admins: "باشقۇرغۇچى"
         moderators: "رىياسەتچى"

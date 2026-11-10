@@ -140,12 +140,201 @@ RSpec.describe Jobs::SyncSalesforceUser do
         properties: "firstname,lastname,community_source",
       },
     ).to_return(status: 404, body: "missing")
+    stub_request(:get, "#{hubspot_url}/objects/contacts/42").with(
+      query: {
+        archived: true,
+      },
+    ).to_return(status: 404, body: "missing")
 
     expect { run_sync }.to raise_error(Hubspot::InvalidApiResponse)
 
     expect(configuration.record_link_for(user.id).external_id).to eq("42")
     expect(configuration.reload.sync_status["error"]).to eq("Hubspot::InvalidApiResponse")
     expect(a_request(:post, "#{hubspot_url}/objects/contacts")).not_to have_been_made
+  end
+
+  it "recreates a confirmed archived contact and invalidates related fingerprints" do
+    DiscourseCrm::RecordLink.link!(
+      provider: "hubspot",
+      account: "12345",
+      object: "Contact",
+      user_id: user.id,
+      external_id: "42",
+    )
+    related =
+      Fabricate(
+        :sync_configuration,
+        provider: "hubspot",
+        account: "12345",
+        object: "Contact",
+        active: false,
+      )
+    other_account =
+      Fabricate(:sync_configuration, provider: "hubspot", account: "67890", object: "Contact")
+    salesforce = Fabricate(:sync_configuration, account: "12345", object: "Contact")
+    [configuration, related, other_account, salesforce].each do |config|
+      DiscourseCrm::SyncState.store(config.id, user.id, fingerprint: "old")
+    end
+    stub_request(:get, "#{hubspot_url}/objects/contacts/42").with(
+      query: {
+        properties: "firstname,lastname,community_source",
+      },
+    ).to_return(status: 404, body: "missing")
+    stub_request(:get, "#{hubspot_url}/objects/contacts/42").with(
+      query: {
+        archived: true,
+      },
+    ).to_return(body: { id: "42", archived: true }.to_json)
+    lookup = stub_contact(nil, status: 404)
+    created =
+      stub_request(:post, "#{hubspot_url}/objects/contacts").with(
+        body: {
+          properties: {
+            email: user.email,
+            firstname: "Alex",
+            lastname: "Morgan",
+            community_source: "Discourse",
+          },
+        },
+      ).to_return(body: { id: "43" }.to_json)
+
+    run_sync
+    run_sync("change")
+
+    expect(lookup).to have_been_requested.once
+    expect(created).to have_been_requested.once
+    expect(configuration.record_link_for(user.id).external_id).to eq("43")
+    expect(configuration.reload.sync_status["error"]).to be_nil
+    expect(
+      DiscourseCrm::SyncState.find_by(configuration: related, user_id: user.id).fingerprint,
+    ).to be_nil
+    [other_account, salesforce].each do |config|
+      expect(
+        DiscourseCrm::SyncState.find_by(configuration: config, user_id: user.id).fingerprint,
+      ).to eq("old")
+    end
+  end
+
+  it "relinks a confirmed archived contact to an existing email match" do
+    DiscourseCrm::RecordLink.link!(
+      provider: "hubspot",
+      account: "12345",
+      object: "Contact",
+      user_id: user.id,
+      external_id: "42",
+    )
+    stub_request(:get, "#{hubspot_url}/objects/contacts/42").with(
+      query: {
+        properties: "firstname,lastname,community_source",
+      },
+    ).to_return(status: 404, body: "missing")
+    stub_request(:get, "#{hubspot_url}/objects/contacts/42").with(
+      query: {
+        archived: true,
+      },
+    ).to_return(body: { id: "42", archived: true }.to_json)
+    lookup =
+      stub_contact(
+        {
+          id: "43",
+          properties: {
+            firstname: "Alex",
+            lastname: "Morgan",
+            community_source: "Discourse",
+          },
+        },
+      )
+
+    run_sync
+
+    expect(lookup).to have_been_requested.once
+    expect(configuration.record_link_for(user.id).external_id).to eq("43")
+    expect(configuration.reload.sync_status["error"]).to be_nil
+    expect(a_request(:post, "#{hubspot_url}/objects/contacts")).not_to have_been_made
+  end
+
+  it "retries unchanged profile events after replacement creation fails" do
+    stub_contact(nil, status: 404)
+    stub_request(:post, "#{hubspot_url}/objects/contacts").to_return(body: { id: "42" }.to_json)
+    run_sync
+    stub_request(:get, "#{hubspot_url}/objects/contacts/42").with(
+      query: {
+        properties: "firstname,lastname,community_source",
+      },
+    ).to_return(status: 404, body: "missing")
+    stub_request(:get, "#{hubspot_url}/objects/contacts/42").with(
+      query: {
+        archived: true,
+      },
+    ).to_return(body: { id: "42", archived: true }.to_json)
+    stub_request(:post, "#{hubspot_url}/objects/contacts").to_return(
+      status: 503,
+      body: "unavailable",
+    )
+
+    expect { run_sync }.to raise_error(Hubspot::InvalidApiResponse)
+    expect(configuration.record_link_for(user.id)).to be_nil
+    expect(
+      DiscourseCrm::SyncState.find_by(configuration: configuration, user_id: user.id).fingerprint,
+    ).to be_nil
+
+    stub_request(:post, "#{hubspot_url}/objects/contacts").to_return(body: { id: "43" }.to_json)
+    run_sync("change")
+
+    expect(configuration.record_link_for(user.id).external_id).to eq("43")
+    expect(configuration.reload.sync_status["error"]).to be_nil
+  end
+
+  it "retains a link when its archive lookup does not confirm that ID was deleted" do
+    DiscourseCrm::RecordLink.link!(
+      provider: "hubspot",
+      account: "12345",
+      object: "Contact",
+      user_id: user.id,
+      external_id: "42",
+    )
+    stub_request(:get, "#{hubspot_url}/objects/contacts/42").with(
+      query: {
+        properties: "firstname,lastname,community_source",
+      },
+    ).to_return(status: 404, body: "missing")
+    [{ id: "42", archived: false }, { id: "43", archived: true }].each do |record|
+      stub_request(:get, "#{hubspot_url}/objects/contacts/42").with(
+        query: {
+          archived: true,
+        },
+      ).to_return(body: record.to_json)
+
+      expect { run_sync }.to raise_error(Hubspot::InvalidApiResponse)
+      expect(configuration.record_link_for(user.id).external_id).to eq("42")
+    end
+
+    expect(a_request(:post, "#{hubspot_url}/objects/contacts")).not_to have_been_made
+  end
+
+  it "retains linked contacts on permission and server errors" do
+    DiscourseCrm::RecordLink.link!(
+      provider: "hubspot",
+      account: "12345",
+      object: "Contact",
+      user_id: user.id,
+      external_id: "42",
+    )
+    [403, 503].each do |status|
+      stub_request(:get, "#{hubspot_url}/objects/contacts/42").with(
+        query: {
+          properties: "firstname,lastname,community_source",
+        },
+      ).to_return(status: status, body: "lookup failed")
+
+      expect { run_sync }.to raise_error(Hubspot::InvalidApiResponse)
+      expect(configuration.record_link_for(user.id).external_id).to eq("42")
+    end
+
+    expect(a_request(:post, "#{hubspot_url}/objects/contacts")).not_to have_been_made
+    expect(
+      a_request(:get, "#{hubspot_url}/objects/contacts/42").with(query: { archived: true }),
+    ).not_to have_been_made
   end
 
   it "queues HubSpot backfills and scheduled refreshes through the shared scheduler" do

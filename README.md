@@ -290,7 +290,10 @@ provider’s defaults. The provider and object cannot change after saving.
 HubSpot uses the same group eligibility, email-verification checks, ownership policies,
 backfill and refresh schedules as Salesforce. HubSpot backfill batches process contacts sequentially. Contacts are matched by email, then linked by provider, Hub ID, object and
 Discourse user. Later email changes retain the existing link and do not overwrite the CRM
-email. Missing linked contacts fail rather than creating a replacement. Changing the Hub ID
+email. If a linked contact returns 404, sync checks the same ID with `archived=true`.
+A confirmed archived contact clears its stale link and fingerprints across guides for that
+Hub ID, then sync matches the user's current verified email or creates a replacement.
+If deletion cannot be confirmed, sync keeps the link and reports the failure. Changing the Hub ID
 stops old configurations until they are explicitly saved for the new connection.
 
 HubSpot guides do not populate legacy Salesforce user fields or synchronize posts/cases.
@@ -304,5 +307,6 @@ allowing 90 CRM requests per 10 seconds. Upstream 429 responses share a cooldown
 numeric Retry-After values (10 seconds by default). Throttled jobs defer without consuming
 normal failure retries. HubSpot backfills process users in sequence and resume the unprocessed
 portion after throttling. Batch errors clear after processing completes; user errors stay
-visible and retry independently. Expected email-lookup 404s are quiet; missing linked IDs
-remain errors. Numeric and boolean comparisons account for HubSpot’s string responses.
+visible and retry independently. Expected email-lookup 404s are quiet; linked IDs whose
+deletion cannot be confirmed remain errors. Numeric and boolean comparisons account for
+HubSpot’s string responses.

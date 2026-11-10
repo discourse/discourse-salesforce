@@ -80,18 +80,48 @@ module Hubspot
     def existing_record
       properties = @configuration.mappings.map { |mapping| mapping["destination"] }.join(",")
       if link = @configuration.record_link_for(@user.id)
-        return(
-          @api.get(
-            "objects/contacts/#{ERB::Util.url_encode(link.external_id)}",
-            properties: properties,
-          )
-        )
+        record = linked_record(link, properties)
+        return record if record
       end
       @api.get(
         "objects/contacts/#{ERB::Util.url_encode(@user.email)}",
         { idProperty: "email", properties: properties },
         allow_not_found: true,
       )
+    end
+
+    def linked_record(link, properties)
+      path = "objects/contacts/#{ERB::Util.url_encode(link.external_id)}"
+      @api.get(path, properties: properties)
+    rescue Hubspot::InvalidApiResponse => error
+      raise unless error.status == 404
+      archived = @api.get(path, archived: true)
+      unless archived.is_a?(Hash) && archived["archived"] == true &&
+               archived["id"] == link.external_id
+        raise error
+      end
+      DiscourseCrm::RecordLink.transaction do
+        removed =
+          DiscourseCrm::RecordLink.unlink!(
+            provider: "hubspot",
+            account: @configuration.account,
+            object: "Contact",
+            user_id: @user.id,
+            external_id: link.external_id,
+          )
+        raise error unless removed
+        configurations =
+          DiscourseCrm::SyncConfiguration.where(
+            provider: "hubspot",
+            account: @configuration.account,
+            object: "Contact",
+          )
+        DiscourseCrm::SyncState.where(
+          configuration_id: configurations.select(:id),
+          user_id: @user.id,
+        ).update_all(fingerprint: nil)
+      end
+      nil
     end
 
     def save_link(id)

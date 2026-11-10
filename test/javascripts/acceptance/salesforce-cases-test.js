@@ -104,18 +104,20 @@ acceptance("Salesforce case unlinking", function (needs) {
     });
   });
 
-  test("unlinks a case from the first post’s admin menu after confirmation", async function (assert) {
+  test("unlinks a case from the topic admin menu after confirmation", async function (assert) {
     await visit("/t/internationalization-localization/280");
 
     assert
       .dom(".unlink-salesforce-case")
-      .doesNotExist("Unlinking is hidden until the post admin menu is opened");
+      .doesNotExist("Unlinking is hidden until the topic admin menu is opened");
     assert
       .dom(".salesforce-case button")
       .doesNotExist("Case details have no standalone action button");
 
-    await click("#post_1 .show-more-actions");
-    await click("#post_1 .show-post-admin-menu");
+    await click(".toggle-admin-menu");
+    assert
+      .dom(".unlink-salesforce-case")
+      .hasText("Unlink Case", "The label matches Sync Case");
     await click(".unlink-salesforce-case");
 
     assert
@@ -139,8 +141,7 @@ acceptance("Salesforce case unlinking", function (needs) {
 
   test("keeps the case when unlinking is cancelled", async function (assert) {
     await visit("/t/internationalization-localization/280");
-    await click("#post_1 .show-more-actions");
-    await click("#post_1 .show-post-admin-menu");
+    await click(".toggle-admin-menu");
     await click(".unlink-salesforce-case");
     await click("#dialog-holder .btn-default");
 
@@ -151,8 +152,7 @@ acceptance("Salesforce case unlinking", function (needs) {
   test("keeps the case when unlinking fails", async function (assert) {
     rejectUnlink = true;
     await visit("/t/internationalization-localization/280");
-    await click("#post_1 .show-more-actions");
-    await click("#post_1 .show-post-admin-menu");
+    await click(".toggle-admin-menu");
     await click(".unlink-salesforce-case");
     await click("#dialog-holder .btn-primary");
 
@@ -165,8 +165,7 @@ acceptance("Salesforce case unlinking", function (needs) {
   test("hides unlinking when permission is absent", async function (assert) {
     canUnlink = false;
     await visit("/t/internationalization-localization/280");
-    await click("#post_1 .show-more-actions");
-    await click("#post_1 .show-post-admin-menu");
+    await click(".toggle-admin-menu");
 
     assert
       .dom(".unlink-salesforce-case")

@@ -191,25 +191,6 @@ function initializeWithApi(api, container) {
 
     customizePost(api);
 
-    api.addPostAdminMenuButton((post) => {
-      const topic = post.topic;
-      if (
-        post.post_number !== 1 ||
-        !topic?.salesforce_case ||
-        !topic.can_unlink_salesforce_case
-      ) {
-        return;
-      }
-
-      return {
-        icon: "link-slash",
-        label: "salesforce.case.unlink",
-        className: "unlink-salesforce-case",
-        action: () =>
-          unlinkCase(topic, container.lookup("service:dialog"), toasts),
-      };
-    });
-
     api.addTopicAdminMenuButton((topic) => {
       if (
         currentUser.admin ||
@@ -241,6 +222,20 @@ function initializeWithApi(api, container) {
           },
         };
       }
+    });
+
+    api.addTopicAdminMenuButton((topic) => {
+      if (!topic?.salesforce_case || !topic.can_unlink_salesforce_case) {
+        return;
+      }
+
+      return {
+        icon: "link-slash",
+        label: "salesforce.case.unlink",
+        className: "unlink-salesforce-case",
+        action: () =>
+          unlinkCase(topic, container.lookup("service:dialog"), toasts),
+      };
     });
   }
 }

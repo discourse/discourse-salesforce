@@ -7,6 +7,22 @@
 da:
   js:
     salesforce:
+      guided_sync:
+        keep_editing: "Fortsæt redigering"
+        cancel_setup: "Annuller"
+        group_name: "Gruppe navn"
+        email: "E-mail"
+        custom_field: "Tilpasset"
+        overwrite: "Discourse"
+        source_groups:
+          activity: "Aktivitet"
+        sources:
+          bio: "Biografi"
+          website: "Hjemmeside"
+          trust: "Tillidsniveau"
+        schedules:
+          daily: "Dagligt"
+          weekly: "Ugentligt"
       case_unlink_allowed_groups:
         admins: "Admins"
         moderators: "Moderatorer"

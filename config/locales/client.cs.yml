@@ -7,6 +7,24 @@
 cs:
   js:
     salesforce:
+      guided_sync:
+        discard_changes: "Zahodit změny"
+        keep_editing: "Pokračovat v úpravách"
+        cancel_setup: "Zrušit"
+        group_name: "Název skupiny"
+        email: "Emaily"
+        custom_field: "Přizpůsobené"
+        overwrite: "Discourse"
+        retry_fields: "Zkuste znovu"
+        source_groups:
+          activity: "Aktivita"
+        sources:
+          bio: "O uživateli"
+          website: "Webová stránka"
+          trust: "Úroveň důvěry"
+        schedules:
+          daily: "Denně"
+          weekly: "Týdně"
       case_unlink_allowed_groups:
         admins: "Administrátoři"
         moderators: "Moderátoři"

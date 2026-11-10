@@ -17,6 +17,27 @@ zh_CN:
         title: "使用 Salesforce 登录"
     salesforce:
       title: Salesforce
+      guided_sync:
+        discard_changes: "舍弃更改"
+        keep_editing: "继续编辑"
+        cancel_setup: "取消"
+        configure: "配置"
+        save_changes: "保存配置"
+        group_name: "群组名称"
+        email: "电子邮件"
+        custom_field: "自定义"
+        keep: "Salesforce"
+        overwrite: "Discourse"
+        retry_fields: "重试"
+        source_groups:
+          activity: "活动"
+        sources:
+          bio: "个人简介"
+          website: "网站"
+          trust: "信任级别"
+        schedules:
+          daily: "每天"
+          weekly: "每周"
       case_unlink_allowed_groups:
         admins: "管理员"
         moderators: "版主"

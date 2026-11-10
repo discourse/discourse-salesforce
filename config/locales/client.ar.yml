@@ -17,6 +17,26 @@ ar:
         title: "تسجيل الدخول من خلال Salesforce"
     salesforce:
       title: Salesforce
+      guided_sync:
+        discard_changes: "تجاهل التغييرين"
+        keep_editing: "الاستمرار في التعديل"
+        cancel_setup: "ألغِ"
+        configure: "التهيئة"
+        group_name: "اسم المجموعة"
+        email: "البريد الإلكتروني"
+        custom_field: "مخصَّصة"
+        keep: "Salesforce"
+        overwrite: "Discourse"
+        retry_fields: "إعادة المحاولة"
+        source_groups:
+          activity: "النشاط"
+        sources:
+          bio: "النبذة التعريفية"
+          website: "الموقع الإلكتروني"
+          trust: "مستوى الثقة"
+        schedules:
+          daily: "يوميًا"
+          weekly: "أسبوعيًا"
       case_unlink_allowed_groups:
         admins: "المسؤولون"
         moderators: "المشرفون"

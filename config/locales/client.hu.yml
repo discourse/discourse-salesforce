@@ -7,6 +7,24 @@
 hu:
   js:
     salesforce:
+      guided_sync:
+        discard_changes: "Változások elvetése"
+        keep_editing: "Szerkesztés tovább"
+        cancel_setup: "Mégse"
+        group_name: "Csoport neve"
+        email: "E-mail"
+        custom_field: "Egyéni"
+        overwrite: "Discourse"
+        retry_fields: "Újra"
+        source_groups:
+          activity: "Tevékenység"
+        sources:
+          bio: "Életrajz"
+          website: "Weboldal"
+          trust: "Bizalmi szint"
+        schedules:
+          daily: "Napi"
+          weekly: "Heti"
       case_unlink_allowed_groups:
         admins: "Adminisztrátorok"
         moderators: "Moderátorok"

@@ -7,6 +7,25 @@
 zh_TW:
   js:
     salesforce:
+      guided_sync:
+        discard_changes: "捨棄變更"
+        keep_editing: "繼續編輯"
+        cancel_setup: "取消"
+        configure: "設定"
+        group_name: "群組名稱"
+        email: "Email"
+        custom_field: "客製"
+        overwrite: "Discourse"
+        retry_fields: "重試"
+        source_groups:
+          activity: "活動"
+        sources:
+          bio: "自我介紹"
+          website: "網站"
+          trust: "信任等級"
+        schedules:
+          daily: "每日"
+          weekly: "每週"
       case_unlink_allowed_groups:
         admins: "管理員"
         moderators: "版主"

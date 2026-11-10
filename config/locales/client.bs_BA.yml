@@ -7,6 +7,20 @@
 bs_BA:
   js:
     salesforce:
+      guided_sync:
+        cancel_setup: "Odustani"
+        group_name: "Ime grupe"
+        email: "Email"
+        custom_field: "Custom"
+        overwrite: "Discourse"
+        source_groups:
+          activity: "Activity"
+        sources:
+          bio: "Biografija"
+          website: "Web stranica"
+        schedules:
+          daily: "Dnevno"
+          weekly: "Sedmično"
       case_unlink_allowed_groups:
         admins: "Admins"
         moderators: "Moderators"

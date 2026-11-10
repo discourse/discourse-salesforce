@@ -7,6 +7,20 @@
 et:
   js:
     salesforce:
+      guided_sync:
+        cancel_setup: "Tühista"
+        group_name: "Rühma nimi"
+        email: "Meiliaadress"
+        custom_field: "Individuaalne"
+        overwrite: "Discourse"
+        source_groups:
+          activity: "Aktiivsus"
+        sources:
+          bio: "Bio"
+          website: "Veebileht"
+        schedules:
+          daily: "Igapäevaselt"
+          weekly: "Iganädalaselt"
       case_unlink_allowed_groups:
         admins: "Adminnid"
         moderators: "Moderaatorid"

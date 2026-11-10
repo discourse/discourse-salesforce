@@ -7,6 +7,19 @@
 lv:
   js:
     salesforce:
+      guided_sync:
+        cancel_setup: "Atcelt"
+        group_name: "Grupas nosaukums"
+        email: "E-pasts"
+        overwrite: "Discourse"
+        source_groups:
+          activity: "Aktivitāte"
+        sources:
+          bio: "Bio"
+          website: "Vietne"
+        schedules:
+          daily: "Dienas"
+          weekly: "Nedēļas"
       case_unlink_allowed_groups:
         admins: "Administratori"
         moderators: "Moderātori"

@@ -17,6 +17,26 @@ fr:
         title: "Se connecter avec Salesforce"
     salesforce:
       title: Salesforce
+      guided_sync:
+        discard_changes: "Annuler les modifications"
+        keep_editing: "Continuer à rédiger"
+        cancel_setup: "Annuler"
+        configure: "Configurer"
+        group_name: "Nom du groupe"
+        email: "E-mail"
+        custom_field: "Personnalisé"
+        keep: "Salesforce"
+        overwrite: "Discourse"
+        retry_fields: "Réessayer"
+        source_groups:
+          activity: "Activité"
+        sources:
+          bio: "Biographie"
+          website: "Site Web"
+          trust: "Niveau de confiance"
+        schedules:
+          daily: "Chaque jour"
+          weekly: "Chaque semaine"
       contact_sync_mode:
         link_only: "Lier uniquement : associer l'utilisateur Discourse au contact Salesforce sans mettre à jour les champs Salesforce"
         fill_blank: "Remplir les champs vides de Salesforce : mettre à jour les champs sélectionnés uniquement s'ils sont vides dans Salesforce"

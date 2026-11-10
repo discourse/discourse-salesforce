@@ -17,6 +17,26 @@ tr_TR:
         title: "Salesforce ile Giriş Yapın"
     salesforce:
       title: Salesforce
+      guided_sync:
+        discard_changes: "Değişiklikleri sil"
+        keep_editing: "Düzenlemeye devam et"
+        cancel_setup: "İptal et"
+        configure: "Yapılandır"
+        group_name: "Grup adı"
+        email: "E-posta"
+        custom_field: "Özel"
+        keep: "Salesforce"
+        overwrite: "Discourse"
+        retry_fields: "Tekrar Dene"
+        source_groups:
+          activity: "Etkinlik"
+        sources:
+          bio: "Biyo"
+          website: "Web sitesi"
+          trust: "Güven seviyesi"
+        schedules:
+          daily: "Günlük"
+          weekly: "Haftalık"
       case_unlink_allowed_groups:
         admins: "Yöneticiler"
         moderators: "Moderatörler"

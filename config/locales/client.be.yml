@@ -7,6 +7,15 @@
 be:
   js:
     salesforce:
+      guided_sync:
+        cancel_setup: "Скасаваць"
+        email: "Электронная пошта"
+        overwrite: "гаворка"
+        source_groups:
+          activity: "Актыўнасць"
+        schedules:
+          daily: "Штодня"
+          weekly: "Штотыдзень"
       case_unlink_allowed_groups:
         admins: "Адміністратары"
         moderators: "Мадэратары"

@@ -7,6 +7,23 @@
 ko:
   js:
     salesforce:
+      guided_sync:
+        keep_editing: "편집 유지"
+        cancel_setup: "취소"
+        group_name: "그룹 이름"
+        email: "이메일"
+        custom_field: "사용자 정의"
+        overwrite: "Discourse"
+        retry_fields: "재시도"
+        source_groups:
+          activity: "활동"
+        sources:
+          bio: "바이오"
+          website: "웹 사이트"
+          trust: "신뢰 레벨"
+        schedules:
+          daily: "일"
+          weekly: "주"
       case_unlink_allowed_groups:
         admins: "관리자"
         moderators: "관리자"

@@ -7,5 +7,21 @@
 te:
   js:
     salesforce:
+      guided_sync:
+        keep_editing: "సవరించడం కొనసాగించండి"
+        cancel_setup: "రద్దుచేయండి"
+        group_name: "సమూహం పేరు"
+        email: "మెయిల్"
+        custom_field: "అనుకూల"
+        overwrite: "డిస్కోర్స్"
+        source_groups:
+          activity: "కలాపం"
+        sources:
+          bio: "జీవిత చరిత్ర"
+          website: "వెబ్సైట్"
+          trust: "విశ్వసనీయ స్థాయి"
+        schedules:
+          daily: "రోజువారీ"
+          weekly: "వారానికోసారి"
       case_unlink_allowed_groups:
         moderators: "నిర్వాహకులు"

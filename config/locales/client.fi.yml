@@ -17,6 +17,26 @@ fi:
         title: "Kirjaudu sisään Salesforce-tilillä"
     salesforce:
       title: Salesforce
+      guided_sync:
+        discard_changes: "Hylkää muutokset"
+        keep_editing: "Jatka muokkaamista"
+        cancel_setup: "Peruuta"
+        configure: "Määritä"
+        group_name: "Ryhmän nimi"
+        email: "Sähköpostiosoite"
+        custom_field: "Mukautettu"
+        keep: "Salesforce"
+        overwrite: "Discourse"
+        retry_fields: "Yritä uudelleen"
+        source_groups:
+          activity: "Toiminta"
+        sources:
+          bio: "Käyttäjätiedot"
+          website: "Verkkosivusto"
+          trust: "Luottamustaso"
+        schedules:
+          daily: "Päivittäin"
+          weekly: "Viikoittain"
       case_unlink_allowed_groups:
         admins: "Ylläpitäjät"
         moderators: "Valvojat"

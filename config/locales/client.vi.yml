@@ -7,6 +7,24 @@
 vi:
   js:
     salesforce:
+      guided_sync:
+        discard_changes: "Hủy bỏ các thay đổi"
+        keep_editing: "Tiếp tục chỉnh sửa"
+        cancel_setup: "Hủy"
+        configure: "Cấu hình"
+        group_name: "Tên nhóm"
+        email: "Email"
+        custom_field: "Tùy chỉnh"
+        overwrite: "Discourse"
+        retry_fields: "Thử lại"
+        source_groups:
+          activity: "Hoạt động"
+        sources:
+          bio: "Tiểu sử"
+          website: "Trang web"
+        schedules:
+          daily: "Theo ngày"
+          weekly: "Theo tuần"
       case_unlink_allowed_groups:
         admins: "Quản trị"
         moderators: "Điều hành viên"

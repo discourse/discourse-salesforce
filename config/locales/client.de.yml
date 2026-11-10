@@ -17,6 +17,26 @@ de:
         title: "Mit Salesforce anmelden"
     salesforce:
       title: Salesforce
+      guided_sync:
+        discard_changes: "Änderungen verwerfen"
+        keep_editing: "Weiter bearbeiten"
+        cancel_setup: "Abbrechen"
+        configure: "Konfigurieren"
+        group_name: "Gruppenname"
+        email: "E-Mail"
+        custom_field: "Benutzerdefiniert"
+        keep: "Salesforce"
+        overwrite: "Discourse"
+        retry_fields: "Erneut versuchen"
+        source_groups:
+          activity: "Aktivität"
+        sources:
+          bio: "Bio"
+          website: "Website"
+          trust: "Vertrauensstufe"
+        schedules:
+          daily: "Täglich"
+          weekly: "Wöchentlich"
       case_unlink_allowed_groups:
         admins: "Administratoren"
         moderators: "Moderatoren"

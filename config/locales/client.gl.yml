@@ -7,6 +7,21 @@
 gl:
   js:
     salesforce:
+      guided_sync:
+        keep_editing: "Seguir editando"
+        cancel_setup: "Cancelar"
+        group_name: "Nome do grupo"
+        email: "Enderezo de correo"
+        custom_field: "Personalizado"
+        overwrite: "Discourse"
+        source_groups:
+          activity: "Actividade"
+        sources:
+          bio: "Biografía"
+          website: "Sitio web"
+        schedules:
+          daily: "Diario"
+          weekly: "Semanal"
       case_unlink_allowed_groups:
         admins: "Administradores"
         moderators: "Moderadores"

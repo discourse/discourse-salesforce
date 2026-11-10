@@ -7,6 +7,26 @@
 pl_PL:
   js:
     salesforce:
+      guided_sync:
+        discard_changes: "Odrzuć zmiany"
+        keep_editing: "Kontynuuj edycję"
+        cancel_setup: "Anuluj"
+        configure: "Konfiguruj"
+        save_changes: "Zapisz konfigurację"
+        group_name: "Nazwa grupy"
+        email: "E-mail"
+        custom_field: "Niestandardowy"
+        overwrite: "Discourse"
+        retry_fields: "Ponów"
+        source_groups:
+          activity: "Aktywność"
+        sources:
+          bio: "Biografia"
+          website: "Strona internetowa"
+          trust: "Poziom zaufania"
+        schedules:
+          daily: "Dziennie"
+          weekly: "Tygodniowo"
       case_unlink_allowed_groups:
         admins: "Administratorzy"
         moderators: "Moderatorzy"

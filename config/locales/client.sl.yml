@@ -7,6 +7,21 @@
 sl:
   js:
     salesforce:
+      guided_sync:
+        keep_editing: "Nadaljuj z urejanjem"
+        cancel_setup: "Prekliči"
+        group_name: "Ime skupine"
+        email: "E-naslov"
+        custom_field: "Po meri"
+        overwrite: "Discourse"
+        source_groups:
+          activity: "Aktivnost"
+        sources:
+          bio: "Bio"
+          website: "Spletna stran"
+        schedules:
+          daily: "Dnevno"
+          weekly: "Tedensko"
       case_unlink_allowed_groups:
         admins: "Administratorji"
         moderators: "Moderatorji"

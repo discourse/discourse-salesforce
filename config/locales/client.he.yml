@@ -17,6 +17,25 @@ he:
         title: "כניסה עם Salesforce"
     salesforce:
       title: Salesforce
+      guided_sync:
+        discard_changes: "התעלמות מהשינויים"
+        keep_editing: "להמשיך לערוך"
+        cancel_setup: "ביטול"
+        configure: "הגדרה"
+        group_name: "שם הקבוצה"
+        email: "דוא״ל"
+        custom_field: "מותאם"
+        keep: "Salesforce"
+        overwrite: "Discourse"
+        source_groups:
+          activity: "פעילות"
+        sources:
+          bio: "קורות חיים"
+          website: "אתר"
+          trust: "דרגת אמון"
+        schedules:
+          daily: "יומי"
+          weekly: "שבועי"
       case_unlink_allowed_groups:
         admins: "מנהלים ראשיים"
         moderators: "מפקחים"

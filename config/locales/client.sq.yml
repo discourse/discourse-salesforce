@@ -7,6 +7,20 @@
 sq:
   js:
     salesforce:
+      guided_sync:
+        cancel_setup: "Anulo"
+        group_name: "Emri i grupit"
+        email: "Email"
+        custom_field: "Grupet e krijuara"
+        overwrite: "Discourse"
+        source_groups:
+          activity: "Aktiviteti"
+        sources:
+          bio: "Bio"
+          website: "Faqja e internetit"
+        schedules:
+          daily: "Ditore"
+          weekly: "Javore"
       case_unlink_allowed_groups:
         admins: "Administratorët"
         moderators: "Moderatorë"

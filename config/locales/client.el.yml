@@ -7,6 +7,25 @@
 el:
   js:
     salesforce:
+      guided_sync:
+        discard_changes: "Απόρριψη αλλαγών"
+        keep_editing: "Συνέχιση επεξεργασίας"
+        cancel_setup: "Ακύρωση"
+        configure: "Διαμόρφωση"
+        group_name: "Όνομα ομάδας"
+        email: "Email"
+        custom_field: "Προσαρμοσμένο"
+        overwrite: "Discourse"
+        retry_fields: "Επανάληψη"
+        source_groups:
+          activity: "Δραστηριότητα"
+        sources:
+          bio: "Βιογραφικό"
+          website: "Website"
+          trust: "Επίπεδο εμπιστοσύνης"
+        schedules:
+          daily: "Ημερήσια"
+          weekly: "Εβδομαδιαία"
       case_unlink_allowed_groups:
         admins: "Διαχειριστές"
         moderators: "Συντονιστές"

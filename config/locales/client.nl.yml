@@ -17,6 +17,26 @@ nl:
         title: "Aanmelden met Salesforce"
     salesforce:
       title: Salesforce
+      guided_sync:
+        discard_changes: "Wijzigingen negeren"
+        keep_editing: "Blijven bewerken"
+        cancel_setup: "Annuleren"
+        configure: "Configureren"
+        group_name: "Groepsnaam"
+        email: "E-mail"
+        custom_field: "Aangepast"
+        keep: "Salesforce"
+        overwrite: "Discourse"
+        retry_fields: "Opnieuw proberen"
+        source_groups:
+          activity: "Activiteit"
+        sources:
+          bio: "Bio"
+          website: "Website"
+          trust: "Vertrouwensniveau"
+        schedules:
+          daily: "Dagelijks"
+          weekly: "Wekelijks"
       case_unlink_allowed_groups:
         admins: "Beheerders"
         moderators: "Moderators"

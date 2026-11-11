@@ -64,6 +64,7 @@ module ::Jobs
     def reconcile_link(field, object, previous_id, destination_object, id)
       return unless field
       DistributedMutex.synchronize("salesforce_person_create_#{field.user_id}") do
+        linked = nil
         UserCustomField.transaction do
           current = UserCustomField.lock.find_by(id: field.id)
           unless current && current.name == Salesforce::Person.for_object(object)::ID_FIELD &&
@@ -92,6 +93,7 @@ module ::Jobs
             end
           end
           destination = UserCustomField.find_by(user_id: current.user_id, name: destination_name)
+          linked = { user_id: current.user_id, previous_id: destination&.value }
           if destination && destination.id != current.id
             destination.update!(value: id)
             current.destroy!
@@ -115,6 +117,15 @@ module ::Jobs
               converted_from_id: (object == "Lead" ? previous_id : previous.converted_from_id),
             )
           end
+        end
+
+        if linked && (user = User.find_by(id: linked[:user_id]))
+          Salesforce::Person.for_object(destination_object).announce_link(
+            user,
+            id,
+            linked[:previous_id],
+            created: false,
+          )
         end
       end
     end

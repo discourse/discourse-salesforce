@@ -48,8 +48,7 @@ module ::Jobs
       end
 
       if lead_id
-        user.salesforce_lead_id = lead_id
-        user.save_custom_fields
+        ::Salesforce::Lead.link!(user, lead_id, created: false)
       elsif SiteSetting.salesforce_contact_auto_create_on_signup &&
             ::Salesforce::Person.auto_create_eligible?(user)
         user.create_salesforce_contact

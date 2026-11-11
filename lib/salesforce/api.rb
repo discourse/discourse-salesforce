@@ -62,8 +62,10 @@ module ::Salesforce
       call(path) { |uri| faraday.post(uri, fields.to_json, "Content-Type": "application/json") }
     end
 
-    def patch(path, fields)
-      call(path) { |uri| faraday.patch(uri, fields.to_json, "Content-Type": "application/json") }
+    def patch(path, fields, headers: {})
+      call(path) do |uri|
+        faraday.patch(uri, fields.to_json, { "Content-Type": "application/json" }.merge(headers))
+      end
     end
 
     def call(path)

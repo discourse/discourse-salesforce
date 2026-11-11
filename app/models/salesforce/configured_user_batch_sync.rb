@@ -188,7 +188,7 @@ module Salesforce
         .zip(results)
         .each do |(user, sync, _), result|
           if result["success"] == true && result["id"].present?
-            sync.complete(result.fetch("id"))
+            sync.complete(result.fetch("id"), created: method == :post)
           else
             retry_user(user, InvalidApiResponse.new(result.fetch("errors", []).to_json))
           end

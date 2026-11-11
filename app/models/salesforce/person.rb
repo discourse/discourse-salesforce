@@ -45,20 +45,39 @@ module ::Salesforce
       user.active? && user.human? && !user.anonymous? && !user.staged? && !user.suspended?
     end
 
-    def self.create!(user)
+    def self.link!(user, id, created:, acting_user: nil)
+      previous_id = user.custom_fields[self::ID_FIELD]
+      user.custom_fields[self::ID_FIELD] = id
+      user.save_custom_fields
+      announce_link(user, id, previous_id, created: created, acting_user: acting_user)
+    end
+
+    def self.announce_link(user, id, previous_id, created:, acting_user: nil)
+      return if id.blank? || id == previous_id
+
+      DiscourseEvent.trigger(
+        :salesforce_person_linked,
+        user,
+        self::OBJECT_NAME,
+        id,
+        created: created,
+        acting_user: acting_user,
+      )
+    end
+
+    def self.create!(user, acting_user: nil)
       DistributedMutex.synchronize("salesforce_person_create_#{user.id}") do
         user.reload
         return if user.custom_fields[self::ID_FIELD].present?
 
-        if sync(user)
+        if sync(user, acting_user: acting_user)
           group.add(user)
           return user.custom_fields[self::ID_FIELD]
         end
 
         id = Salesforce::Api.new.post("sobjects/#{self::OBJECT_NAME}", payload(user))["id"]
 
-        user.custom_fields[self::ID_FIELD] = id
-        user.save_custom_fields
+        link!(user, id, created: true, acting_user: acting_user)
 
         group.add(user)
 
@@ -76,7 +95,7 @@ module ::Salesforce
         user.single_sign_on_record&.external_email&.downcase == user.email
     end
 
-    def self.sync(user)
+    def self.sync(user, acting_user: nil)
       mode = email_verified?(user) ? sync_mode : "link_only"
       sync_payload =
         if mode == "link_only"
@@ -89,8 +108,7 @@ module ::Salesforce
         find_by_email(user.email, fields: sync_payload.keys, require_unique: sync_payload.present?)
       return false if record.blank?
 
-      user.custom_fields[self::ID_FIELD] = record["Id"]
-      user.save_custom_fields
+      link!(user, record["Id"], created: false, acting_user: acting_user)
 
       return true if sync_payload.empty?
 

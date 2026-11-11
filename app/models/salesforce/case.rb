@@ -96,19 +96,23 @@ module ::Salesforce
 
     CASE_ID_FIELD = "salesforce_case_id"
 
-    def self.sync!(topic)
+    def self.sync!(topic, acting_user: nil)
       salesforce_case = find_or_initialize_by(topic_id: topic.id)
-      salesforce_case.tap do |c|
+      created = false
+
+      begin
         user = topic.user
 
-        if c.new_record?
+        if salesforce_case.new_record?
           post = topic.first_post
           description = "#{post.full_url}\n\n#{PostContent.body_for(post, max_length: 30_000)}"
-          c.contact_id =
-            contact_id_for(user) || SiteSetting.salesforce_default_contact_id_for_case_sync.presence
-          c.subject = topic.title
-          c.description = description
-          c.generate!
+          salesforce_case.contact_id =
+            contact_id_for(user, acting_user: acting_user) ||
+              SiteSetting.salesforce_default_contact_id_for_case_sync.presence
+          salesforce_case.subject = topic.title
+          salesforce_case.description = description
+          salesforce_case.generate!
+          created = true
 
           Jobs.enqueue(:sync_case_comments, topic_id: topic.id)
 
@@ -116,18 +120,27 @@ module ::Salesforce
           topic.save_custom_fields
         end
 
-        c.sync!
+        salesforce_case.sync!
+      ensure
+        if created
+          DiscourseEvent.trigger(
+            :salesforce_case_created,
+            salesforce_case,
+            acting_user: acting_user,
+          )
+        end
       end
+
       salesforce_case
     end
 
-    def self.contact_id_for(user)
+    def self.contact_id_for(user, acting_user: nil)
       return user.salesforce_contact_id if user.salesforce_contact_id
 
       if SiteSetting.salesforce_skip_contact_creation_on_case_sync
         nil
       else
-        user.create_salesforce_contact
+        user.create_salesforce_contact(acting_user: acting_user)
       end
     end
 

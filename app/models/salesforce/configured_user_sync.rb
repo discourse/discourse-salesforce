@@ -105,14 +105,13 @@ module Salesforce
             values.merge("Email" => @user.email),
           ).fetch("id")
       end
-      complete(id)
+      complete(id, created: record.nil?)
       SyncState.store(@configuration.id, @user.id, fingerprint: fingerprint)
     end
 
-    def complete(id)
+    def complete(id, created: false)
       save_link(id)
-      @user.custom_fields[@person::ID_FIELD] = id
-      @user.save_custom_fields
+      @person.link!(@user, id, created: created)
       SyncState.where(configuration_id: @configuration.id, user_id: @user.id).update_all(
         fingerprint: nil,
       )
@@ -150,8 +149,7 @@ module Salesforce
           converted_from_id: record["Id"],
         )
         @user.salesforce_lead_id = nil if @user.salesforce_lead_id == record["Id"]
-        @user.salesforce_contact_id = contact_id
-        @user.save_custom_fields
+        Contact.link!(@user, contact_id, created: false)
       end
       SyncConfiguration.record_result(@configuration.id, @user.id)
       true

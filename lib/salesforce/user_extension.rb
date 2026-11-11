@@ -20,8 +20,8 @@ module Salesforce
       custom_fields[::Salesforce::Lead::ID_FIELD] = value
     end
 
-    def create_salesforce_contact
-      ::Salesforce::Contact.create!(self)
+    def create_salesforce_contact(acting_user: nil)
+      ::Salesforce::Contact.create!(self, acting_user: acting_user)
     end
 
     def salesforce_contact_payload

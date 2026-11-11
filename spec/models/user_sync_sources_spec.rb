@@ -220,4 +220,46 @@ RSpec.describe Salesforce::UserSyncSources do
       Salesforce::ConfiguredUserSync.validate_mappings!(configuration, fields)
     }.to raise_error(Discourse::InvalidParameters)
   end
+
+  describe "custom_field source" do
+    let(:fields) do
+      %w[Text__c Object__c List__c].map do |name|
+        { "name" => name, "type" => "string", "createable" => true, "updateable" => true }
+      end
+    end
+
+    after { User.send(:custom_field_meta_data).delete("sf_json") }
+
+    it "sends non-text and list values as text" do
+      User.register_custom_field_type("sf_json", :json)
+      user.custom_fields["sf_text"] = "plain"
+      user.custom_fields["sf_json"] = { "a" => 1 }
+      user.custom_fields["sf_multi"] = %w[One Two]
+      user.save_custom_fields
+      mappings =
+        {
+          "sf_text" => "Text__c",
+          "sf_json" => "Object__c",
+          "sf_multi" => "List__c",
+        }.map do |name, destination|
+          {
+            "source" => "custom_field",
+            "value" => name,
+            "destination" => destination,
+            "policy" => "overwrite",
+          }
+        end
+      sources = described_class.new(mappings, [user])
+      mapped =
+        Salesforce::FieldMapping.new(mappings, fields) do |mapping, _field|
+          sources.value(described_class.source_key(mapping), user)
+        end
+
+      expect(mapped.values(nil)).to eq(
+        "Text__c" => "plain",
+        "Object__c" => '{"a":1}',
+        "List__c" => "One, Two",
+      )
+    end
+  end
 end

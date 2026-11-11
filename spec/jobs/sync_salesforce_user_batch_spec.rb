@@ -158,6 +158,39 @@ RSpec.describe Jobs::SyncSalesforceUserBatch do
     )
   end
 
+  it "sends each user's value for any custom field named in a mapping" do
+    user.custom_fields["account_tier"] = "gold"
+    user.save_custom_fields
+    configuration.update!(
+      mappings:
+        configuration.mappings +
+          [
+            {
+              "source" => "custom_field",
+              "value" => "account_tier",
+              "destination" => "Tier__c",
+              "policy" => "overwrite",
+            },
+          ],
+    )
+    fields << { name: "Tier__c", type: "string", createable: true, updateable: true }
+    stub_request(:get, "#{api_path}/Contact/describe").to_return(body: { fields: fields }.to_json)
+    stub_request(:get, query_path).with(query: hash_including("q" => /SELECT/)).to_return(
+      body: { records: [] }.to_json,
+    )
+    sent = nil
+    stub_request(:post, collection_url)
+      .with do |request|
+        sent = JSON.parse(request.body)
+        true
+      end
+      .to_return(body: [{ id: "one", success: true }, { id: "two", success: true }].to_json)
+    run_batch
+    expect(sent["records"].map { |record| record.slice("Email", "Tier__c") }).to eq(
+      [{ "Email" => user.email, "Tier__c" => "gold" }, { "Email" => other_user.email }],
+    )
+  end
+
   it "batches reads and creates, saves links, and skips unchanged records on retry" do
     query =
       "SELECT Id,Email,LastName,LeadSource FROM Contact WHERE Email IN ('#{user.email}','#{other_user.email}')"

@@ -40,13 +40,14 @@ module Salesforce
       valid &&=
         mappings.all? do |mapping|
           field = fields.find { |item| item["name"] == mapping["destination"] }
-          static_value_valid =
-            mapping["source"] != "static" ||
+          max_length = UserSyncSources::VALUE_MAX_LENGTHS[mapping["source"]]
+          value_valid =
+            max_length.nil? ||
               (
                 mapping["value"].is_a?(String) && mapping["value"].present? &&
-                  mapping["value"].length <= 1000
+                  mapping["value"].length <= max_length
               )
-          static_value_valid && field && source_types[mapping["source"]].present? &&
+          value_valid && field && source_types[mapping["source"]].present? &&
             source_types[mapping["source"]] == field_type(field["type"]) &&
             %w[keep overwrite].include?(mapping["policy"])
         end
@@ -159,7 +160,9 @@ module Salesforce
 
     def mapped_values(fields, record)
       FieldMapping
-        .new(@configuration.mappings, fields) { |source| source_value(source) }
+        .new(@configuration.mappings, fields) do |mapping|
+          source_value(UserSyncSources.source_key(mapping))
+        end
         .values(record)
     end
 
@@ -183,7 +186,9 @@ module Salesforce
     end
 
     def source_fingerprint
-      sources = @configuration.mappings.map { |mapping| mapping["source"] }.uniq - %w[static]
+      sources =
+        @configuration.mappings.map { |mapping| UserSyncSources.source_key(mapping) }.uniq -
+          %w[static]
       Digest::SHA256.hexdigest(
         {
           instance: SiteSetting.salesforce_instance_url,

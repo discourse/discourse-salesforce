@@ -20,7 +20,12 @@ module Salesforce
       "seen" => "date",
       "first_seen" => "date",
       "static" => "text",
+      "custom_field" => "text",
     }.freeze
+
+    CUSTOM_FIELD_KEY_PREFIX = "custom_field:"
+    VALUE_MAX_LENGTHS = { "static" => 1000, "custom_field" => 256 }.freeze
+    CUSTOM_FIELD_NAMES_LIMIT = 200
 
     PROFILE_COLUMNS = { "bio" => :bio_raw, "website" => :website }.freeze
 
@@ -30,6 +35,29 @@ module Salesforce
       "likes_given" => :likes_given,
       "likes_received" => :likes_received,
     }.freeze
+
+    def self.source_key(mapping)
+      source = mapping["source"]
+      source == "custom_field" ? "#{CUSTOM_FIELD_KEY_PREFIX}#{mapping["value"]}" : source
+    end
+
+    def self.custom_field_name(key)
+      if key.to_s.start_with?(CUSTOM_FIELD_KEY_PREFIX)
+        key.to_s.delete_prefix(CUSTOM_FIELD_KEY_PREFIX)
+      end
+    end
+
+    # Admin user fields are listed through custom_sources, so their storage keys are left out.
+    def self.custom_field_names
+      UserCustomField
+        .where("TRIM(name) <> ''")
+        .where.not(name: [Contact::ID_FIELD, Lead::ID_FIELD])
+        .where.not("name LIKE ?", "#{UserCustomField.sanitize_sql_like("user_field_")}%")
+        .distinct
+        .order(:name)
+        .limit(CUSTOM_FIELD_NAMES_LIMIT)
+        .pluck(:name)
+    end
 
     def self.custom_sources
       UserField
@@ -52,7 +80,7 @@ module Salesforce
     end
 
     def initialize(mappings, users)
-      sources = mappings.map { |mapping| mapping["source"] }
+      sources = mappings.map { |mapping| self.class.source_key(mapping) }
       user_ids = users.map(&:id)
       @recent_reads =
         if sources.include?("posts_read30")
@@ -127,7 +155,7 @@ module Salesforce
           .pluck(:id, :field_type)
           .to_h
           .transform_keys { |id| "user_field_#{id}" }
-      custom_keys = @field_types.keys
+      custom_keys = @field_types.keys + sources.filter_map { |s| self.class.custom_field_name(s) }
       @custom_values = User.custom_fields_for_ids(user_ids, custom_keys)
     end
 
@@ -164,6 +192,13 @@ module Salesforce
       end
       if column = STAT_COLUMNS[source]
         return @stats.dig(user.id, column) || 0
+      end
+
+      if name = self.class.custom_field_name(source)
+        value = @custom_values.dig(user.id, name)
+        return nil if value.nil? || value == ""
+        text = ->(item) { item.is_a?(String) ? item : item.to_json }
+        return value.is_a?(Array) ? value.map(&text) : text.call(value)
       end
 
       type = @field_types[source]

@@ -197,6 +197,132 @@ RSpec.describe Jobs::SyncSalesforceUser do
     expect(update).to have_been_requested.once
   end
 
+  describe "custom field source" do
+    let(:record) do
+      {
+        Id: "lead123",
+        LastName: "Morgan",
+        Company: "Unknown",
+        Trust__c: user.trust_level,
+        Tier__c: "gold",
+        Region__c: "emea",
+      }
+    end
+
+    before do
+      configuration.update!(
+        mappings:
+          configuration.mappings +
+            [
+              {
+                "source" => "custom_field",
+                "value" => "account_tier",
+                "destination" => "Tier__c",
+                "policy" => "overwrite",
+              },
+              {
+                "source" => "custom_field",
+                "value" => "account_region",
+                "destination" => "Region__c",
+                "policy" => "overwrite",
+              },
+            ],
+      )
+      fields.concat(
+        %w[Tier__c Region__c].map do |name|
+          { name: name, type: "string", createable: true, updateable: true }
+        end,
+      )
+      stub_request(:get, "#{api_path}/Lead/describe").to_return(body: { fields: fields }.to_json)
+      user.custom_fields["account_tier"] = "gold"
+      user.custom_fields["account_region"] = "emea"
+      user.save_custom_fields
+    end
+
+    def stub_lookup(record: nil)
+      stub_salesforce_person_lookup(
+        "Lead",
+        user.email,
+        records: record ? nil : [],
+        record: record,
+        fields: %w[LastName Company Trust__c Tier__c Region__c],
+      )
+    end
+
+    it "sends each field's value on creation and on update" do
+      stub_lookup
+      create =
+        stub_request(:post, "#{api_path}/Lead").with(
+          body: hash_including(Tier__c: "gold", Region__c: "emea"),
+        ).to_return(status: 201, body: { id: "lead123" }.to_json)
+      run_sync
+      expect(create).to have_been_requested.once
+
+      stub_lookup(record: record.merge(Tier__c: "old", Region__c: "old"))
+      stub_request(:get, "#{api_path}/Lead/lead123").to_return(
+        body: record.merge(Tier__c: "old", Region__c: "old").to_json,
+      )
+      update =
+        stub_request(:patch, "#{api_path}/Lead/lead123").with(
+          body: {
+            Tier__c: "gold",
+            Region__c: "emea",
+          },
+        ).to_return(status: 204)
+      run_sync
+      expect(update).to have_been_requested.once
+    end
+
+    it "sends nothing for a user without the field" do
+      user.custom_fields.delete("account_tier")
+      user.save_custom_fields
+      stub_lookup
+      create =
+        stub_request(:post, "#{api_path}/Lead")
+          .with do |request|
+            body = JSON.parse(request.body)
+            body["Region__c"] == "emea" && !body.key?("Tier__c")
+          end
+          .to_return(status: 201, body: { id: "lead123" }.to_json)
+      run_sync
+      expect(create).to have_been_requested.once
+    end
+
+    it "syncs on change only when a mapped custom field value changed" do
+      stub_lookup(record: record)
+      stub_request(:get, "#{api_path}/Lead/lead123").to_return(body: record.to_json)
+      run_sync("change")
+      user.update_columns(locale: "fr")
+      run_sync("change")
+      expect(a_request(:get, "#{api_path}/Lead/lead123")).not_to have_been_made
+
+      user.custom_fields["account_region"] = "apac"
+      user.save_custom_fields
+      update =
+        stub_request(:patch, "#{api_path}/Lead/lead123").with(
+          body: {
+            Region__c: "apac",
+          },
+        ).to_return(status: 204)
+      run_sync("change")
+      expect(update).to have_been_requested.once
+
+      synced = record.merge(Region__c: "apac")
+      stub_lookup(record: synced)
+      stub_request(:get, "#{api_path}/Lead/lead123").to_return(body: synced.to_json)
+      user.custom_fields["account_tier"] = "silver"
+      user.save_custom_fields
+      tier_update =
+        stub_request(:patch, "#{api_path}/Lead/lead123").with(
+          body: {
+            Tier__c: "silver",
+          },
+        ).to_return(status: 204)
+      run_sync("change")
+      expect(tier_update).to have_been_requested.once
+    end
+  end
+
   it "recreates a confirmed deleted Lead and relinks subsequent retries" do
     old_id = "00Qbm00000v6wJpEAI"
     Salesforce::RecordLink.link!(

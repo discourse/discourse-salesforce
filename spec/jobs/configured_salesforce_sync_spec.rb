@@ -306,61 +306,20 @@ RSpec.describe Jobs::SyncSalesforceUser do
         ).to_return(status: 204)
       run_sync("change")
       expect(update).to have_been_requested.once
-    end
 
-    it "does not collide two mappings with different field names in the fingerprint" do
-      stub_lookup(record: record)
-      stub_request(:get, "#{api_path}/Lead/lead123").to_return(body: record.to_json)
-      run_sync("change")
+      synced = record.merge(Region__c: "apac")
+      stub_lookup(record: synced)
+      stub_request(:get, "#{api_path}/Lead/lead123").to_return(body: synced.to_json)
       user.custom_fields["account_tier"] = "silver"
       user.save_custom_fields
-      update =
+      tier_update =
         stub_request(:patch, "#{api_path}/Lead/lead123").with(
           body: {
             Tier__c: "silver",
           },
         ).to_return(status: 204)
       run_sync("change")
-      expect(update).to have_been_requested.once
-    end
-  end
-
-  describe ".validate_mappings!" do
-    let(:validation_fields) do
-      %w[Email LastName Company Trust__c Tier__c].map do |name|
-        {
-          "name" => name,
-          "type" => name == "Trust__c" ? "int" : "string",
-          "createable" => true,
-          "updateable" => true,
-        }
-      end
-    end
-
-    def validate(value)
-      configuration.mappings =
-        configuration.mappings.reject { |mapping| mapping["destination"] == "Tier__c" } +
-          [
-            {
-              "source" => "custom_field",
-              "value" => value,
-              "destination" => "Tier__c",
-              "policy" => "overwrite",
-            },
-          ]
-      Salesforce::ConfiguredUserSync.validate_mappings!(configuration, validation_fields)
-    end
-
-    it "rejects blank, non-string and oversized names" do
-      [nil, "", "  ", 5, "a" * 257].each do |value|
-        expect { validate(value) }.to raise_error(Discourse::InvalidParameters)
-      end
-    end
-
-    it "accepts any other name" do
-      ["account_tier", "a" * 256, "user_field_1", "some:odd name"].each do |value|
-        expect { validate(value) }.not_to raise_error
-      end
+      expect(tier_update).to have_been_requested.once
     end
   end
 

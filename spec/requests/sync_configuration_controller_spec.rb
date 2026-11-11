@@ -119,7 +119,7 @@ RSpec.describe Salesforce::SyncConfigurationController do
       end
     end
 
-    it "lists known user custom field names without admin user fields or blanks" do
+    it "lists known user custom field names without admin user fields, link fields or blanks" do
       sign_in(admin)
       stub_request(:get, "#{api_path}/Lead/describe").to_return(body: { fields: [] }.to_json)
       admin_field = Fabricate(:user_field)
@@ -128,6 +128,9 @@ RSpec.describe Salesforce::SyncConfigurationController do
       UserCustomField.create!(user_id: Fabricate(:user).id, name: "account_tier", value: "tin")
       UserCustomField.create!(user_id: admin.id, name: "region", value: "emea")
       UserCustomField.create!(user_id: admin.id, name: " ", value: "x")
+      [Salesforce::Contact::ID_FIELD, Salesforce::Lead::ID_FIELD].each do |name|
+        UserCustomField.create!(user_id: admin.id, name: name, value: "x")
+      end
       get "/salesforce/admin/guided-sync/fields.json", params: { object: "Lead" }
       expect(response.parsed_body.fetch("custom_field_names")).to eq(%w[account_tier region])
     end
@@ -341,7 +344,7 @@ RSpec.describe Salesforce::SyncConfigurationController do
       end
     end
 
-    it "persists a custom field mapping and rejects blank, padded or oversized names" do
+    it "persists a custom field mapping and rejects invalid names" do
       sign_in(admin)
       configuration[:mappings][1] = {
         source: "custom_field",
@@ -359,7 +362,7 @@ RSpec.describe Salesforce::SyncConfigurationController do
         "source" => "custom_field",
         "value" => "account_tier",
       )
-      [nil, "  ", " account_tier", "account_tier ", "a" * 257].each do |value|
+      [nil, "  ", 5, "a" * 257].each do |value|
         configuration[:mappings][1][:value] = value
         post "/salesforce/admin/guided-sync/configurations.json",
              params: {

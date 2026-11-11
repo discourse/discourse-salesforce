@@ -128,7 +128,7 @@ reconciliation preserve conflicting existing Lead or Contact associations. New L
 LeadSource can be mapped to optional static text. Administrators must
 map values accepted by their org's picklists and validation rules; Salesforce rejects
 invalid payloads and the job records the failure. No implicit AccountId lookup occurs.
-Configured custom user fields are available as mapping sources. Other custom fields are only readable through the explicit **User custom field** source, which names the field.
+Admin user fields are available as mapping sources.
 
 All-time posts use UserStat; 30-day posts count nondeleted regular posts on regular
 topics; group membership includes the user's group names. Last seen uses last_seen_at.
@@ -150,9 +150,7 @@ to `LeadSource`. Static values must contain 1–1,000 characters and use the sam
 keep/overwrite rules as other mappings. Choose Discourse under **Keep value from**
 to replace an existing Salesforce value.
 
-Existing user custom fields are listed under **Custom fields**. Choose **Other…** and type a
-field name (1–256 characters, no leading or trailing spaces) for one that is not listed.
-Text values are sent as is, array items are sent individually, and other values are sent as JSON text.
+Other user custom fields are listed under **Custom fields**; choose **Other…** to type a name that is not listed. Values are sent as text: lists are joined and other non-text values are sent as JSON.
 
 When Salesforce confirms a linked Lead was deleted (and not converted), sync matches
 by email again and creates a replacement if no active match exists. Missing or

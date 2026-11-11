@@ -21,8 +21,8 @@ import SalesforceSourceMenu from "discourse/plugins/discourse-salesforce/discour
 import {
   createCompanyMapping,
   createSyncConfiguration,
-  listedCustomFieldOption,
-  OTHER_CUSTOM_FIELD_SOURCE,
+  customFieldSources,
+  sourceLabel,
   sourceOption,
   updateMapping,
   USER_SYNC_SOURCES,
@@ -128,16 +128,7 @@ export default class SalesforceSyncConfiguration extends Component {
         group: "custom",
         label: source.name,
       })),
-      ...this.customFieldNames.map((name) => ({
-        id: listedCustomFieldOption(name),
-        type: "text",
-        group: "custom",
-        label: name,
-      })),
-      {
-        ...OTHER_CUSTOM_FIELD_SOURCE,
-        label: i18n(`${PREFIX}.sources.custom_field`),
-      },
+      ...customFieldSources(this.customFieldNames),
     ];
   }
 
@@ -275,7 +266,7 @@ export default class SalesforceSyncConfiguration extends Component {
       );
       if (source && source.type !== field.type) {
         message = i18n(`${PREFIX}.errors.incompatible`, {
-          source: source.label,
+          source: sourceLabel(mapping, this.sources),
           source_type: source.type,
           destination: field.id,
           destination_type: field.type,
@@ -289,11 +280,20 @@ export default class SalesforceSyncConfiguration extends Component {
 
   @action
   valueInput(mapping) {
-    return valueInputFor(mapping, this.customFieldNames);
+    const input = valueInputFor(mapping, this.customFieldNames);
+    return (
+      input && {
+        label: i18n(`${PREFIX}.${input.id}`),
+        error: i18n(`${PREFIX}.errors.${input.id}`),
+        description:
+          input.description && i18n(`${PREFIX}.${input.description}`),
+        maxLength: input.maxLength,
+      }
+    );
   }
 
   @action
-  sourceOption(mapping) {
+  selectedSource(mapping) {
     return sourceOption(mapping, this.customFieldNames);
   }
 
@@ -306,13 +306,9 @@ export default class SalesforceSyncConfiguration extends Component {
     if (
       typeof value !== "string" ||
       !value.trim() ||
-      value.length > input.maxLength ||
-      (input.trimmed && value !== value.trim())
+      value.length > input.maxLength
     ) {
-      addError(name, {
-        title: i18n(`${PREFIX}.${input.id}`),
-        message: i18n(`${PREFIX}.errors.${input.id}`),
-      });
+      addError(name, { title: input.label, message: input.error });
     }
   }
 
@@ -780,40 +776,27 @@ export default class SalesforceSyncConfiguration extends Component {
                         <SalesforceSourceMenu
                           @control={{field.Control}}
                           @sources={{this.sources}}
-                          @value={{this.sourceOption mapping}}
+                          @value={{this.selectedSource mapping}}
                         />
                       </collection.Field>
                       {{#let (this.valueInput mapping) as |input|}}
                         {{#if input}}
                           <collection.Field
-                            @description={{if
-                              input.description
-                              (i18n
-                                (concat
-                                  "salesforce.guided_sync." input.description
-                                )
-                              )
-                            }}
+                            @description={{input.description}}
                             @format="full"
                             @name="value"
                             @showTitle={{false}}
                             @onSet={{fn this.setMapping "value"}}
                             @validate={{this.validateSourceValue}}
-                            @title={{i18n
-                              (concat "salesforce.guided_sync." input.id)
-                            }}
+                            @title={{input.label}}
                             @type="input"
                             @validation="required"
                             as |field|
                           >
                             <field.Control
-                              aria-label={{i18n
-                                (concat "salesforce.guided_sync." input.id)
-                              }}
+                              aria-label={{input.label}}
                               maxlength={{input.maxLength}}
-                              placeholder={{i18n
-                                (concat "salesforce.guided_sync." input.id)
-                              }}
+                              placeholder={{input.label}}
                             />
                           </collection.Field>
                         {{/if}}

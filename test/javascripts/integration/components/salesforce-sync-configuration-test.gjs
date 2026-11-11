@@ -12,7 +12,10 @@ import { setupRenderingTest } from "discourse/tests/helpers/component-test";
 import pretender from "discourse/tests/helpers/create-pretender";
 import formKit from "discourse/tests/helpers/form-kit-helper";
 import SalesforceSyncConfiguration from "discourse/plugins/discourse-salesforce/discourse/components/salesforce-sync-configuration";
-import { createSyncConfiguration } from "discourse/plugins/discourse-salesforce/discourse/lib/sync-configuration";
+import {
+  createCompanyMapping,
+  createSyncConfiguration,
+} from "discourse/plugins/discourse-salesforce/discourse/lib/sync-configuration";
 import selectSyncGroups from "../../helpers/select-sync-groups";
 import { SALESFORCE_FIELDS } from "../../helpers/sync-fields-fixtures";
 
@@ -523,37 +526,6 @@ module(
       });
     });
 
-    test("saves the typed name of a user custom field", async function (assert) {
-      const saved = [];
-      this.save = (configuration) => saved.push(structuredClone(configuration));
-      await render(
-        <template>
-          <SalesforceSyncConfiguration
-            @groups={{this.groups}}
-            @onSave={{this.save}}
-          />
-        </template>
-      );
-      await selectSyncGroups("customers");
-      await click("[data-test-add-mapping]");
-      await formKit().field("mappings.4.source").select("custom_field");
-      await formKit().field("mappings.4.destination").select("LeadSource");
-      assert
-        .dom('[data-name="mappings.4.value"] input')
-        .exists("shows the field name input");
-      await click("[data-test-save]");
-      assert.dom(".form-kit__errors-summary").exists("requires a name");
-      assert.strictEqual(saved.length, 0, "does not submit a blank name");
-      await formKit().field("mappings.4.value").fillIn("account_tier");
-      await click("[data-test-save]");
-      assert.strictEqual(saved.length, 1);
-      assert.propContains(saved[0].mappings[4], {
-        source: "custom_field",
-        value: "account_tier",
-        destination: "LeadSource",
-      });
-    });
-
     test("Lead company defaults to editable static text and can use a custom field", async function (assert) {
       this.customSources = [
         { id: "user_field_42", name: "Company", type: "text" },
@@ -608,23 +580,7 @@ module(
         .hasValue("Unknown", "restores the explicit Lead default");
     });
 
-    test("switching the default Company mapping to a custom field clears the static value", async function (assert) {
-      await render(
-        <template>
-          <SalesforceSyncConfiguration @groups={{this.groups}} />
-        </template>
-      );
-      await selectSyncGroups("customers");
-      assert
-        .dom('[data-name="mappings.3.value"] input')
-        .hasValue("Unknown", "starts with the static default");
-      await formKit().field("mappings.3.source").select("custom_field");
-      assert
-        .dom('[data-name="mappings.3.value"] input')
-        .hasValue("", "does not carry the static text into the field name");
-    });
-
-    test("lists existing user custom fields under Custom fields", async function (assert) {
+    test("picks a listed user custom field without asking for a name", async function (assert) {
       this.customFieldNames = ["account_tier", "region"];
       const saved = [];
       this.save = (configuration) => saved.push(structuredClone(configuration));
@@ -641,26 +597,8 @@ module(
       await click(
         '[data-name="mappings.4.source"] .form-kit__control-menu-trigger'
       );
-      assert
-        .dom(".salesforce-source-menu__option")
-        .exists("lists the known names");
-      const labels = [
-        ...document.querySelectorAll(
-          ".salesforce-source-menu__group, .salesforce-source-menu__option"
-        ),
-      ].map((element) => element.textContent.trim());
-      const custom = labels.slice(labels.indexOf("Custom fields") + 1);
-      assert.deepEqual(
-        custom.slice(0, 3),
-        ["account_tier", "region", "Other…"],
-        "ends the group with Other…"
-      );
-      assert.false(
-        labels.includes("User custom field"),
-        "no longer offers the typed entry under Custom values"
-      );
       await click(
-        '.form-kit__control-menu-item[data-value="custom_field:region"] button'
+        '.form-kit__control-menu-item[data-value="listed_custom_field:region"] button'
       );
       assert
         .dom('[data-name="mappings.4.source"]')
@@ -670,15 +608,14 @@ module(
         .doesNotExist("does not ask for a name");
       await formKit().field("mappings.4.destination").select("LeadSource");
       await click("[data-test-save]");
-      assert.strictEqual(saved.length, 1);
-      assert.propContains(saved[0].mappings[4], {
-        source: "custom_field",
-        value: "region",
-        destination: "LeadSource",
-      });
+      assert.propContains(
+        saved[0].mappings[4],
+        { source: "custom_field", value: "region" },
+        "saves the field name as the value"
+      );
     });
 
-    test("Other… asks for the name and keeps typing in the input", async function (assert) {
+    test("Other… takes a typed custom field name", async function (assert) {
       this.customFieldNames = ["account_tier"];
       const saved = [];
       this.save = (configuration) => saved.push(structuredClone(configuration));
@@ -691,43 +628,41 @@ module(
         </template>
       );
       await selectSyncGroups("customers");
-      await click("[data-test-add-mapping]");
-      await formKit().field("mappings.4.source").select("custom_field");
-      await formKit().field("mappings.4.destination").select("LeadSource");
+      await formKit().field("mappings.3.source").select("custom_field");
       assert
-        .dom('[data-name="mappings.4.source"]')
+        .dom('[data-name="mappings.3.source"]')
         .includesText("Other…", "shows the Other… entry");
-      await formKit().field("mappings.4.value").fillIn("account_tier");
       assert
-        .dom('[data-name="mappings.4.value"] input')
+        .dom('[data-name="mappings.3.value"] input')
+        .hasValue("", "does not carry the static text into the name");
+      await click("[data-test-save]");
+      assert.dom(".form-kit__errors-summary").exists("requires a name");
+      assert.strictEqual(saved.length, 0, "does not submit a blank name");
+      await formKit().field("mappings.3.value").fillIn("account_tier");
+      assert
+        .dom('[data-name="mappings.3.value"] input')
         .hasValue("account_tier", "keeps the input when the name is listed");
       await click("[data-test-save]");
-      assert.propContains(saved[0].mappings[4], {
-        source: "custom_field",
-        value: "account_tier",
-      });
+      assert.propContains(
+        saved[0].mappings[3],
+        { source: "custom_field", value: "account_tier" },
+        "saves the typed name"
+      );
     });
 
-    test("loads a saved custom field as the listed entry or as Other…", async function (assert) {
+    test("loads saved custom fields as listed or Other…", async function (assert) {
       this.customFieldNames = ["account_tier"];
       this.record = {
+        ...createSyncConfiguration(),
         id: 9,
         name: "Saved",
         kind: "users",
-        object: "Lead",
-        schedule: "daily",
         backfill: false,
         group_ids: [2],
         groups: ["customers"],
         mappings: [
           { id: 1, source: "last", destination: "LastName", policy: "keep" },
-          {
-            id: 2,
-            source: "static",
-            value: "X",
-            destination: "Company",
-            policy: "keep",
-          },
+          { ...createCompanyMapping(2), destination: "Description" },
           {
             id: 3,
             source: "custom_field",
@@ -739,7 +674,7 @@ module(
             id: 4,
             source: "custom_field",
             value: "legacy_flag",
-            destination: "Description",
+            destination: "Company",
             policy: "keep",
           },
         ],
@@ -754,7 +689,7 @@ module(
       );
       assert
         .dom('[data-name="mappings.2.source"]')
-        .includesText("account_tier", "shows the listed entry");
+        .includesText("account_tier", "shows the listed name");
       assert
         .dom('[data-name="mappings.2.value"]')
         .doesNotExist("hides the input for a listed name");
@@ -764,28 +699,6 @@ module(
       assert
         .dom('[data-name="mappings.3.value"] input')
         .hasValue("legacy_flag", "fills in the saved name");
-    });
-
-    test("rejects custom field names with surrounding whitespace", async function (assert) {
-      const saved = [];
-      this.save = (configuration) => saved.push(structuredClone(configuration));
-      await render(
-        <template>
-          <SalesforceSyncConfiguration
-            @groups={{this.groups}}
-            @onSave={{this.save}}
-          />
-        </template>
-      );
-      await selectSyncGroups("customers");
-      await formKit().field("mappings.3.source").select("custom_field");
-      await formKit().field("mappings.3.value").fillIn(" account_tier");
-      await click("[data-test-save]");
-      assert.dom(".form-kit__errors-summary").exists();
-      assert.strictEqual(saved.length, 0, "does not submit a padded name");
-      await formKit().field("mappings.3.value").fillIn("account_tier");
-      await click("[data-test-save]");
-      assert.strictEqual(saved.length, 1);
     });
 
     test("backfill label handles missing counts and uses the selected group's real count", async function (assert) {

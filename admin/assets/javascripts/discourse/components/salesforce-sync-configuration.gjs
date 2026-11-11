@@ -1,7 +1,6 @@
 import Component from "@glimmer/component";
 import { tracked } from "@glimmer/tracking";
 import { concat, fn } from "@ember/helper";
-import { on } from "@ember/modifier";
 import { action } from "@ember/object";
 import { cancel, next } from "@ember/runloop";
 import { service } from "@ember/service";
@@ -13,12 +12,12 @@ import { eq } from "discourse/truth-helpers";
 import DButton from "discourse/ui-kit/d-button";
 import DConditionalLoadingSpinner from "discourse/ui-kit/d-conditional-loading-spinner";
 import DMultiSelect from "discourse/ui-kit/d-multi-select";
-import DPageSubheader from "discourse/ui-kit/d-page-subheader";
 import dIcon from "discourse/ui-kit/helpers/d-icon";
 import { i18n } from "discourse-i18n";
 import SalesforceCreateGroupModal from "discourse/plugins/discourse-salesforce/discourse/components/salesforce-create-group-modal";
 import SalesforceFieldMenu from "discourse/plugins/discourse-salesforce/discourse/components/salesforce-field-menu";
 import SalesforceSourceMenu from "discourse/plugins/discourse-salesforce/discourse/components/salesforce-source-menu";
+import SyncConfigurationHeading from "discourse/plugins/discourse-salesforce/discourse/components/sync-configuration-heading";
 import {
   createCompanyMapping,
   createSyncConfiguration,
@@ -37,7 +36,6 @@ export default class SalesforceSyncConfiguration extends Component {
     this.args.record || createSyncConfiguration()
   );
   @tracked createdGroups = [];
-  @tracked nameFormData;
   @tracked saving = false;
   @tracked salesforceFields = [];
   @tracked customSources = [];
@@ -388,33 +386,9 @@ export default class SalesforceSyncConfiguration extends Component {
   }
 
   @action
-  editName() {
-    this.nameFormData = { name: this.title };
-  }
-
-  @action
-  cancelNameEdit() {
-    this.nameFormData = null;
-  }
-
-  @action
-  handleNameKeydown(event) {
-    if (event.key === "Escape") {
-      event.preventDefault();
-      event.stopPropagation();
-      this.cancelNameEdit();
-    }
-  }
-
-  @action
-  applyName({ name }) {
-    const value = name.trim();
-    if (!value) {
-      return;
-    }
+  applyName(value) {
     this.#form?.set("name", value);
     this.configuration = { ...this.configuration, name: value };
-    this.nameFormData = null;
   }
 
   @action
@@ -480,58 +454,12 @@ export default class SalesforceSyncConfiguration extends Component {
       class="salesforce-sync-configuration admin-config-page__main-area"
       ...attributes
     >
-      <div class="salesforce-sync-configuration__heading">
-        {{#if this.nameFormData}}
-          <Form
-            class="salesforce-sync-configuration__name-form"
-            @data={{this.nameFormData}}
-            @onSubmit={{this.applyName}}
-            @onDirtyCheck={{this.allowNavigation}}
-            as |nameForm|
-          >
-            <nameForm.Field
-              @format="full"
-              @name="name"
-              @showTitle={{false}}
-              @title={{i18n "salesforce.guided_sync.configuration_name"}}
-              @type="input"
-              @validation="required"
-              as |field|
-            >
-              <field.Control
-                @autofocus={{true}}
-                @maxlength={{60}}
-                {{on "keydown" this.handleNameKeydown}}
-              />
-            </nameForm.Field>
-            <div class="salesforce-sync-configuration__name-actions">
-              <DButton
-                class="btn-primary"
-                type="submit"
-                @icon="check"
-                @title="salesforce.guided_sync.apply_name"
-              />
-              <DButton
-                class="btn-transparent"
-                @action={{this.cancelNameEdit}}
-                @icon="xmark"
-                @title="cancel"
-              />
-            </div>
-          </Form>
-        {{else}}
-          <DPageSubheader @titleLabel={{this.title}} />
-          {{#if @onSave}}
-            <DButton
-              class="btn-transparent"
-              data-test-edit-name
-              @action={{this.editName}}
-              @icon="pencil"
-              @title="salesforce.guided_sync.edit_name"
-            />
-          {{/if}}
-        {{/if}}
-      </div>
+      <SyncConfigurationHeading
+        class="salesforce-sync-configuration__heading"
+        @editable={{@onSave}}
+        @onApply={{this.applyName}}
+        @title={{this.title}}
+      />
       <p>{{i18n "salesforce.guided_sync.description"}}</p>
 
       <Form

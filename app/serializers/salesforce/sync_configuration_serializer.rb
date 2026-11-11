@@ -6,6 +6,7 @@ module Salesforce
                :name,
                :kind,
                :provider,
+               :direction,
                :schedule,
                :backfill,
                :group_ids,

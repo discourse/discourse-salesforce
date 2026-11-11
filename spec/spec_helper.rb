@@ -68,3 +68,60 @@ RSpec.shared_context "with salesforce spec helper" do
     )
   end
 end
+
+RSpec.shared_context "with hubspot spec helper" do
+  before do
+    Rails.cache.clear
+    SiteSetting.salesforce_enabled = true
+    SiteSetting.enable_guided_sync_configuration = true
+    SiteSetting.hubspot_enabled = true
+    SiteSetting.hubspot_portal_id = "12345"
+    SiteSetting.hubspot_access_token = "HUBSPOT_ACCESS_TOKEN"
+  end
+
+  def hubspot_url(path)
+    "https://api.hubapi.com/crm/v3/#{path}"
+  end
+
+  def hubspot_contact(id, email, **properties)
+    {
+      "id" => id.to_s,
+      "properties" => { "email" => email, "lastmodifieddate" => "2026-11-01T10:00:00.000Z" }.merge(
+        properties.stringify_keys,
+      ),
+    }
+  end
+
+  def stub_hubspot_properties(names)
+    stub_request(:get, hubspot_url("properties/contacts")).to_return(
+      body: {
+        results:
+          names.map do |name|
+            { name: name, label: name.humanize, type: "string", groupName: "contactinformation" }
+          end,
+      }.to_json,
+    )
+  end
+
+  def stub_hubspot_contact_list(results, query: {}, after: nil)
+    stub_request(:get, hubspot_url("objects/contacts")).with(
+      query: hash_including(query),
+    ).to_return(
+      body: { results: results, paging: after ? { next: { after: after } } : nil }.compact.to_json,
+    )
+  end
+
+  def stub_hubspot_contact_search(results, after: nil, status: 200, headers: {})
+    stub_request(:post, hubspot_url("objects/contacts/search")).to_return(
+      status: status,
+      headers: headers,
+      body: { results: results, paging: after ? { next: { after: after } } : nil }.compact.to_json,
+    )
+  end
+
+  def stub_hubspot_batch_read(results)
+    stub_request(:post, hubspot_url("objects/contacts/batch/read")).to_return(
+      body: { results: results }.to_json,
+    )
+  end
+end

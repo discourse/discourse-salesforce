@@ -31,6 +31,15 @@ register_svg_icon "address-card"
 register_svg_icon "link-slash"
 
 after_initialize do
+  if respond_to?(:register_discourse_workflows_node)
+    register_discourse_workflows_node do
+      [
+        DiscourseWorkflows::Nodes::SalesforceCaseCreated::V1,
+        DiscourseWorkflows::Nodes::SalesforcePersonLinked::V1,
+      ]
+    end
+  end
+
   add_to_class(:guardian, :can_sync_salesforce_cases?) do
     is_admin? || (is_moderator? && SiteSetting.salesforce_allow_moderators_to_create_cases)
   end

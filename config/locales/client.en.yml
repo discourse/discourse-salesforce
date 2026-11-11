@@ -5,6 +5,24 @@ en:
         categories:
           discourse_salesforce: "Discourse Salesforce"
   js:
+    discourse_workflows:
+      node_unavailable:
+        requires_salesforce: "Requires the Salesforce plugin to be enabled"
+      nodes:
+        "trigger:salesforce_case_created": "Salesforce case created"
+        "trigger:salesforce_person_linked": "Salesforce contact or lead linked"
+      node_descriptions:
+        "trigger:salesforce_case_created": "Fires when a Salesforce case is created for a topic"
+        "trigger:salesforce_person_linked": "Fires when a user is linked to a Salesforce contact or lead, either an existing record or one that was just created"
+      salesforce_case_created:
+        tag_names: "Tags"
+        tag_names_description: "Only trigger for topics that have at least one of these tags"
+      salesforce_person_linked:
+        objects: "Objects"
+        objects_description: "Leave empty to match both contacts and leads."
+        objects_contact: "Contact"
+        objects_lead: "Lead"
+        objects_placeholder: "Contacts and leads"
     login:
       salesforce:
         name: "Salesforce"

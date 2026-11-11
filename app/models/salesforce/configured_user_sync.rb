@@ -93,6 +93,13 @@ module Salesforce
       record = existing_record
       return if record == :converted_lead
       return if record == :conversion_error
+      if record.nil? && existing_contact_for_lead?
+        SyncState.where(configuration_id: @configuration.id, user_id: @user.id).update_all(
+          fingerprint: nil,
+        )
+        SyncConfiguration.record_result(@configuration.id, @user.id)
+        return
+      end
       values = mapped_values(fields, record)
       if record
         id = record.fetch("Id")
@@ -168,6 +175,10 @@ module Salesforce
     end
 
     private
+
+    def existing_contact_for_lead?
+      @person == Lead && Contact.find_by_email(@user.email, api: @api).present?
+    end
 
     def link_scope(object: @configuration.object)
       {

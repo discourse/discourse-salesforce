@@ -71,14 +71,27 @@ RSpec.describe Salesforce::SyncConfigurationController do
       sign_in(admin)
       SiteSetting.salesforce_client_id = ""
       get "/salesforce/admin/guided-sync/configurations.json"
-      expect(response.parsed_body.fetch("credentials_configured")).to eq(false)
+      expect(response.parsed_body.fetch("providers")).to eq(
+        [{ "name" => "salesforce", "credentials_configured" => false }],
+      )
       SiteSetting.salesforce_client_id = "test-client"
       SiteSetting.salesforce_username = "test@example.com"
       SiteSetting.salesforce_rsa_private_key = "test-private-key"
       SiteSetting.salesforce_authorization_server_url = "https://login.salesforce.com"
+      SiteSetting.hubspot_enabled = true
       get "/salesforce/admin/guided-sync/configurations.json"
       expect(response.parsed_body).to include(
         "configurations" => [],
+        "providers" => [
+          { "name" => "salesforce", "credentials_configured" => true },
+          { "name" => "hubspot", "credentials_configured" => false },
+        ],
+      )
+      SiteSetting.hubspot_portal_id = "12345"
+      SiteSetting.hubspot_access_token = "HUBSPOT_ACCESS_TOKEN"
+      get "/salesforce/admin/guided-sync/configurations.json"
+      expect(response.parsed_body.fetch("providers").last).to eq(
+        "name" => "hubspot",
         "credentials_configured" => true,
       )
     end
@@ -224,6 +237,9 @@ RSpec.describe Salesforce::SyncConfigurationController do
 
     let(:configuration) do
       {
+        provider: "salesforce",
+        direction: "outbound",
+        kind: "users",
         name: "Lead sync",
         object: "Lead",
         group_ids: [sync_group.id],
@@ -488,6 +504,79 @@ RSpec.describe Salesforce::SyncConfigurationController do
       expect(Salesforce::SyncConfiguration.pluck(:id, :name)).to eq(
         [[record.fetch("id"), "Lead sync"]],
       )
+    end
+  end
+
+  describe "hubspot configurations" do
+    include_context "with hubspot spec helper"
+
+    let(:configuration) do
+      {
+        provider: "hubspot",
+        direction: "inbound",
+        kind: "users",
+        object: "contact",
+        name: "Import contacts",
+        schedule: "daily",
+        backfill: true,
+        mappings: [{ id: 1, source: "lifecyclestage" }, { id: 2, source: "jobtitle" }],
+      }
+    end
+
+    it "creates, lists and rejects hubspot configurations" do
+      sign_in(admin)
+      stub_hubspot_properties(%w[lifecyclestage jobtitle])
+
+      post "/salesforce/admin/guided-sync/configurations.json",
+           params: {
+             configuration: configuration,
+           },
+           as: :json
+      expect(response).to have_http_status(:created)
+      record = response.parsed_body.fetch("configuration")
+      expect(record).to include(
+        "provider" => "hubspot",
+        "direction" => "inbound",
+        "kind" => "users",
+        "object" => "contact",
+        "group_ids" => [],
+        "mappings" => [
+          { "id" => 1, "source" => "lifecyclestage" },
+          { "id" => 2, "source" => "jobtitle" },
+        ],
+      )
+      get "/salesforce/admin/guided-sync/configurations.json"
+      expect(response.parsed_body.fetch("configurations").map { |row| row.fetch("id") }).to eq(
+        [record.fetch("id")],
+      )
+
+      post "/salesforce/admin/guided-sync/configurations.json",
+           params: {
+             configuration: configuration.except(:direction),
+           },
+           as: :json
+      expect(response).to have_http_status(:bad_request)
+      post "/salesforce/admin/guided-sync/configurations.json",
+           params: {
+             configuration: configuration.merge(name: "Second import"),
+           },
+           as: :json
+      expect(response).to have_http_status(:bad_request)
+      expect(Salesforce::SyncConfiguration.count).to eq(1)
+    end
+
+    it "refuses hubspot configurations while the provider is disabled" do
+      sign_in(admin)
+      SiteSetting.hubspot_enabled = false
+
+      post "/salesforce/admin/guided-sync/configurations.json",
+           params: {
+             configuration: configuration,
+           },
+           as: :json
+      expect(response).to have_http_status(:bad_request)
+      expect(a_request(:any, /api.hubapi.com/)).not_to have_been_made
+      expect(Salesforce::SyncConfiguration.all).to be_empty
     end
   end
 end

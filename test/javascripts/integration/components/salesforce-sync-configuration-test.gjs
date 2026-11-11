@@ -77,44 +77,40 @@ module(
       await click("[data-test-edit-name]");
       assert
         .dom(
-          ".salesforce-sync-configuration__heading .salesforce-sync-configuration__name-form"
+          ".salesforce-sync-configuration__heading .sync-configuration-heading__form"
         )
         .exists("edits the name in the heading");
       assert
         .dom(".d-page-subheader__title")
         .doesNotExist("replaces the title while editing");
       await fillInput(
-        ".salesforce-sync-configuration__name-form input",
+        ".sync-configuration-heading__form input",
         "Customer contacts"
       );
-      await click(
-        '.salesforce-sync-configuration__name-form button[type="submit"]'
-      );
+      await click('.sync-configuration-heading__form button[type="submit"]');
       assert
         .dom(".d-page-subheader__title")
         .hasText("Customer contacts", "applies the name");
       assert
-        .dom(".salesforce-sync-configuration__name-form")
+        .dom(".sync-configuration-heading__form")
         .doesNotExist("closes the editor");
 
       await click("[data-test-edit-name]");
       await fillInput(
-        ".salesforce-sync-configuration__name-form input",
+        ".sync-configuration-heading__form input",
         "Discarded name"
       );
-      await click(
-        ".salesforce-sync-configuration__name-actions .btn-transparent"
-      );
+      await click(".sync-configuration-heading__actions .btn-transparent");
       assert
         .dom(".d-page-subheader__title")
         .hasText("Customer contacts", "cancel preserves the name");
       await click("[data-test-edit-name]");
       await fillInput(
-        ".salesforce-sync-configuration__name-form input",
+        ".sync-configuration-heading__form input",
         "Discard with Escape"
       );
       await triggerKeyEvent(
-        ".salesforce-sync-configuration__name-form input",
+        ".sync-configuration-heading__form input",
         "keydown",
         "Escape"
       );

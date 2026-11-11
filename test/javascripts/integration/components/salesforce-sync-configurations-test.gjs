@@ -4,7 +4,10 @@ import DialogHolder from "discourse/dialog-holder/components/dialog-holder";
 import { setupRenderingTest } from "discourse/tests/helpers/component-test";
 import pretender from "discourse/tests/helpers/create-pretender";
 import SalesforceSyncConfigurations from "discourse/plugins/discourse-salesforce/discourse/components/salesforce-sync-configurations";
-import { createSyncConfiguration } from "discourse/plugins/discourse-salesforce/discourse/lib/sync-configuration";
+import {
+  createHubspotSyncConfiguration,
+  createSyncConfiguration,
+} from "discourse/plugins/discourse-salesforce/discourse/lib/sync-configuration";
 import selectSyncGroups from "../../helpers/select-sync-groups";
 
 module(
@@ -40,13 +43,18 @@ module(
         { id: 2, name: "customers", user_count: 86 },
         { id: 3, name: "partners", user_count: 32 },
       ];
+      this.providers = [{ name: "salesforce", credentials_configured: true }];
+      this.allProviders = [
+        { name: "salesforce", credentials_configured: true },
+        { name: "hubspot", credentials_configured: true },
+      ];
     });
 
     test("post sync deep links cannot open the disabled post configuration", async function (assert) {
       await render(
         <template>
           <SalesforceSyncConfigurations
-            @credentialsConfigured={{true}}
+            @providers={{this.providers}}
             @selectedId="new-posts"
           />
         </template>
@@ -84,7 +92,7 @@ module(
       await render(
         <template>
           <SalesforceSyncConfigurations
-            @credentialsConfigured={{true}}
+            @providers={{this.providers}}
             @groups={{this.groups}}
             @onClose={{this.close}}
           />
@@ -103,9 +111,7 @@ module(
       await click('[data-test-configuration="saved"] button');
       await click("[data-test-edit-name]");
       await fillIn('[data-name="name"] input', "Updated user export");
-      await click(
-        '.salesforce-sync-configuration__name-form button[type="submit"]'
-      );
+      await click('.sync-configuration-heading__form button[type="submit"]');
       await click("[data-test-save]");
       assert
         .dom('[data-test-configuration="saved"]')
@@ -136,7 +142,7 @@ module(
         <template>
           <SalesforceSyncConfigurations
             @groups={{this.groups}}
-            @credentialsConfigured={{true}}
+            @providers={{this.providers}}
             @records={{this.records}}
           />
           <DialogHolder />
@@ -179,11 +185,14 @@ module(
     });
 
     test("requires configured plugin credentials before opening setup", async function (assert) {
+      this.noCredentials = [
+        { name: "salesforce", credentials_configured: false },
+      ];
       await render(
         <template>
           <SalesforceSyncConfigurations
             @groups={{this.groups}}
-            @credentialsConfigured={{false}}
+            @providers={{this.noCredentials}}
           />
         </template>
       );
@@ -203,7 +212,7 @@ module(
         <template>
           <SalesforceSyncConfigurations
             @groups={{this.groups}}
-            @credentialsConfigured={{true}}
+            @providers={{this.providers}}
           /><DialogHolder />
         </template>
       );
@@ -242,7 +251,7 @@ module(
         <template>
           <SalesforceSyncConfigurations
             @groups={{this.groups}}
-            @credentialsConfigured={{true}}
+            @providers={{this.providers}}
             @records={{this.records}}
             @selectedId="contact"
             @onClose={{this.close}}
@@ -297,7 +306,7 @@ module(
         <template>
           <SalesforceSyncConfigurations
             @groups={{this.groups}}
-            @credentialsConfigured={{true}}
+            @providers={{this.providers}}
             @records={{this.records}}
           /><DialogHolder />
         </template>
@@ -312,7 +321,7 @@ module(
           '[data-test-configuration="contact"] .salesforce-sync-configurations__status'
         )
         .hasText(
-          "Sending failed — check background job errors",
+          "Sync failed — check background job errors",
           "keeps errors visible"
         );
       assert
@@ -320,7 +329,7 @@ module(
           '[data-test-configuration="stale-connection"] .salesforce-sync-configurations__status'
         )
         .hasText(
-          "Salesforce connection changed. Configure and save again to resume sending."
+          "CRM connection changed. Configure and save again to resume syncing."
         );
       await click('[data-test-delete-configuration="lead"]');
       assert
@@ -346,6 +355,104 @@ module(
       assert
         .dom('[data-test-configuration="contact"]')
         .exists("keeps the other configuration");
+    });
+
+    test("offers HubSpot contact pull only while the provider is enabled and unconfigured", async function (assert) {
+      pretender.get("/salesforce/admin/hubspot/contact-properties.json", () => [
+        200,
+        { "Content-Type": "application/json" },
+        JSON.stringify({
+          properties: [{ name: "lifecyclestage", label: "Lifecycle stage" }],
+        }),
+      ]);
+      this.records = [];
+      await render(
+        <template>
+          <SalesforceSyncConfigurations
+            @groups={{this.groups}}
+            @providers={{this.providers}}
+            @records={{this.records}}
+          />
+        </template>
+      );
+      assert
+        .dom("[data-test-sync-contacts]")
+        .doesNotExist("hides HubSpot while the provider is disabled");
+
+      await render(
+        <template>
+          <SalesforceSyncConfigurations
+            @groups={{this.groups}}
+            @providers={{this.allProviders}}
+            @records={{this.records}}
+          />
+          <DialogHolder />
+        </template>
+      );
+      assert
+        .dom("[data-test-sync-contacts]")
+        .hasText("Pull contacts from HubSpot", "offers the HubSpot pull");
+      await click("[data-test-sync-contacts]");
+      assert
+        .dom(".hubspot-sync-configuration .d-page-subheader__title")
+        .hasText(
+          "Pull contacts",
+          "opens the HubSpot editor with a default name"
+        );
+      await click("[data-test-configurations-back]");
+      await click(".dialog-footer .btn-danger");
+
+      this.records = [
+        {
+          ...createHubspotSyncConfiguration(),
+          id: "hubspot",
+          name: "Pull contacts",
+        },
+      ];
+      await render(
+        <template>
+          <SalesforceSyncConfigurations
+            @groups={{this.groups}}
+            @providers={{this.allProviders}}
+            @records={{this.records}}
+          />
+        </template>
+      );
+      assert
+        .dom("[data-test-sync-contacts]")
+        .isDisabled("allows a single HubSpot pull");
+      assert.dom("[data-test-sync-contacts]").hasText("Already configured");
+      assert
+        .dom('[data-test-configuration="hubspot"]')
+        .includesText("Pull contacts from HubSpot", "labels the type");
+      assert
+        .dom(
+          '[data-test-configuration="hubspot"] [data-test-configuration-scope]'
+        )
+        .includesText("All users", "pulls apply to every user");
+      await click('[data-test-configuration="hubspot"] button');
+      assert
+        .dom(".hubspot-sync-configuration")
+        .exists("opens saved HubSpot configurations in the HubSpot editor");
+    });
+
+    test("opens a new HubSpot configuration from a direct link", async function (assert) {
+      pretender.get("/salesforce/admin/hubspot/contact-properties.json", () => [
+        200,
+        { "Content-Type": "application/json" },
+        JSON.stringify({ properties: [] }),
+      ]);
+      await render(
+        <template>
+          <SalesforceSyncConfigurations
+            @groups={{this.groups}}
+            @providers={{this.allProviders}}
+            @selectedId="new-hubspot-users"
+          />
+        </template>
+      );
+      assert.dom(".hubspot-sync-configuration").exists();
+      assert.dom(".salesforce-sync-configuration").doesNotExist();
     });
   }
 );

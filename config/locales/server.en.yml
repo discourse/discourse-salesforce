@@ -43,6 +43,12 @@ en:
   hubspot:
     error:
       invalid_response: "Invalid response from HubSpot API"
+      connection:
+        authentication: "HubSpot authentication failed. Check the private app access token, then retry."
+        permissions: "HubSpot denied access. Check the private app’s contact and property scopes, then retry."
+        rate_limit: "HubSpot is rate limiting requests. Wait a moment, then retry."
+        temporary: "HubSpot is temporarily unavailable. Retry in a few minutes."
+        invalid_response: "HubSpot returned an unexpected response. Retry, and check the plugin logs if it keeps failing."
   dashboard:
     problem:
       salesforce_invalid_credentials: "There was an issue with the Salesforce credentials. Please confirm the validity of the Salesforce client id and client secret settings"

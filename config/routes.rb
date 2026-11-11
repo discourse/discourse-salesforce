@@ -5,6 +5,7 @@ Salesforce::Engine.routes.draw do
   post "/cases/sync" => "cases#sync"
   delete "/cases/:id" => "cases#destroy"
   get "/admin/guided-sync/fields" => "sync_configuration#fields"
+  get "/admin/hubspot/contact-properties" => "/hubspot/contact_properties#index"
   get "/admin/guided-sync/groups" => "sync_configuration#groups"
   get "/admin/guided-sync/configurations" => "sync_configuration#configurations"
   post "/admin/guided-sync/configurations" => "sync_configuration#save_configuration"

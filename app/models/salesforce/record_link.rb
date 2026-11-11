@@ -4,6 +4,12 @@ module Salesforce
   class RecordLink < ActiveRecord::Base
     self.table_name = "crm_record_links"
 
+    belongs_to :record,
+               class_name: "Salesforce::Record",
+               primary_key: %i[provider account object external_id],
+               foreign_key: %i[provider account object external_id],
+               optional: true
+
     scope :within, ->(provider:, account:, object:) { where(provider:, account:, object:) }
     scope :live, -> { where(converted_to_id: nil) }
 
@@ -12,6 +18,11 @@ module Salesforce
         .where(user_id: user_ids)
         .order(:user_id)
         .index_by(&:user_id)
+    end
+
+    def self.link_many!(rows)
+      return if rows.empty?
+      insert_all(rows, unique_by: :index_crm_record_links_on_scope_user_and_external_id)
     end
 
     def self.link!(provider:, account:, object:, user_id:, external_id:, converted_from_id: nil)
@@ -70,5 +81,6 @@ end
 # Indexes
 #
 #  idx_on_provider_account_object_external_id_e6565f303b  (provider,account,object,external_id)
-#  idx_on_provider_account_object_user_id_2760c0fe2e      (provider,account,object,user_id) UNIQUE
+#  index_crm_record_links_on_salesforce_user              (provider,account,object,user_id) UNIQUE WHERE ((provider)::text = 'salesforce'::text)
+#  index_crm_record_links_on_scope_user_and_external_id   (provider,account,object,user_id,external_id) UNIQUE
 #

@@ -1,6 +1,7 @@
 @use "lib/viewport";
 
-.salesforce-sync-configuration {
+.salesforce-sync-configuration,
+.hubspot-sync-configuration {
   width: 100%;
   min-width: 0;
 
@@ -417,7 +418,7 @@
   }
 }
 
-.salesforce-sync-configuration__heading {
+.sync-configuration-heading {
   display: flex;
   align-items: center;
   gap: 0.5em;
@@ -427,7 +428,7 @@
   }
 }
 
-.salesforce-sync-configuration__name-form {
+.sync-configuration-heading__form {
   display: flex;
   flex-direction: row;
   align-items: flex-start;
@@ -447,13 +448,14 @@
   }
 }
 
-.salesforce-sync-configuration__name-actions {
+.sync-configuration-heading__actions {
   display: flex;
   flex-shrink: 0;
   gap: 0.5em;
 }
 
-.salesforce-sync-configuration__section {
+.salesforce-sync-configuration__section,
+.hubspot-sync-configuration__section {
   min-width: 0;
   padding-block: 1.5em;
   border-block-end: 1px solid var(--primary-low);
@@ -462,10 +464,35 @@
     margin-block: 0 0.35em;
   }
 
-  > .salesforce-sync-configuration__description {
+  > .salesforce-sync-configuration__description,
+  > .hubspot-sync-configuration__description {
     margin-block: 0 1em;
     color: var(--primary-high);
   }
+}
+
+.hubspot-sync-configuration__properties .d-multi-select-trigger {
+  max-width: 100%;
+  min-width: 0;
+}
+
+.hubspot-sync-configuration__property {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 1em;
+  width: 100%;
+
+  code {
+    padding: 0;
+    background: none;
+    color: var(--primary-high);
+    font-size: var(--font-down-1);
+  }
+}
+
+.hubspot-sync-configuration__retry-properties {
+  margin-block-start: 1em;
 }
 
 .salesforce-sync-configuration__scope-fields {
@@ -480,7 +507,8 @@
   }
 }
 
-.salesforce-sync-configuration__behavior-fields {
+.salesforce-sync-configuration__behavior-fields,
+.hubspot-sync-configuration__behavior-fields {
   display: flex;
   flex-direction: column;
   gap: 1.5em;

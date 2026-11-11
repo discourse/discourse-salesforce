@@ -5,6 +5,36 @@ en:
         categories:
           discourse_salesforce: "Discourse Salesforce"
   js:
+    discourse_workflows:
+      node_unavailable:
+        requires_salesforce: "Requires the Salesforce plugin to be enabled"
+      nodes:
+        "trigger:salesforce_case_created": "Salesforce case created"
+        "trigger:salesforce_person_linked": "Salesforce contact or lead linked"
+        "action:salesforce_record": "Salesforce record"
+      node_descriptions:
+        "trigger:salesforce_case_created": "Fires when a Salesforce case is created for a topic"
+        "trigger:salesforce_person_linked": "Fires when a user is linked to a new or existing Salesforce contact or lead"
+        "action:salesforce_record": "Read or update a record in Salesforce"
+      salesforce_person_linked:
+        objects: "Objects"
+        objects_contact: "Contact"
+        objects_lead: "Lead"
+        objects_placeholder: "Contacts and leads"
+      salesforce_record:
+        operation: "Operation"
+        operations:
+          get: "Get"
+          update: "Update"
+        object: "Object"
+        object_description: "The Salesforce object API name, for example Case"
+        record_id: "Record ID"
+        field_names: "Fields to return"
+        field_names_description: "Comma-separated field API names. Leave empty to return all fields."
+        fields: "Fields to update"
+        key_placeholder: "Field API name"
+        value_placeholder: "Value"
+        add_field: "Add field"
     login:
       salesforce:
         name: "Salesforce"

@@ -92,12 +92,19 @@ module ::Jobs
             end
           end
           destination = UserCustomField.find_by(user_id: current.user_id, name: destination_name)
+          previous_destination_id = destination&.value
           if destination && destination.id != current.id
             destination.update!(value: id)
             current.destroy!
           else
             current.update!(name: destination_name, value: id)
           end
+          Salesforce::Person.for_object(destination_object).announce_link(
+            current.user,
+            id,
+            previous_destination_id,
+            created: false,
+          )
           if object == "Lead"
             Salesforce::RecordLink.mark_converted!(
               **scope,

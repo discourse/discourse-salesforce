@@ -112,7 +112,7 @@ module Salesforce
           next
         end
         if record && values.empty?
-          sync.complete(record.fetch("Id"))
+          sync.complete(record.fetch("Id"), created: false)
         elsif record
           sync.save_link(record.fetch("Id"))
           updates << [user, sync, values.merge("Id" => record.fetch("Id"))]
@@ -188,7 +188,7 @@ module Salesforce
         .zip(results)
         .each do |(user, sync, _), result|
           if result["success"] == true && result["id"].present?
-            sync.complete(result.fetch("id"))
+            sync.complete(result.fetch("id"), created: method == :post)
           else
             retry_user(user, InvalidApiResponse.new(result.fetch("errors", []).to_json))
           end

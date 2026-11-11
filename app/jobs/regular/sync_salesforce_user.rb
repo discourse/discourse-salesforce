@@ -32,7 +32,8 @@ module ::Jobs
       end
 
       user = User.find(args[:user_id])
-      return if ::Salesforce::Contact.sync(user)
+      lock_key = "salesforce_person_create_#{user.id}"
+      return if DistributedMutex.synchronize(lock_key) { ::Salesforce::Contact.sync(user) }
 
       lead_id = nil
       if ::Salesforce.leads_enabled?
@@ -48,8 +49,9 @@ module ::Jobs
       end
 
       if lead_id
-        user.salesforce_lead_id = lead_id
-        user.save_custom_fields
+        DistributedMutex.synchronize(lock_key) do
+          ::Salesforce::Lead.link!(user, lead_id, created: false)
+        end
       elsif SiteSetting.salesforce_contact_auto_create_on_signup &&
             ::Salesforce::Person.auto_create_eligible?(user)
         user.create_salesforce_contact

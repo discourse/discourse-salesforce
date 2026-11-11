@@ -14,7 +14,7 @@ module Salesforce
       guardian.ensure_can_see!(topic)
 
       begin
-        salesforce_case = Case.sync!(topic)
+        salesforce_case = Case.sync!(topic, acting_user: current_user)
         render_serialized(salesforce_case, CaseSerializer)
       rescue Salesforce::InvalidCredentials
         render json: {

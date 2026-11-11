@@ -10,7 +10,7 @@ module ::Salesforce
     OBJECT_NAME = "Lead"
     REQUIRED_MAPPING_FIELDS = %w[LastName Company].freeze
 
-    def self.create!(user)
+    def self.create!(user, acting_user: nil)
       return unless Salesforce.leads_enabled?
 
       Salesforce.seed_groups! if group.blank?
@@ -37,7 +37,7 @@ module ::Salesforce
       result.fetch("records").first
     end
 
-    def self.sync(user)
+    def self.sync(user, acting_user: nil)
       return true if super
 
       converted_lead = find_converted_by_email(user.email)
@@ -103,8 +103,7 @@ module ::Salesforce
           converted_from_id: converted_lead["Id"],
         )
         user.salesforce_lead_id = nil if user.salesforce_lead_id == converted_lead["Id"]
-        user.salesforce_contact_id = contact_id
-        user.save_custom_fields
+        Contact.link!(user, contact_id, created: false, acting_user: acting_user)
       end
       true
     end

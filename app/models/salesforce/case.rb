@@ -96,38 +96,40 @@ module ::Salesforce
 
     CASE_ID_FIELD = "salesforce_case_id"
 
-    def self.sync!(topic)
+    def self.sync!(topic, acting_user: nil)
       salesforce_case = find_or_initialize_by(topic_id: topic.id)
-      salesforce_case.tap do |c|
-        user = topic.user
+      return salesforce_case.tap(&:sync!) if salesforce_case.persisted?
 
-        if c.new_record?
-          post = topic.first_post
-          description = "#{post.full_url}\n\n#{PostContent.body_for(post, max_length: 30_000)}"
-          c.contact_id =
-            contact_id_for(user) || SiteSetting.salesforce_default_contact_id_for_case_sync.presence
-          c.subject = topic.title
-          c.description = description
-          c.generate!
+      post = topic.first_post
+      description = "#{post.full_url}\n\n#{PostContent.body_for(post, max_length: 30_000)}"
+      salesforce_case.contact_id =
+        contact_id_for(topic.user, acting_user: acting_user) ||
+          SiteSetting.salesforce_default_contact_id_for_case_sync.presence
+      salesforce_case.subject = topic.title
+      salesforce_case.description = description
+      salesforce_case.generate!
 
-          Jobs.enqueue(:sync_case_comments, topic_id: topic.id)
+      begin
+        Jobs.enqueue(:sync_case_comments, topic_id: topic.id)
 
-          topic.custom_fields["has_salesforce_case"] = true
-          topic.save_custom_fields
-        end
+        topic.custom_fields["has_salesforce_case"] = true
+        topic.save_custom_fields
 
-        c.sync!
+        salesforce_case.sync!
+      ensure
+        DiscourseEvent.trigger(:salesforce_case_created, salesforce_case, acting_user: acting_user)
       end
+
       salesforce_case
     end
 
-    def self.contact_id_for(user)
+    def self.contact_id_for(user, acting_user: nil)
       return user.salesforce_contact_id if user.salesforce_contact_id
 
       if SiteSetting.salesforce_skip_contact_creation_on_case_sync
         nil
       else
-        user.create_salesforce_contact
+        Contact.create!(user, acting_user: acting_user)
       end
     end
 

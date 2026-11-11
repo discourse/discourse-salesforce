@@ -44,7 +44,7 @@ module Salesforce
           if mapping["source"] == "static"
             mapping["value"]
           else
-            @source_value.call(mapping["source"], field)
+            @source_value.call(UserSyncSources.key(mapping), field)
           end
         )
       return value if value.nil? || value == ""

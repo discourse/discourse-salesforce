@@ -43,7 +43,10 @@ export default class SalesforceFieldMenu extends Component {
           custom: (field.label || field.id).endsWith("__c"),
           description: assigned
             ? i18n("salesforce.guided_sync.mapped_to", {
-                source: source?.label || assigned.source,
+                source:
+                  (assigned.source === "custom_field" && assigned.value) ||
+                  source?.label ||
+                  assigned.source,
               })
             : null,
         };

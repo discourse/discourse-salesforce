@@ -220,4 +220,70 @@ RSpec.describe Salesforce::UserSyncSources do
       Salesforce::ConfiguredUserSync.validate_mappings!(configuration, fields)
     }.to raise_error(Discourse::InvalidParameters)
   end
+
+  describe "custom_field source" do
+    let(:fields) do
+      {
+        "Text__c" => "string",
+        "Number__c" => "string",
+        "Flag__c" => "string",
+        "Object__c" => "string",
+        "List__c" => "string",
+        "Objects__c" => "string",
+      }.map do |name, type|
+        { "name" => name, "type" => type, "createable" => true, "updateable" => true }
+      end
+    end
+
+    after do
+      %w[sf_int sf_bool sf_json sf_json_list].each do |name|
+        User.send(:custom_field_meta_data).delete(name)
+      end
+    end
+
+    it "sends typed, JSON and array values as text" do
+      User.register_custom_field_type("sf_int", :integer)
+      User.register_custom_field_type("sf_bool", :boolean)
+      User.register_custom_field_type("sf_json", :json)
+      User.register_custom_field_type("sf_json_list", :json)
+      user.custom_fields["sf_text"] = "plain"
+      user.custom_fields["sf_int"] = 42
+      user.custom_fields["sf_bool"] = false
+      user.custom_fields["sf_json"] = { "a" => 1 }
+      user.custom_fields["sf_json_list"] = [{ "a" => 1 }, { "b" => 2 }]
+      user.custom_fields["sf_multi"] = %w[One Two]
+      user.save_custom_fields
+      user = User.find(self.user.id)
+
+      destinations = {
+        "sf_text" => "Text__c",
+        "sf_int" => "Number__c",
+        "sf_bool" => "Flag__c",
+        "sf_json" => "Object__c",
+        "sf_multi" => "List__c",
+        "sf_json_list" => "Objects__c",
+      }
+      mappings =
+        destinations.map do |name, destination|
+          {
+            "source" => "custom_field",
+            "value" => name,
+            "destination" => destination,
+            "policy" => "overwrite",
+          }
+        end
+      sources = described_class.new(mappings, [user])
+      mapped =
+        Salesforce::FieldMapping.new(mappings, fields) { |key, _field| sources.value(key, user) }
+
+      expect(mapped.values(nil)).to eq(
+        "Text__c" => "plain",
+        "Number__c" => "42",
+        "Flag__c" => "false",
+        "Object__c" => '{"a":1}',
+        "List__c" => "One, Two",
+        "Objects__c" => '{"a":1}, {"b":2}',
+      )
+    end
+  end
 end

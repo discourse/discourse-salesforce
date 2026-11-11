@@ -22,6 +22,7 @@ module Salesforce
       render json: {
                fields: Api.cached_writable_fields(object, refresh: params[:refresh] == "true"),
                custom_sources: UserSyncSources.custom_sources,
+               custom_field_names: UserSyncSources.custom_field_names,
              }
     rescue Salesforce::InvalidCredentials,
            Salesforce::InvalidApiResponse,

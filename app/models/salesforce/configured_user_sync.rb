@@ -40,11 +40,21 @@ module Salesforce
       valid &&=
         mappings.all? do |mapping|
           field = fields.find { |item| item["name"] == mapping["destination"] }
+          max_length =
+            if mapping["source"] == "static"
+              1000
+            elsif mapping["source"] == "custom_field"
+              UserSyncSources::CUSTOM_FIELD_NAME_MAX_LENGTH
+            end
           static_value_valid =
-            mapping["source"] != "static" ||
+            max_length.nil? ||
               (
                 mapping["value"].is_a?(String) && mapping["value"].present? &&
-                  mapping["value"].length <= 1000
+                  mapping["value"].length <= max_length &&
+                  (
+                    mapping["source"] != "custom_field" ||
+                      mapping["value"] == mapping["value"].strip
+                  )
               )
           static_value_valid && field && source_types[mapping["source"]].present? &&
             source_types[mapping["source"]] == field_type(field["type"]) &&
@@ -183,7 +193,8 @@ module Salesforce
     end
 
     def source_fingerprint
-      sources = @configuration.mappings.map { |mapping| mapping["source"] }.uniq - %w[static]
+      sources =
+        @configuration.mappings.map { |mapping| UserSyncSources.key(mapping) }.uniq - %w[static]
       Digest::SHA256.hexdigest(
         {
           instance: SiteSetting.salesforce_instance_url,

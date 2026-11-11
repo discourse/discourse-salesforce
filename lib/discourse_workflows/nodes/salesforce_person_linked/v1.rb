@@ -23,6 +23,11 @@ if defined?(DiscourseWorkflows)
                   "description" =>
                     "True when the record was created in Salesforce, false when an existing one was linked",
                 },
+                "email_verified" => {
+                  "type" => "boolean",
+                  "description" =>
+                    "True when the user's email is verified, so the record matched by that email is theirs",
+                },
               ),
               DiscourseWorkflows::Schema::USER_SCHEMA,
               DiscourseWorkflows::Schema::ACTOR_SCHEMA,
@@ -50,16 +55,13 @@ if defined?(DiscourseWorkflows)
             },
           )
 
-          def self.from_event(event_name, *args)
-            new(event_name, *args)
-          end
-
-          def initialize(_event_name, user, object_name, record_id, payload = {})
+          def initialize(user, object_name, record_id, payload = {})
             super(parameters: {})
             @user = user
             @object_name = object_name
             @record_id = record_id
             @created = payload[:created] == true
+            @email_verified = payload[:email_verified] == true
             @actor = payload[:acting_user]
           end
 
@@ -72,6 +74,7 @@ if defined?(DiscourseWorkflows)
               object: @object_name,
               id: @record_id,
               created: @created,
+              email_verified: @email_verified,
               user: serialize_user(@user),
               actor: serialize_user(@actor),
             }

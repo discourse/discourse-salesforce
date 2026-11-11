@@ -6,30 +6,37 @@ if defined?(DiscourseWorkflows)
       module SalesforceRecord
         class V1 < DiscourseWorkflows::NodeType
           OPERATIONS = %w[get update].freeze
-          NAME_PATTERN = /\A[A-Za-z][A-Za-z0-9_]*\z/
-          RECORD_ID_PATTERN = /\A[a-zA-Z0-9]{15}(?:[a-zA-Z0-9]{3})?\z/
 
-          OUTPUT_SCHEMA =
+          RECORD_PROPERTIES = {
+            "object" => {
+              "type" => "string",
+              "description" => "Salesforce object API name",
+            },
+            "id" => {
+              "type" => "string",
+              "description" => "Salesforce record ID",
+            },
+          }.freeze
+
+          GET_OUTPUT_SCHEMA =
             DiscourseWorkflows::Schema.document(
-              "object" => {
-                "type" => "string",
-                "description" => "Salesforce object API name",
-              },
-              "id" => {
-                "type" => "string",
-                "description" => "Salesforce record ID",
-              },
-              "record" => {
-                "type" => "object",
-                "description" => "Fields returned by Salesforce",
-                "x-optional" => true,
-              },
-              "fields" => {
-                "type" => "object",
-                "description" => "Fields sent to Salesforce",
-                "x-optional" => true,
-              },
-            ).freeze
+              RECORD_PROPERTIES.merge(
+                "record" => {
+                  "type" => "object",
+                  "description" => "Fields returned by Salesforce",
+                },
+              ),
+            )
+
+          UPDATE_OUTPUT_SCHEMA =
+            DiscourseWorkflows::Schema.document(
+              RECORD_PROPERTIES.merge(
+                "fields" => {
+                  "type" => "object",
+                  "description" => "Fields sent to Salesforce",
+                },
+              ),
+            )
 
           description(
             name: "action:salesforce_record",
@@ -40,7 +47,21 @@ if defined?(DiscourseWorkflows)
             },
             available: -> { SiteSetting.salesforce_enabled },
             unavailable_reason_key: "discourse_workflows.node_unavailable.requires_salesforce",
-            output_contracts: [{ schema: OUTPUT_SCHEMA }],
+            output_contracts: [
+              {
+                variants: [
+                  { schema: GET_OUTPUT_SCHEMA, display_options: { show: { operation: ["get"] } } },
+                  {
+                    schema: UPDATE_OUTPUT_SCHEMA,
+                    display_options: {
+                      show: {
+                        operation: ["update"],
+                      },
+                    },
+                  },
+                ],
+              },
+            ],
             capabilities: {
               run_scope: "per_item",
             },
@@ -96,16 +117,6 @@ if defined?(DiscourseWorkflows)
                   },
                 ],
               },
-              apply_assignment_rules: {
-                type: :boolean,
-                required: false,
-                default: true,
-                display_options: {
-                  show: {
-                    operation: ["update"],
-                  },
-                },
-              },
             },
           )
 
@@ -124,25 +135,39 @@ if defined?(DiscourseWorkflows)
             operation = exec_ctx.get_node_parameter("operation", item_index, default: "get").to_s
             object = exec_ctx.get_node_parameter("object", item_index).to_s.strip
             record_id = exec_ctx.get_node_parameter("record_id", item_index).to_s.strip
-            validate_object!(object, item_index)
-            validate_record_id!(record_id, item_index)
 
             case operation
             when "get"
               names =
-                field_names(exec_ctx.get_node_parameter("field_names", item_index), item_index)
+                exec_ctx
+                  .get_node_parameter("field_names", item_index)
+                  .to_s
+                  .split(",")
+                  .map(&:strip)
+                  .compact_blank
+              exec_ctx.ensure_no_expression_errors!
+              check!(object, ::Salesforce::Person::FIELD_NAME_PATTERN, "invalid_object", item_index)
+              check!(
+                record_id,
+                ::Salesforce::Associations::ID_PATTERN,
+                "invalid_record_id",
+                item_index,
+              )
+              names.each do |name|
+                check!(name, ::Salesforce::Person::FIELD_NAME_PATTERN, "invalid_field", item_index)
+              end
               fetch(object, record_id, names)
             when "update"
-              fields =
-                update_fields(
-                  exec_ctx.get_node_parameter("fields.values", item_index, default: []),
-                  item_index,
-                )
+              pairs = exec_ctx.get_node_parameter("fields.values", item_index, default: [])
               exec_ctx.ensure_no_expression_errors!
-              validate_update_fields!(fields, item_index)
-              apply_rules =
-                exec_ctx.get_node_parameter("apply_assignment_rules", item_index, default: true)
-              update(object, record_id, fields, apply_rules != false)
+              check!(object, ::Salesforce::Person::FIELD_NAME_PATTERN, "invalid_object", item_index)
+              check!(
+                record_id,
+                ::Salesforce::Associations::ID_PATTERN,
+                "invalid_record_id",
+                item_index,
+              )
+              update(object, record_id, update_fields(pairs, item_index))
             else
               raise_node_error!(
                 I18n.t("discourse_workflows.errors.unknown_operation", operation: operation),
@@ -174,9 +199,8 @@ if defined?(DiscourseWorkflows)
             { object: object, id: record_id, record: record.except("attributes") }
           end
 
-          def update(object, record_id, fields, apply_assignment_rules)
-            headers = apply_assignment_rules ? {} : { "Sforce-Auto-Assign" => "FALSE" }
-            api.patch("sobjects/#{object}/#{record_id}", fields, headers: headers)
+          def update(object, record_id, fields)
+            api.patch("sobjects/#{object}/#{record_id}", fields)
 
             { object: object, id: record_id, fields: fields }
           end
@@ -185,63 +209,39 @@ if defined?(DiscourseWorkflows)
             @api ||= ::Salesforce::Api.new
           end
 
-          def field_names(value, item_index)
-            names = value.to_s.split(",").map(&:strip).compact_blank
-            names.each { |name| validate_field_name!(name, item_index) }
-            names
-          end
-
           def update_fields(pairs, item_index)
-            Array
-              .wrap(pairs)
-              .each_with_object({}) do |pair, fields|
-                name = pair["key"].to_s.strip
-                validate_field_name!(name, item_index)
-                fields[name] = pair["value"]
-              end
-          end
-
-          def validate_update_fields!(fields, item_index)
-            if fields.empty?
-              raise_node_error!(
-                I18n.t("salesforce.discourse_workflows.record.no_fields"),
-                item_index: item_index,
-              )
-            end
-
-            fields.each do |name, value|
-              next if !value.nil?
-
-              raise_node_error!(
-                I18n.t("salesforce.discourse_workflows.record.missing_value", field: name),
-                item_index: item_index,
-              )
-            end
-          end
-
-          def validate_object!(object, item_index)
-            return if NAME_PATTERN.match?(object)
+            fields =
+              Array
+                .wrap(pairs)
+                .to_h do |pair|
+                  name = pair["key"].to_s.strip
+                  check!(
+                    name,
+                    ::Salesforce::Person::FIELD_NAME_PATTERN,
+                    "invalid_field",
+                    item_index,
+                  )
+                  if pair["value"].nil?
+                    raise_node_error!(
+                      I18n.t("salesforce.discourse_workflows.record.missing_value", field: name),
+                      item_index: item_index,
+                    )
+                  end
+                  [name, pair["value"]]
+                end
+            return fields if fields.present?
 
             raise_node_error!(
-              I18n.t("salesforce.discourse_workflows.record.invalid_object", name: object),
+              I18n.t("salesforce.discourse_workflows.record.no_fields"),
               item_index: item_index,
             )
           end
 
-          def validate_field_name!(name, item_index)
-            return if NAME_PATTERN.match?(name)
+          def check!(value, pattern, error_key, item_index)
+            return if pattern.match?(value)
 
             raise_node_error!(
-              I18n.t("salesforce.discourse_workflows.record.invalid_field", field: name),
-              item_index: item_index,
-            )
-          end
-
-          def validate_record_id!(record_id, item_index)
-            return if RECORD_ID_PATTERN.match?(record_id)
-
-            raise_node_error!(
-              I18n.t("salesforce.discourse_workflows.record.invalid_record_id", id: record_id),
+              I18n.t("salesforce.discourse_workflows.record.#{error_key}", value: value),
               item_index: item_index,
             )
           end

@@ -32,11 +32,11 @@ en:
   salesforce:
     discourse_workflows:
       record:
-        invalid_object: "\"%{name}\" is not a valid Salesforce object name"
-        invalid_field: "\"%{field}\" is not a valid Salesforce field name"
-        invalid_record_id: "\"%{id}\" is not a valid Salesforce record ID"
+        invalid_object: "\"%{value}\" is not a valid Salesforce object name"
+        invalid_field: "\"%{value}\" is not a valid Salesforce field name"
+        invalid_record_id: "\"%{value}\" is not a valid Salesforce record ID"
         no_fields: "Add at least one field to update"
-        missing_value: "The value for \"%{field}\" is empty, so it was not sent to Salesforce"
+        missing_value: "\"%{field}\" has no value"
         request_failed: "Could not reach Salesforce: %{message}"
     error:
       connection:

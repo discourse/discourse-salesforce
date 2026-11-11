@@ -112,7 +112,7 @@ module Salesforce
           next
         end
         if record && values.empty?
-          sync.complete(record.fetch("Id"))
+          sync.complete(record.fetch("Id"), created: false)
         elsif record
           sync.save_link(record.fetch("Id"))
           updates << [user, sync, values.merge("Id" => record.fetch("Id"))]

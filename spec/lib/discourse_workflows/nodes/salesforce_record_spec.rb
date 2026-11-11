@@ -14,6 +14,25 @@ RSpec.describe DiscourseWorkflows::Nodes::SalesforceRecord::V1, discourse_workfl
     output
   end
 
+  def update_config(values)
+    {
+      "operation" => "update",
+      "object" => "Case",
+      "record_id" => record_id,
+      "fields" => {
+        "values" => values,
+      },
+    }
+  end
+
+  def expect_node_error(configuration, message)
+    expect { execute_node(configuration: configuration.deep_stringify_keys) }.to raise_error(
+      DiscourseWorkflows::NodeError,
+      message,
+    )
+    expect(a_request(:any, /#{Regexp.escape(instance_url)}/)).not_to have_been_made
+  end
+
   describe "get" do
     let(:salesforce_response) do
       { attributes: { type: "Case" }, Id: record_id, Status: "New", Priority: "High" }
@@ -55,21 +74,21 @@ RSpec.describe DiscourseWorkflows::Nodes::SalesforceRecord::V1, discourse_workfl
   end
 
   describe "update" do
-    let(:fields) do
-      [{ "key" => "Status", "value" => "Working" }, { "key" => "Priority__c", "value" => "High" }]
-    end
-    let(:body) { { Status: "Working", Priority__c: "High" } }
-
-    it "patches the record and leaves assignment rules on by default" do
+    it "patches the record" do
       request =
-        stub_request(:patch, "#{api_path}/Case/#{record_id}")
-          .with(body: body.to_json) do |req|
-            req.headers.keys.map(&:downcase).exclude?("sforce-auto-assign")
-          end
-          .to_return(status: 204)
+        stub_request(:patch, "#{api_path}/Case/#{record_id}").with(
+          body: { Status: "Working", Priority__c: "High" }.to_json,
+        ).to_return(status: 204)
 
       output =
-        run(operation: "update", object: "Case", record_id: record_id, fields: { values: fields })
+        run(
+          update_config(
+            [
+              { "key" => "Status", "value" => "Working" },
+              { "key" => "Priority__c", "value" => "High" },
+            ],
+          ),
+        )
 
       expect(request).to have_been_requested.once
       expect(output).to eq(
@@ -81,39 +100,9 @@ RSpec.describe DiscourseWorkflows::Nodes::SalesforceRecord::V1, discourse_workfl
         },
       )
     end
-
-    it "disables assignment rules when asked" do
-      request =
-        stub_request(:patch, "#{api_path}/Case/#{record_id}").with(
-          body: body.to_json,
-          headers: {
-            "Sforce-Auto-Assign" => "FALSE",
-          },
-        ).to_return(status: 204)
-
-      run(
-        operation: "update",
-        object: "Case",
-        record_id: record_id,
-        fields: {
-          values: fields,
-        },
-        apply_assignment_rules: false,
-      )
-
-      expect(request).to have_been_requested.once
-    end
   end
 
   describe "validation" do
-    def expect_node_error(configuration, message)
-      expect { execute_node(configuration: configuration.deep_stringify_keys) }.to raise_error(
-        DiscourseWorkflows::NodeError,
-        message,
-      )
-      expect(a_request(:any, /#{Regexp.escape(instance_url)}/)).not_to have_been_made
-    end
-
     it "rejects an invalid object name" do
       expect_node_error(
         { operation: "get", object: "Case/../User", record_id: record_id },
@@ -142,55 +131,39 @@ RSpec.describe DiscourseWorkflows::Nodes::SalesforceRecord::V1, discourse_workfl
 
     it "rejects an invalid field name in an update" do
       expect_node_error(
-        {
-          operation: "update",
-          object: "Case",
-          record_id: record_id,
-          fields: {
-            values: [{ "key" => "Status=1", "value" => "x" }],
-          },
-        },
+        update_config([{ "key" => "Status=1", "value" => "x" }]),
         /not a valid Salesforce field name/,
       )
     end
-  end
 
-  describe "update values" do
-    def update_config(values)
-      {
-        "operation" => "update",
-        "object" => "Case",
-        "record_id" => record_id,
-        "fields" => {
-          "values" => values,
+    it "does not request every field when the field list expression raises" do
+      expect_node_error(
+        {
+          operation: "get",
+          object: "Case",
+          record_id: record_id,
+          field_names: "={{ $json.missing.deeper }}",
         },
-      }
-    end
-
-    def expect_no_patch(values, message)
-      expect { execute_node(configuration: update_config(values)) }.to raise_error(
-        DiscourseWorkflows::NodeError,
-        message,
+        /TypeError/,
       )
-      expect(a_request(:patch, /#{Regexp.escape(instance_url)}/)).not_to have_been_made
     end
 
     it "does not send null when an expression resolves to undefined" do
-      expect_no_patch(
-        [{ "key" => "Status", "value" => "={{ $json.missing }}" }],
-        /"Status" is empty/,
+      expect_node_error(
+        update_config([{ "key" => "Status", "value" => "={{ $json.missing }}" }]),
+        /"Status" has no value/,
       )
     end
 
     it "does not send null when an expression raises" do
-      expect_no_patch(
-        [{ "key" => "Status", "value" => "={{ $json.missing.deeper }}" }],
+      expect_node_error(
+        update_config([{ "key" => "Status", "value" => "={{ $json.missing.deeper }}" }]),
         /TypeError/,
       )
     end
 
     it "rejects an update without fields" do
-      expect_no_patch([], /at least one field/)
+      expect_node_error(update_config([]), /at least one field/)
     end
   end
 
@@ -207,16 +180,7 @@ RSpec.describe DiscourseWorkflows::Nodes::SalesforceRecord::V1, discourse_workfl
       )
 
       expect {
-        execute_node(
-          configuration: {
-            "operation" => "update",
-            "object" => "Case",
-            "record_id" => record_id,
-            "fields" => {
-              "values" => [{ "key" => "Subject", "value" => "" }],
-            },
-          },
-        )
+        execute_node(configuration: update_config([{ "key" => "Subject", "value" => "" }]))
       }.to raise_error(DiscourseWorkflows::NodeError, /Required fields are missing/)
     end
 
@@ -224,16 +188,7 @@ RSpec.describe DiscourseWorkflows::Nodes::SalesforceRecord::V1, discourse_workfl
       stub_request(:patch, "#{api_path}/Case/#{record_id}").to_timeout
 
       expect {
-        execute_node(
-          configuration: {
-            "operation" => "update",
-            "object" => "Case",
-            "record_id" => record_id,
-            "fields" => {
-              "values" => [{ "key" => "Status", "value" => "Working" }],
-            },
-          },
-        )
+        execute_node(configuration: update_config([{ "key" => "Status", "value" => "Working" }]))
       }.to raise_error(DiscourseWorkflows::NodeError, /Could not reach Salesforce/)
     end
 

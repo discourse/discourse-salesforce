@@ -48,11 +48,7 @@ if defined?(DiscourseWorkflows)
             },
           )
 
-          def self.from_event(event_name, *args)
-            new(event_name, *args)
-          end
-
-          def initialize(_event_name, salesforce_case, payload = {})
+          def initialize(salesforce_case, payload = {})
             super(parameters: {})
             @salesforce_case = salesforce_case
             @actor = payload[:acting_user]

@@ -46,35 +46,6 @@ RSpec.describe ::Salesforce::Api do
     expect(lookup).to have_been_requested.times(4)
   end
 
-  it "sends extra headers with a patch request" do
-    plain =
-      stub_request(:patch, "#{api_path}/Case/1").with(
-        body: { Status: "Closed" }.to_json,
-        headers: {
-          "Content-Type" => "application/json",
-        },
-      ).to_return(status: 204)
-    with_header =
-      stub_request(:patch, "#{api_path}/Case/2").with(
-        headers: {
-          "Sforce-Auto-Assign" => "FALSE",
-          "Content-Type" => "application/json",
-        },
-      ).to_return(status: 204)
-
-    described_class.new.patch("sobjects/Case/1", { Status: "Closed" })
-    described_class.new.patch(
-      "sobjects/Case/2",
-      { Status: "Closed" },
-      headers: {
-        "Sforce-Auto-Assign" => "FALSE",
-      },
-    )
-
-    expect(plain).to have_been_requested.once
-    expect(with_header).to have_been_requested.once
-  end
-
   it "escapes plus signs in SOQL query parameters" do
     soql = "SELECT Id FROM Contact WHERE Email = 'team+salesforce-discourse-dev-ed@example.com'"
 

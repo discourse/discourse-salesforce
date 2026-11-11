@@ -98,37 +98,26 @@ module ::Salesforce
 
     def self.sync!(topic, acting_user: nil)
       salesforce_case = find_or_initialize_by(topic_id: topic.id)
-      created = false
+      return salesforce_case.tap(&:sync!) if salesforce_case.persisted?
+
+      post = topic.first_post
+      description = "#{post.full_url}\n\n#{PostContent.body_for(post, max_length: 30_000)}"
+      salesforce_case.contact_id =
+        contact_id_for(topic.user, acting_user: acting_user) ||
+          SiteSetting.salesforce_default_contact_id_for_case_sync.presence
+      salesforce_case.subject = topic.title
+      salesforce_case.description = description
+      salesforce_case.generate!
 
       begin
-        user = topic.user
+        Jobs.enqueue(:sync_case_comments, topic_id: topic.id)
 
-        if salesforce_case.new_record?
-          post = topic.first_post
-          description = "#{post.full_url}\n\n#{PostContent.body_for(post, max_length: 30_000)}"
-          salesforce_case.contact_id =
-            contact_id_for(user, acting_user: acting_user) ||
-              SiteSetting.salesforce_default_contact_id_for_case_sync.presence
-          salesforce_case.subject = topic.title
-          salesforce_case.description = description
-          salesforce_case.generate!
-          created = true
-
-          Jobs.enqueue(:sync_case_comments, topic_id: topic.id)
-
-          topic.custom_fields["has_salesforce_case"] = true
-          topic.save_custom_fields
-        end
+        topic.custom_fields["has_salesforce_case"] = true
+        topic.save_custom_fields
 
         salesforce_case.sync!
       ensure
-        if created
-          DiscourseEvent.trigger(
-            :salesforce_case_created,
-            salesforce_case,
-            acting_user: acting_user,
-          )
-        end
+        DiscourseEvent.trigger(:salesforce_case_created, salesforce_case, acting_user: acting_user)
       end
 
       salesforce_case
@@ -140,7 +129,7 @@ module ::Salesforce
       if SiteSetting.salesforce_skip_contact_creation_on_case_sync
         nil
       else
-        user.create_salesforce_contact(acting_user: acting_user)
+        Contact.create!(user, acting_user: acting_user)
       end
     end
 

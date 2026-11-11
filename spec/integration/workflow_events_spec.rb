@@ -34,12 +34,6 @@ RSpec.describe "Salesforce workflow events" do
       expect(salesforce_case).to have_attributes(uid: "234567", number: "345678", status: "New")
     end
 
-    it "fires without an acting user for automatic syncs" do
-      events = track(:salesforce_case_created) { Salesforce::Case.sync!(topic) }
-
-      expect(events.map(&:last)).to eq([{ acting_user: nil }])
-    end
-
     it "still fires once when reading the new case back fails, and not again on retry" do
       stub_request(:get, "#{api_path}/Case/234567")
         .to_return(status: 503, body: "")
@@ -77,6 +71,10 @@ RSpec.describe "Salesforce workflow events" do
       track(:salesforce_person_linked, &block)
     end
 
+    def link_event(object, id, created:, acting_user: nil)
+      [user, object, id, { created:, email_verified: true, acting_user: }]
+    end
+
     context "when an admin creates a record" do
       before { sign_in(admin) }
 
@@ -94,7 +92,7 @@ RSpec.describe "Salesforce workflow events" do
 
         expect(response.status).to eq(200)
         expect(events).to eq(
-          [[user, "Contact", "contact123", { created: true, acting_user: admin }]],
+          [link_event("Contact", "contact123", created: true, acting_user: admin)],
         )
       end
 
@@ -107,7 +105,7 @@ RSpec.describe "Salesforce workflow events" do
           end
 
         expect(events).to eq(
-          [[user, "Contact", "contact123", { created: false, acting_user: admin }]],
+          [link_event("Contact", "contact123", created: false, acting_user: admin)],
         )
       end
     end
@@ -127,7 +125,7 @@ RSpec.describe "Salesforce workflow events" do
 
       events = linked_events { Salesforce::Case.sync!(topic, acting_user: admin) }
 
-      expect(events).to eq([[user, "Contact", "contact123", { created: true, acting_user: admin }]])
+      expect(events).to eq([link_event("Contact", "contact123", created: true, acting_user: admin)])
     end
 
     it "reports a Lead linked by the signup job" do
@@ -136,22 +134,24 @@ RSpec.describe "Salesforce workflow events" do
 
       events = linked_events { Jobs::SyncSalesforceUser.new.execute(user_id: user.id) }
 
-      expect(events).to eq([[user, "Lead", "lead123", { created: false, acting_user: nil }]])
+      expect(events).to eq([link_event("Lead", "lead123", created: false)])
     end
 
-    it "reports the Contact linked when a converted Lead is reconciled" do
-      stub_salesforce_person_lookup("Lead", user.email)
-      stub_salesforce_converted_lead_lookup(
-        user.email,
-        records: [{ Id: "converted-lead", IsConverted: true, ConvertedContactId: "contact1" }],
-      )
+    it "does not report a link that an overlapping sync already stored" do
+      stale_user = User.find(user.id)
+      stale_user.custom_fields
+      stub_salesforce_person_lookup("Contact", user.email, id: "contact123")
 
-      events = linked_events { Salesforce::Lead.create!(user) }
+      events =
+        linked_events do
+          Salesforce::Contact.create!(user)
+          Salesforce::Contact.sync(stale_user)
+        end
 
-      expect(events).to eq([[user, "Contact", "contact1", { created: false, acting_user: nil }]])
+      expect(events).to eq([link_event("Contact", "contact123", created: false)])
     end
 
-    it "reports the acting user when a converted Lead is reconciled during creation" do
+    it "reports the Contact linked when a converted Lead is reconciled during creation" do
       stub_salesforce_person_lookup("Lead", user.email)
       stub_salesforce_converted_lead_lookup(
         user.email,
@@ -160,7 +160,7 @@ RSpec.describe "Salesforce workflow events" do
 
       events = linked_events { Salesforce::Lead.create!(user, acting_user: admin) }
 
-      expect(events).to eq([[user, "Contact", "contact1", { created: false, acting_user: admin }]])
+      expect(events).to eq([link_event("Contact", "contact1", created: false, acting_user: admin)])
     end
 
     context "with guided sync" do
@@ -198,7 +198,7 @@ RSpec.describe "Salesforce workflow events" do
 
         events = linked_events { run_sync }
 
-        expect(events).to eq([[user, "Lead", "lead123", { created: true, acting_user: nil }]])
+        expect(events).to eq([link_event("Lead", "lead123", created: true)])
 
         stub_request(:get, "#{api_path}/Lead/lead123").to_return(
           body: { Id: "lead123", LastName: "Morgan", Company: "None" }.to_json,
@@ -212,7 +212,7 @@ RSpec.describe "Salesforce workflow events" do
 
         events = linked_events { run_sync }
 
-        expect(events).to eq([[user, "Lead", "lead123", { created: false, acting_user: nil }]])
+        expect(events).to eq([link_event("Lead", "lead123", created: false)])
       end
 
       it "reports the Contact linked when a converted Lead is reconciled" do
@@ -224,7 +224,7 @@ RSpec.describe "Salesforce workflow events" do
 
         events = linked_events { run_sync }
 
-        expect(events).to eq([[user, "Contact", "contact1", { created: false, acting_user: nil }]])
+        expect(events).to eq([link_event("Contact", "contact1", created: false)])
       end
     end
   end

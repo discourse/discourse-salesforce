@@ -46,7 +46,8 @@ module ::Salesforce
     end
 
     def self.link!(user, id, created:, acting_user: nil)
-      previous_id = user.custom_fields[self::ID_FIELD]
+      # The user object can be stale when another job linked the user first.
+      previous_id = UserCustomField.where(user_id: user.id, name: self::ID_FIELD).pick(:value)
       user.custom_fields[self::ID_FIELD] = id
       user.save_custom_fields
       announce_link(user, id, previous_id, created: created, acting_user: acting_user)
@@ -61,6 +62,7 @@ module ::Salesforce
         self::OBJECT_NAME,
         id,
         created: created,
+        email_verified: email_verified?(user),
         acting_user: acting_user,
       )
     end

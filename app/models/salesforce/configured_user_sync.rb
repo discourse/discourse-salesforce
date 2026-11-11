@@ -109,7 +109,7 @@ module Salesforce
       SyncState.store(@configuration.id, @user.id, fingerprint: fingerprint)
     end
 
-    def complete(id, created: false)
+    def complete(id, created:)
       save_link(id)
       @person.link!(@user, id, created: created)
       SyncState.where(configuration_id: @configuration.id, user_id: @user.id).update_all(

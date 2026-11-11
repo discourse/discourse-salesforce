@@ -2,7 +2,8 @@
 
 require_relative "../spec_helper"
 
-RSpec.describe "Salesforce workflow example", discourse_workflows: true do
+RSpec.describe "Workflow: Salesforce case created -> Salesforce record",
+               discourse_workflows: true do
   include_context "with salesforce spec helper"
 
   fab!(:admin)
@@ -63,7 +64,7 @@ RSpec.describe "Salesforce workflow example", discourse_workflows: true do
                        "operation" => "equals",
                        "singleValue" => false,
                      },
-                     "value" => "={{ $('Case created').first().json.topic.category_id }}",
+                     "value" => "={{ $trigger.topic.category_id }}",
                    },
                  ],
                }
@@ -73,21 +74,17 @@ RSpec.describe "Salesforce workflow example", discourse_workflows: true do
                configuration: {
                  "operation" => "update",
                  "object" => "Case",
-                 "record_id" => "={{ $('Case created').first().json.case.id }}",
+                 "record_id" => "={{ $trigger.case.id }}",
                  "fields" => {
                    "values" => [
-                     {
-                       "key" => "Topic_URL__c",
-                       "value" => "={{ $('Case created').first().json.topic.url }}",
-                     },
+                     { "key" => "Topic_URL__c", "value" => "={{ $trigger.topic.url }}" },
                      { "key" => "Owner_Team__c", "value" => "={{ $json.owner_team }}" },
                    ],
                  },
                }
         g.chain "trigger", "lookup", "update"
       end
-    workflow = Fabricate(:discourse_workflows_workflow, created_by: admin, published: true, **graph)
-    publish_workflow!(workflow)
+    Fabricate(:discourse_workflows_workflow, created_by: admin, published: true, **graph)
     update_request =
       stub_request(:patch, "#{api_path}/Case/#{case_id}").with(
         body: { Topic_URL__c: topic.url, Owner_Team__c: "Billing" }.to_json,
@@ -97,10 +94,9 @@ RSpec.describe "Salesforce workflow example", discourse_workflows: true do
 
     jobs = Jobs::DiscourseWorkflows::ExecuteWorkflow.jobs
     expect(jobs.size).to eq(1)
-    trigger_data = jobs.first["args"].first["trigger_data"]
-    execution = DiscourseWorkflows::Executor.new(workflow, "trigger", trigger_data).run
+    Jobs::DiscourseWorkflows::ExecuteWorkflow.new.execute(jobs.first["args"].first.symbolize_keys)
 
-    expect(execution.status).to eq("success")
+    expect(DiscourseWorkflows::Execution.last.status).to eq("success")
     expect(update_request).to have_been_requested.once
   end
 end

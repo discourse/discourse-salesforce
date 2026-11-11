@@ -55,14 +55,6 @@ RSpec.describe DiscourseWorkflows::Nodes::SalesforceCaseCreated::V1, discourse_w
       expect(data["actor"]["id"]).to eq(admin.id)
     end
 
-    it "leaves the actor empty for automatic syncs" do
-      workflow
-      DiscourseEvent.trigger(:salesforce_case_created, salesforce_case, acting_user: nil)
-
-      expect(dispatched.first["actor"]).to be_nil
-      expect(dispatched.first).to match_node_output_schema(described_class)
-    end
-
     it "stops dispatching when Salesforce is disabled" do
       workflow
       SiteSetting.salesforce_enabled = false

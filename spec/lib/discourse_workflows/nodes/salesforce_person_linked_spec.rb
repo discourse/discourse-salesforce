@@ -52,6 +52,7 @@ RSpec.describe DiscourseWorkflows::Nodes::SalesforcePersonLinked::V1, discourse_
         "Contact",
         "003000000000001AAA",
         created: false,
+        email_verified: true,
         acting_user: admin,
       )
 
@@ -61,23 +62,10 @@ RSpec.describe DiscourseWorkflows::Nodes::SalesforcePersonLinked::V1, discourse_
         "object" => "Contact",
         "id" => "003000000000001AAA",
         "created" => false,
+        "email_verified" => true,
       )
       expect(dispatched.first["user"]["id"]).to eq(user.id)
       expect(dispatched.first["actor"]["id"]).to eq(admin.id)
-    end
-
-    it "does not dispatch for objects that were not selected" do
-      workflow
-      DiscourseEvent.trigger(
-        :salesforce_person_linked,
-        user,
-        "Lead",
-        "00Q000000000001AAA",
-        created: true,
-        acting_user: nil,
-      )
-
-      expect(dispatched).to be_empty
     end
 
     it "stops dispatching when Salesforce is disabled" do

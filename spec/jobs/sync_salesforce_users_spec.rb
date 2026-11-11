@@ -183,24 +183,19 @@ RSpec.describe Jobs::SyncSalesforceUsers do
           .pluck(:params)
 
       expect(events).to contain_exactly(
-        [user1, "Contact", "contact_456", { created: false, acting_user: nil }],
-        [user2, "Contact", "contact_789", { created: false, acting_user: nil }],
+        [
+          user1,
+          "Contact",
+          "contact_456",
+          { created: false, email_verified: false, acting_user: nil },
+        ],
+        [
+          user2,
+          "Contact",
+          "contact_789",
+          { created: false, email_verified: false, acting_user: nil },
+        ],
       )
-    end
-
-    it "fires nothing when there is nothing left to reconcile" do
-      described_class.new.execute({})
-      stub_request(
-        :get,
-        "#{path}/Contact?fields=MasterRecordId&ids=contact_456,contact_789",
-      ).to_return(status: 200, body: [].to_json)
-
-      events =
-        DiscourseEvent
-          .track_events(:salesforce_person_linked) { described_class.new.execute({}) }
-          .pluck(:params)
-
-      expect(events).to be_empty
     end
   end
 

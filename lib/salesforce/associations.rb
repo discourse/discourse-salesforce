@@ -61,7 +61,7 @@ module ::Salesforce
 
       object = person_class::OBJECT_NAME
       account = SiteSetting.salesforce_instance_url
-      configuration_ids = SyncConfiguration.for_current_account.where(object: object)
+      configuration_ids = SyncConfiguration.for_provider("salesforce").where(object: object)
 
       each_dead_user_link(api, person_class) do |user, legacy_id, guided_id|
         user_id = user.id

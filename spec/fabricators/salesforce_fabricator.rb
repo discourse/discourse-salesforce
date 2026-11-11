@@ -17,6 +17,7 @@ Fabricator(:sync_configuration, class_name: ::Salesforce::SyncConfiguration) do
   transient :groups
 
   provider "salesforce"
+  direction "outbound"
   account { SiteSetting.salesforce_instance_url }
   name "Lead sync"
   kind "users"
@@ -41,4 +42,25 @@ Fabricator(:sync_configuration, class_name: ::Salesforce::SyncConfiguration) do
       configuration.configuration_groups.create!(group_id: group.id)
     end
   end
+end
+
+Fabricator(:hubspot_sync_configuration, class_name: ::Salesforce::SyncConfiguration) do
+  provider "hubspot"
+  direction "inbound"
+  account { SiteSetting.hubspot_portal_id }
+  name "Import contacts"
+  kind "users"
+  object "contact"
+  schedule "daily"
+  backfill true
+  active true
+  mappings { [{ "source" => "lifecyclestage" }, { "source" => "jobtitle" }] }
+end
+
+Fabricator(:crm_record, class_name: ::Salesforce::Record) do
+  provider "hubspot"
+  account { SiteSetting.hubspot_portal_id }
+  object "contact"
+  external_id { sequence(:external_id) { |i| "contact-#{i}" } }
+  data { { "lifecyclestage" => "customer" } }
 end

@@ -6,13 +6,22 @@ import { service } from "@ember/service";
 import AdminConfigAreaCard from "discourse/admin/components/admin-config-area-card";
 import { ajax } from "discourse/lib/ajax";
 import { popupAjaxError } from "discourse/lib/ajax-error";
-import { eq, not } from "discourse/truth-helpers";
+import { eq, not, or } from "discourse/truth-helpers";
 import DButton from "discourse/ui-kit/d-button";
 import DPageSubheader from "discourse/ui-kit/d-page-subheader";
 import { i18n } from "discourse-i18n";
+import HubspotSyncConfiguration from "discourse/plugins/discourse-salesforce/discourse/components/hubspot-sync-configuration";
 import SalesforceDeleteSyncConfirmation from "discourse/plugins/discourse-salesforce/discourse/components/salesforce-delete-sync-confirmation";
 import SalesforceSyncConfiguration from "discourse/plugins/discourse-salesforce/discourse/components/salesforce-sync-configuration";
-import { createSyncConfiguration } from "discourse/plugins/discourse-salesforce/discourse/lib/sync-configuration";
+import {
+  createHubspotSyncConfiguration,
+  createSyncConfiguration,
+} from "discourse/plugins/discourse-salesforce/discourse/lib/sync-configuration";
+
+const NEW_KEYS = {
+  salesforce: "new-salesforce-users",
+  hubspot: "new-hubspot-users",
+};
 
 export default class SalesforceSyncConfigurations extends Component {
   @service a11y;
@@ -29,15 +38,41 @@ export default class SalesforceSyncConfigurations extends Component {
       (configuration) =>
         String(configuration.id) === String(this.args.selectedId)
     );
+    const provider = Object.keys(NEW_KEYS).find(
+      (name) => NEW_KEYS[name] === this.args.selectedId
+    );
     if (record && record.kind !== "posts") {
       this.selected = { key: record.id, configuration: record };
-    } else if (this.args.selectedId === "new-users") {
-      this.add();
+    } else if (provider) {
+      this.add(provider);
     }
   }
 
   get editors() {
     return this.selected ? [this.selected] : [];
+  }
+
+  get providers() {
+    return this.args.providers || [];
+  }
+
+  get salesforceProvider() {
+    return this.providers.find((provider) => provider.name === "salesforce");
+  }
+
+  get hubspotProvider() {
+    return this.providers.find((provider) => provider.name === "hubspot");
+  }
+
+  get credentialsConfigured() {
+    return this.providers.some((provider) => provider.credentials_configured);
+  }
+
+  get hubspotConfigured() {
+    return this.records.some(
+      (record) =>
+        record.provider === "hubspot" && record.direction === "inbound"
+    );
   }
 
   get displayRecords() {
@@ -46,26 +81,38 @@ export default class SalesforceSyncConfigurations extends Component {
       scope:
         record.kind === "posts"
           ? record.category
-          : (record.groups || []).join(", "),
-      kindLabel: i18n(
-        `salesforce.guided_sync.${record.kind === "posts" ? "posts_kind" : "users_kind"}`
+          : record.direction === "inbound"
+            ? i18n("salesforce.guided_sync.all_users")
+            : (record.groups || []).join(", "),
+      objectLabel:
+        record.provider === "hubspot"
+          ? i18n("salesforce.guided_sync.hubspot.contacts")
+          : record.object,
+      typeLabel: i18n(
+        `salesforce.guided_sync.types.${record.direction}_${record.kind}`
       ),
     }));
   }
 
   @action
-  add() {
-    if (this.args.onSelect && this.args.selectedId !== "new-users") {
-      this.args.onSelect("new-users");
+  add(provider) {
+    const key = NEW_KEYS[provider];
+    if (this.args.onSelect && this.args.selectedId !== key) {
+      this.args.onSelect(key);
       return;
     }
     this.selected = {
-      key: "new-users",
-      configuration: {
-        ...createSyncConfiguration(),
-        kind: "users",
-        name: i18n("salesforce.guided_sync.default_users_name"),
-      },
+      key,
+      configuration:
+        provider === "hubspot"
+          ? {
+              ...createHubspotSyncConfiguration(),
+              name: i18n("salesforce.guided_sync.hubspot.default_name"),
+            }
+          : {
+              ...createSyncConfiguration(),
+              name: i18n("salesforce.guided_sync.default_users_name"),
+            },
     };
   }
 
@@ -145,7 +192,7 @@ export default class SalesforceSyncConfigurations extends Component {
   }
 
   <template>
-    {{#if (not @credentialsConfigured)}}
+    {{#if (not this.credentialsConfigured)}}
       <AdminConfigAreaCard @heading="salesforce.guided_sync.credentials_title">
         <:content>
           <p data-test-credentials-required>{{i18n
@@ -160,12 +207,20 @@ export default class SalesforceSyncConfigurations extends Component {
       </AdminConfigAreaCard>
     {{else if this.selected}}
       {{#each this.editors key="key" as |editor|}}
-        <SalesforceSyncConfiguration
-          @groups={{@groups}}
-          @record={{editor.configuration}}
-          @onCancel={{this.close}}
-          @onSave={{this.save}}
-        />
+        {{#if (eq editor.configuration.provider "hubspot")}}
+          <HubspotSyncConfiguration
+            @record={{editor.configuration}}
+            @onCancel={{this.close}}
+            @onSave={{this.save}}
+          />
+        {{else}}
+          <SalesforceSyncConfiguration
+            @groups={{@groups}}
+            @record={{editor.configuration}}
+            @onCancel={{this.close}}
+            @onSave={{this.save}}
+          />
+        {{/if}}
       {{/each}}
     {{else}}
       <div
@@ -187,11 +242,34 @@ export default class SalesforceSyncConfigurations extends Component {
             <:content><DButton
                 class="btn-primary"
                 data-test-sync-users
-                @action={{this.add}}
+                @action={{fn this.add "salesforce"}}
+                @disabled={{not this.salesforceProvider.credentials_configured}}
                 @icon="users"
                 @label="salesforce.guided_sync.send_users"
               /></:content>
           </AdminConfigAreaCard>
+          {{#if this.hubspotProvider}}
+            <AdminConfigAreaCard
+              @heading="salesforce.guided_sync.hubspot.pull_contacts"
+              @description="salesforce.guided_sync.hubspot.description"
+            >
+              <:content><DButton
+                  class="btn-primary"
+                  data-test-sync-contacts
+                  @action={{fn this.add "hubspot"}}
+                  @disabled={{or
+                    (not this.hubspotProvider.credentials_configured)
+                    this.hubspotConfigured
+                  }}
+                  @icon="address-card"
+                  @label={{if
+                    this.hubspotConfigured
+                    "salesforce.guided_sync.hubspot.already_configured"
+                    "salesforce.guided_sync.hubspot.pull_contacts"
+                  }}
+                /></:content>
+            </AdminConfigAreaCard>
+          {{/if}}
           <AdminConfigAreaCard
             class="salesforce-sync-configurations__coming-soon"
             @heading="salesforce.guided_sync.send_posts"
@@ -211,7 +289,7 @@ export default class SalesforceSyncConfigurations extends Component {
             <thead class="d-table__header"><tr>
                 <th>{{i18n "salesforce.guided_sync.configuration_name"}}</th>
                 <th>{{i18n "salesforce.guided_sync.configuration_type"}}</th>
-                <th>{{i18n "salesforce.guided_sync.salesforce_object"}}</th>
+                <th>{{i18n "salesforce.guided_sync.crm_object"}}</th>
                 <th>{{i18n "salesforce.guided_sync.scope"}}</th>
                 <th></th>
               </tr></thead>
@@ -234,21 +312,23 @@ export default class SalesforceSyncConfigurations extends Component {
                       class="d-table__mobile-label"
                     >{{i18n
                         "salesforce.guided_sync.configuration_type"
-                      }}</div>{{record.kindLabel}}</td>
+                      }}</div>{{record.typeLabel}}</td>
                   <td class="d-table__cell --detail"><div
                       class="d-table__mobile-label"
                     >{{i18n
-                        "salesforce.guided_sync.salesforce_object"
-                      }}</div>{{record.object}}</td>
-                  <td class="d-table__cell --detail"><div
-                      class="d-table__mobile-label"
-                    >{{i18n
+                        "salesforce.guided_sync.crm_object"
+                      }}</div>{{record.objectLabel}}</td>
+                  <td
+                    class="d-table__cell --detail"
+                    data-test-configuration-scope
+                  ><div class="d-table__mobile-label">{{i18n
                         "salesforce.guided_sync.scope"
                       }}</div>{{record.scope}}</td>
                   <td class="d-table__cell --controls">
                     <div class="d-table__cell-actions">
                       <DButton
                         class="btn-default btn-small"
+                        data-test-configure={{record.id}}
                         @action={{fn this.edit record}}
                         @disabled={{eq record.kind "posts"}}
                         @label="salesforce.guided_sync.configure"

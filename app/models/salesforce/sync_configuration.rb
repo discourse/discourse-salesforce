@@ -4,9 +4,10 @@ module Salesforce
   class SyncConfiguration < ActiveRecord::Base
     self.table_name = "crm_sync_configurations"
 
-    PROVIDER = "salesforce"
-    KINDS = %w[users].freeze
-    OBJECTS = %w[Lead Contact].freeze
+    PROVIDERS = {
+      "salesforce" => ::Salesforce::SyncProvider,
+      "hubspot" => ::Hubspot::SyncProvider,
+    }.freeze
     SCHEDULES = %w[daily hourly weekly manual].freeze
     MAX_GROUPS = 100
     MAX_MAPPINGS = 50
@@ -20,24 +21,41 @@ module Salesforce
              class_name: "Salesforce::SyncState",
              foreign_key: :configuration_id,
              dependent: :delete_all
+    has_many :record_links,
+             class_name: "Salesforce::RecordLink",
+             primary_key: %i[provider account object],
+             foreign_key: %i[provider account object]
+    has_many :records,
+             class_name: "Salesforce::Record",
+             primary_key: %i[provider account object],
+             foreign_key: %i[provider account object]
 
-    validates :provider, inclusion: { in: [PROVIDER] }
+    enum :direction, { outbound: "outbound", inbound: "inbound" }, validate: true
+
+    validates :provider, inclusion: { in: PROVIDERS.keys }
     validates :name, presence: true, length: { maximum: 60 }
-    validates :kind, inclusion: { in: KINDS }
-    validates :object, inclusion: { in: OBJECTS }
     validates :schedule, inclusion: { in: SCHEDULES }
+    validates :account, uniqueness: { scope: %i[provider object] }, if: :inbound?
+    validate :provider_shape
     validate :mappings_shape
 
-    scope :for_current_account,
-          -> { where(provider: PROVIDER, account: SiteSetting.salesforce_instance_url) }
+    scope :for_provider,
+          ->(name) { where(provider: name, account: self.provider_definition(name).account) }
+
+    def self.provider_definition(name)
+      PROVIDERS.fetch(name)
+    end
 
     def self.enabled?
       SiteSetting.salesforce_enabled && SiteSetting.enable_guided_sync_configuration
     end
 
     def self.active
-      return none unless enabled?
-      where(active: true, kind: "users").for_current_account
+      enabled = PROVIDERS.values.select(&:enabled?)
+      return none if enabled.empty?
+      where(active: true).merge(
+        enabled.map { |definition| for_provider(definition.key) }.reduce(:or),
+      )
     end
 
     def self.available_groups(query: nil)
@@ -72,31 +90,48 @@ module Salesforce
       raise Discourse::InvalidAccess unless guardian.is_admin?
 
       params = params.deep_stringify_keys
-      provider = params.fetch("provider", PROVIDER)
-      raise Discourse::InvalidParameters.new(:provider) if provider != PROVIDER
-      groups = resolve_groups!(params["group_ids"])
+      definition = PROVIDERS[params["provider"]]
+      raise Discourse::InvalidParameters.new(:provider) unless definition&.enabled?
+      %w[direction kind].each do |attribute|
+        raise Discourse::InvalidParameters.new(attribute.to_sym) if params[attribute].blank?
+      end
+      flow = definition.flow(params["direction"], params["kind"])
+      unless flow
+        if definition.flows.none? { |candidate| candidate.direction == params["direction"] }
+          raise Discourse::InvalidParameters.new(:direction)
+        end
+        raise Discourse::InvalidParameters.new(:kind)
+      end
+      if flow.requires_groups?
+        groups = resolve_groups!(params["group_ids"])
+      else
+        raise Discourse::InvalidParameters.new(:group_ids) if params["group_ids"].present?
+        groups = []
+      end
 
-      record = id ? find_by(id: id) : new(provider: PROVIDER)
+      record = id ? find_by(id: id) : new(provider: definition.key, direction: params["direction"])
       raise Discourse::NotFound if id && !record
-      if record.persisted? && record.object != params["object"]
-        raise Discourse::InvalidParameters.new(:object)
+      if record.persisted?
+        %w[provider direction kind object].each do |attribute|
+          if record.public_send(attribute) != params[attribute]
+            raise Discourse::InvalidParameters.new(attribute.to_sym)
+          end
+        end
       end
       record.assign_attributes(
         name: params["name"],
-        kind: params.fetch("kind", "users"),
+        kind: params["kind"],
         object: params["object"],
         schedule: params["schedule"],
         backfill: ActiveModel::Type::Boolean.new.cast(params["backfill"]),
         mappings: params["mappings"],
         active: true,
       )
+      record.account = definition.account
       raise Discourse::InvalidParameters.new(:configuration) if record.invalid?
 
-      ConfiguredUserSync.validate_mappings!(
-        record,
-        Api.cached_writable_fields(record.object, refresh: true),
-      )
-      record.account = SiteSetting.salesforce_instance_url
+      flow.validate_mappings!(record)
+      record.account = definition.account
 
       previous_group_ids = record.persisted? ? record.group_ids.sort : []
       new_group_ids = groups.map(&:id).sort
@@ -144,6 +179,14 @@ module Salesforce
       where(id: id).update_all(last_error: nil, last_error_at: nil)
     end
 
+    def provider_definition
+      PROVIDERS[provider]
+    end
+
+    def flow
+      provider_definition&.flow(direction, kind)
+    end
+
     def reason_enabled?(reason)
       case reason
       when "join", "change"
@@ -158,11 +201,7 @@ module Salesforce
     end
 
     def connection_changed?
-      account != SiteSetting.salesforce_instance_url
-    end
-
-    def record_links
-      RecordLink.within(provider:, account:, object:)
+      account != provider_definition.account
     end
 
     def record_link_for(user_id)
@@ -182,11 +221,24 @@ module Salesforce
     private
 
     def first_user_error
+      users = inbound? ? Person.eligible_users : Person.eligible_group_members(group_ids)
       sync_states
         .where.not(error: nil)
-        .where(user_id: Person.eligible_group_members(group_ids).select(:id))
+        .where(user_id: users.select(:id))
         .order(:error_at, :id)
         .pick(:error, :error_at)
+    end
+
+    def provider_shape
+      definition = provider_definition
+      return unless definition
+      if definition.flows.none? { |candidate| candidate.direction == direction }
+        errors.add(:direction, :invalid)
+      elsif flow.nil?
+        errors.add(:kind, :invalid)
+      elsif flow.objects.exclude?(object)
+        errors.add(:object, :invalid)
+      end
     end
 
     def mappings_shape
@@ -207,6 +259,7 @@ end
 #  account           :string           not null
 #  active            :boolean          default(TRUE), not null
 #  backfill          :boolean          default(FALSE), not null
+#  direction         :string           not null
 #  kind              :string           default("users"), not null
 #  last_error        :string
 #  last_error_at     :datetime
@@ -222,5 +275,6 @@ end
 #
 # Indexes
 #
+#  index_crm_sync_configurations_on_inbound_scope         (provider,account,object) UNIQUE WHERE ((direction)::text = 'inbound'::text)
 #  index_crm_sync_configurations_on_provider_and_account  (provider,account)
 #

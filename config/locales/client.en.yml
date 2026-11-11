@@ -11,12 +11,30 @@ en:
       nodes:
         "trigger:salesforce_case_created": "Salesforce case created"
         "trigger:salesforce_person_linked": "Salesforce contact or lead linked"
+        "action:salesforce_record": "Salesforce record"
       node_descriptions:
         "trigger:salesforce_case_created": "Fires when a Salesforce case is created for a topic"
+        "action:salesforce_record": "Read or update a record in Salesforce"
         "trigger:salesforce_person_linked": "Fires when a user is linked to a Salesforce contact or lead, either an existing record or one that was just created"
       salesforce_case_created:
         tag_names: "Tags"
         tag_names_description: "Only trigger for topics that have at least one of these tags"
+      salesforce_record:
+        operation: "Operation"
+        operations:
+          get: "Get"
+          update: "Update"
+        object: "Object"
+        object_description: "The Salesforce object API name, for example Case"
+        record_id: "Record ID"
+        field_names: "Fields to return"
+        field_names_description: "Comma-separated field API names. Leave empty to return all fields."
+        fields: "Fields to update"
+        key_placeholder: "Field API name"
+        value_placeholder: "value"
+        add_field: "Add field"
+        apply_assignment_rules: "Apply assignment rules"
+        apply_assignment_rules_description: "Let Salesforce reassign the record using its active assignment rules"
       salesforce_person_linked:
         objects: "Objects"
         objects_description: "Leave empty to match both contacts and leads."

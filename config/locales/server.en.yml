@@ -30,6 +30,14 @@ en:
     hubspot_portal_id: "HubSpot portal (hub) ID, found in the HubSpot account settings."
     hubspot_access_token: "HubSpot private app access token used to authenticate API requests."
   salesforce:
+    discourse_workflows:
+      record:
+        invalid_object: "\"%{name}\" is not a valid Salesforce object name"
+        invalid_field: "\"%{field}\" is not a valid Salesforce field name"
+        invalid_record_id: "\"%{id}\" is not a valid Salesforce record ID"
+        no_fields: "Add at least one field to update"
+        missing_value: "The value for \"%{field}\" is empty, so it was not sent to Salesforce"
+        request_failed: "Could not reach Salesforce: %{message}"
     error:
       connection:
         authentication: "Salesforce authentication failed. Check the API credentials and the integration user’s app authorization, then retry."

@@ -36,6 +36,7 @@ after_initialize do
       [
         DiscourseWorkflows::Nodes::SalesforceCaseCreated::V1,
         DiscourseWorkflows::Nodes::SalesforcePersonLinked::V1,
+        DiscourseWorkflows::Nodes::SalesforceRecord::V1,
       ]
     end
   end

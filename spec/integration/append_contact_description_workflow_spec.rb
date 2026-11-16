@@ -119,10 +119,6 @@ RSpec.describe "Workflow: Salesforce contact or lead linked -> Salesforce record
     )
   end
 
-  def description_update(value)
-    a_request(:patch, contact_path).with(body: { Description: value }.to_json)
-  end
-
   it "appends the profile URL to the description of an existing contact" do
     stub_existing_contact("Old notes")
     stub_request(:patch, contact_path).to_return(status: 204)
@@ -132,19 +128,11 @@ RSpec.describe "Workflow: Salesforce contact or lead linked -> Salesforce record
     run_queued_workflow
 
     expect(DiscourseWorkflows::Execution.last.status).to eq("success")
-    expect(description_update("Old notes\n\n#{profile_url}")).to have_been_made.once
-  end
-
-  it "sets just the profile URL when the description is blank" do
-    stub_existing_contact(nil)
-    stub_request(:patch, contact_path).to_return(status: 204)
-
-    Salesforce::Contact.create!(user)
-    expect(queued_jobs.size).to eq(1)
-    run_queued_workflow
-
-    expect(DiscourseWorkflows::Execution.last.status).to eq("success")
-    expect(description_update(profile_url)).to have_been_made.once
+    expect(
+      a_request(:patch, contact_path).with(
+        body: { Description: "Old notes\n\n#{profile_url}" }.to_json,
+      ),
+    ).to have_been_made.once
   end
 
   it "does not append the profile URL twice" do

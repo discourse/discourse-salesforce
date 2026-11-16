@@ -103,21 +103,15 @@ RSpec.describe DiscourseWorkflows::Nodes::SalesforceRecord::V1, discourse_workfl
   end
 
   describe "validation" do
-    it "rejects an invalid object name" do
+    it "rejects invalid names, record IDs and empty updates without calling Salesforce" do
       expect_node_error(
         { operation: "get", object: "Case/../User", record_id: record_id },
         /not a valid Salesforce object name/,
       )
-    end
-
-    it "rejects an invalid record id" do
       expect_node_error(
         { operation: "get", object: "Case", record_id: "abc?x=1" },
         /not a valid Salesforce record ID/,
       )
-    end
-
-    it "rejects an invalid field name in a get" do
       expect_node_error(
         {
           operation: "get",
@@ -127,16 +121,14 @@ RSpec.describe DiscourseWorkflows::Nodes::SalesforceRecord::V1, discourse_workfl
         },
         /not a valid Salesforce field name/,
       )
-    end
-
-    it "rejects an invalid field name in an update" do
       expect_node_error(
         update_config([{ "key" => "Status=1", "value" => "x" }]),
         /not a valid Salesforce field name/,
       )
+      expect_node_error(update_config([]), /at least one field/)
     end
 
-    it "does not request every field when the field list expression raises" do
+    it "fails without calling Salesforce when an expression has no value or raises" do
       expect_node_error(
         {
           operation: "get",
@@ -146,24 +138,14 @@ RSpec.describe DiscourseWorkflows::Nodes::SalesforceRecord::V1, discourse_workfl
         },
         /TypeError/,
       )
-    end
-
-    it "does not send null when an expression resolves to undefined" do
       expect_node_error(
         update_config([{ "key" => "Status", "value" => "={{ $json.missing }}" }]),
         /"Status" has no value/,
       )
-    end
-
-    it "does not send null when an expression raises" do
       expect_node_error(
         update_config([{ "key" => "Status", "value" => "={{ $json.missing.deeper }}" }]),
         /TypeError/,
       )
-    end
-
-    it "rejects an update without fields" do
-      expect_node_error(update_config([]), /at least one field/)
     end
   end
 
@@ -184,26 +166,21 @@ RSpec.describe DiscourseWorkflows::Nodes::SalesforceRecord::V1, discourse_workfl
       }.to raise_error(DiscourseWorkflows::NodeError, /Required fields are missing/)
     end
 
-    it "turns a connection failure into a node error" do
+    it "turns connection and credential failures into node errors" do
+      configuration = update_config([{ "key" => "Status", "value" => "Working" }])
       stub_request(:patch, "#{api_path}/Case/#{record_id}").to_timeout
 
-      expect {
-        execute_node(configuration: update_config([{ "key" => "Status", "value" => "Working" }]))
-      }.to raise_error(DiscourseWorkflows::NodeError, /Could not reach Salesforce/)
-    end
+      expect { execute_node(configuration: configuration) }.to raise_error(
+        DiscourseWorkflows::NodeError,
+        /Could not reach Salesforce/,
+      )
 
-    it "reports invalid credentials" do
       SiteSetting.salesforce_client_id = ""
 
-      expect {
-        execute_node(
-          configuration: {
-            "operation" => "get",
-            "object" => "Case",
-            "record_id" => record_id,
-          },
-        )
-      }.to raise_error(DiscourseWorkflows::NodeError, /Salesforce credentials/)
+      expect { execute_node(configuration: configuration) }.to raise_error(
+        DiscourseWorkflows::NodeError,
+        /Salesforce credentials/,
+      )
     end
   end
 end

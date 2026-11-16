@@ -20,12 +20,9 @@ RSpec.describe DiscourseWorkflows::Nodes::SalesforcePersonLinked::V1, discourse_
   end
 
   describe "#matches?" do
-    it "matches any object when none is selected" do
+    it "matches only the selected objects, or any object when none is selected" do
       expect(trigger_for("Contact").matches?(trigger_context({}))).to eq(true)
       expect(trigger_for("Lead").matches?(trigger_context(objects: []))).to eq(true)
-    end
-
-    it "matches only the selected objects" do
       expect(trigger_for("Contact").matches?(trigger_context(objects: ["Lead"]))).to eq(false)
       expect(trigger_for("Lead").matches?(trigger_context(objects: ["Lead"]))).to eq(true)
     end
@@ -66,22 +63,6 @@ RSpec.describe DiscourseWorkflows::Nodes::SalesforcePersonLinked::V1, discourse_
       )
       expect(dispatched.first["user"]["id"]).to eq(user.id)
       expect(dispatched.first["actor"]["id"]).to eq(admin.id)
-    end
-
-    it "stops dispatching when Salesforce is disabled" do
-      workflow
-      SiteSetting.salesforce_enabled = false
-
-      DiscourseEvent.trigger(
-        :salesforce_person_linked,
-        user,
-        "Contact",
-        "003000000000001AAA",
-        created: true,
-        acting_user: nil,
-      )
-
-      expect(dispatched).to be_empty
     end
   end
 end

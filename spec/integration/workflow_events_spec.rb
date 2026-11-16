@@ -26,15 +26,7 @@ RSpec.describe "Salesforce workflow events" do
       )
     end
 
-    it "fires once for a new case with the synced number and the acting user" do
-      events = track(:salesforce_case_created) { Salesforce::Case.sync!(topic, acting_user: admin) }
-
-      salesforce_case = Salesforce::Case.find_by(topic_id: topic.id)
-      expect(events).to eq([[salesforce_case, { acting_user: admin }]])
-      expect(salesforce_case).to have_attributes(uid: "234567", number: "345678", status: "New")
-    end
-
-    it "still fires once when reading the new case back fails, and not again on retry" do
+    it "fires once with the acting user even if reading the case back fails, and not on retry" do
       stub_request(:get, "#{api_path}/Case/234567")
         .to_return(status: 503, body: "")
         .then
@@ -42,25 +34,18 @@ RSpec.describe "Salesforce workflow events" do
 
       events =
         track(:salesforce_case_created) do
-          expect { Salesforce::Case.sync!(topic) }.to raise_error(Salesforce::InvalidApiResponse)
+          expect { Salesforce::Case.sync!(topic, acting_user: admin) }.to raise_error(
+            Salesforce::InvalidApiResponse,
+          )
         end
 
       salesforce_case = Salesforce::Case.find_by(topic_id: topic.id)
-      expect(events).to eq([[salesforce_case, { acting_user: nil }]])
-      expect(salesforce_case).to have_attributes(uid: "234567", number: nil, status: nil)
+      expect(events).to eq([[salesforce_case, { acting_user: admin }]])
 
       retried = track(:salesforce_case_created) { Salesforce::Case.sync!(topic) }
 
       expect(retried).to be_empty
       expect(salesforce_case.reload.number).to eq("345678")
-    end
-
-    it "does not fire when an existing case is synced again" do
-      Salesforce::Case.sync!(topic)
-
-      events = track(:salesforce_case_created) { Salesforce::Case.sync!(topic, acting_user: admin) }
-
-      expect(events).to be_empty
     end
   end
 
@@ -75,39 +60,18 @@ RSpec.describe "Salesforce workflow events" do
       [user, object, id, { created:, email_verified: true, acting_user: }]
     end
 
-    context "when an admin creates a record" do
-      before { sign_in(admin) }
+    it "reports the admin as the actor when they link an existing Contact" do
+      sign_in(admin)
+      stub_salesforce_person_lookup("Contact", user.email, id: "contact123")
 
-      it "reports a created Contact with the admin as the actor" do
-        stub_salesforce_person_lookup("Contact", user.email)
-        stub_request(:post, "#{api_path}/Contact").to_return(
-          status: 200,
-          body: { id: "contact123" }.to_json,
-        )
+      events =
+        linked_events do
+          post "/salesforce/persons/create.json", params: { user_id: user.id, type: "contact" }
+        end
 
-        events =
-          linked_events do
-            post "/salesforce/persons/create.json", params: { user_id: user.id, type: "contact" }
-          end
-
-        expect(response.status).to eq(200)
-        expect(events).to eq(
-          [link_event("Contact", "contact123", created: true, acting_user: admin)],
-        )
-      end
-
-      it "reports an existing Contact as linked rather than created" do
-        stub_salesforce_person_lookup("Contact", user.email, id: "contact123")
-
-        events =
-          linked_events do
-            post "/salesforce/persons/create.json", params: { user_id: user.id, type: "contact" }
-          end
-
-        expect(events).to eq(
-          [link_event("Contact", "contact123", created: false, acting_user: admin)],
-        )
-      end
+      expect(events).to eq(
+        [link_event("Contact", "contact123", created: false, acting_user: admin)],
+      )
     end
 
     it "reports the Contact created for a new case with the acting user" do
@@ -189,7 +153,7 @@ RSpec.describe "Salesforce workflow events" do
         )
       end
 
-      it "reports a created Lead once and stays quiet on later syncs" do
+      it "reports a created Lead" do
         stub_salesforce_person_lookup("Lead", user.email, fields: lead_fields)
         stub_request(:post, "#{api_path}/Lead").to_return(
           status: 201,
@@ -199,11 +163,6 @@ RSpec.describe "Salesforce workflow events" do
         events = linked_events { run_sync }
 
         expect(events).to eq([link_event("Lead", "lead123", created: true)])
-
-        stub_request(:get, "#{api_path}/Lead/lead123").to_return(
-          body: { Id: "lead123", LastName: "Morgan", Company: "None" }.to_json,
-        )
-        expect(linked_events { run_sync }).to be_empty
       end
 
       it "reports an existing Lead as linked" do

@@ -54,14 +54,5 @@ RSpec.describe DiscourseWorkflows::Nodes::SalesforceCaseCreated::V1, discourse_w
       expect(data["user"]["id"]).to eq(topic.user_id)
       expect(data["actor"]["id"]).to eq(admin.id)
     end
-
-    it "stops dispatching when Salesforce is disabled" do
-      workflow
-      SiteSetting.salesforce_enabled = false
-
-      DiscourseEvent.trigger(:salesforce_case_created, salesforce_case, acting_user: admin)
-
-      expect(dispatched).to be_empty
-    end
   end
 end

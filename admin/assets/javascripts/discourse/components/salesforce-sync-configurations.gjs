@@ -18,9 +18,23 @@ import {
   createSyncConfiguration,
 } from "discourse/plugins/discourse-salesforce/discourse/lib/sync-configuration";
 
-const NEW_KEYS = {
-  salesforce: "new-salesforce-users",
-  hubspot: "new-hubspot-users",
+const PROVIDERS = {
+  salesforce: {
+    newKey: "new-salesforce-users",
+    editor: SalesforceSyncConfiguration,
+    create: () => ({
+      ...createSyncConfiguration(),
+      name: i18n("salesforce.guided_sync.default_users_name"),
+    }),
+  },
+  hubspot: {
+    newKey: "new-hubspot-users",
+    editor: HubspotSyncConfiguration,
+    create: () => ({
+      ...createHubspotSyncConfiguration(),
+      name: i18n("salesforce.guided_sync.hubspot.default_name"),
+    }),
+  },
 };
 
 export default class SalesforceSyncConfigurations extends Component {
@@ -38,11 +52,11 @@ export default class SalesforceSyncConfigurations extends Component {
       (configuration) =>
         String(configuration.id) === String(this.args.selectedId)
     );
-    const provider = Object.keys(NEW_KEYS).find(
-      (name) => NEW_KEYS[name] === this.args.selectedId
+    const provider = Object.keys(PROVIDERS).find(
+      (name) => PROVIDERS[name].newKey === this.args.selectedId
     );
     if (record && record.kind !== "posts") {
-      this.selected = { key: record.id, configuration: record };
+      this.selected = this.#editorFor(record);
     } else if (provider) {
       this.add(provider);
     }
@@ -96,24 +110,12 @@ export default class SalesforceSyncConfigurations extends Component {
 
   @action
   add(provider) {
-    const key = NEW_KEYS[provider];
-    if (this.args.onSelect && this.args.selectedId !== key) {
-      this.args.onSelect(key);
+    const { newKey, create } = PROVIDERS[provider];
+    if (this.args.onSelect && this.args.selectedId !== newKey) {
+      this.args.onSelect(newKey);
       return;
     }
-    this.selected = {
-      key,
-      configuration:
-        provider === "hubspot"
-          ? {
-              ...createHubspotSyncConfiguration(),
-              name: i18n("salesforce.guided_sync.hubspot.default_name"),
-            }
-          : {
-              ...createSyncConfiguration(),
-              name: i18n("salesforce.guided_sync.default_users_name"),
-            },
-    };
+    this.selected = this.#editorFor(create(), newKey);
   }
 
   @action
@@ -125,7 +127,7 @@ export default class SalesforceSyncConfigurations extends Component {
       this.args.onSelect(record.id);
       return;
     }
-    this.selected = { key: record.id, configuration: record };
+    this.selected = this.#editorFor(record);
   }
 
   @action
@@ -191,6 +193,14 @@ export default class SalesforceSyncConfigurations extends Component {
     }
   }
 
+  #editorFor(configuration, key = configuration.id) {
+    return {
+      key,
+      configuration,
+      component: PROVIDERS[configuration.provider].editor,
+    };
+  }
+
   <template>
     {{#if (not this.credentialsConfigured)}}
       <AdminConfigAreaCard @heading="salesforce.guided_sync.credentials_title">
@@ -207,20 +217,12 @@ export default class SalesforceSyncConfigurations extends Component {
       </AdminConfigAreaCard>
     {{else if this.selected}}
       {{#each this.editors key="key" as |editor|}}
-        {{#if (eq editor.configuration.provider "hubspot")}}
-          <HubspotSyncConfiguration
-            @record={{editor.configuration}}
-            @onCancel={{this.close}}
-            @onSave={{this.save}}
-          />
-        {{else}}
-          <SalesforceSyncConfiguration
-            @groups={{@groups}}
-            @record={{editor.configuration}}
-            @onCancel={{this.close}}
-            @onSave={{this.save}}
-          />
-        {{/if}}
+        <editor.component
+          @groups={{@groups}}
+          @record={{editor.configuration}}
+          @onCancel={{this.close}}
+          @onSave={{this.save}}
+        />
       {{/each}}
     {{else}}
       <div

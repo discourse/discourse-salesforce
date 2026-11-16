@@ -8,13 +8,17 @@ module PageObjects
         self
       end
 
-      def start_hubspot_pull
-        find("[data-test-sync-contacts]").click
+      def start_pull
+        find("[data-test-pull-crm]").click
         self
       end
 
-      def has_hubspot_pull_disabled?
-        has_css?("[data-test-sync-contacts][disabled]")
+      def has_pull_disabled?
+        has_css?("[data-test-pull-crm][disabled]")
+      end
+
+      def has_pull_object?(label)
+        has_css?('[data-name="object"] .form-kit__control-menu-trigger', text: label)
       end
 
       def select_property(label)

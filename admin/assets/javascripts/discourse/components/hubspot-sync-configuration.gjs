@@ -15,6 +15,11 @@ import SyncConfigurationHeading from "discourse/plugins/discourse-salesforce/dis
 import { createHubspotSyncConfiguration } from "discourse/plugins/discourse-salesforce/discourse/lib/sync-configuration";
 
 const PREFIX = "salesforce.guided_sync.hubspot";
+const COMING_SOON_OBJECTS = [
+  { value: "company", label: "hubspot_company" },
+  { value: "Contact", label: "salesforce_contact" },
+  { value: "Lead", label: "salesforce_lead" },
+];
 
 export default class HubspotSyncConfiguration extends Component {
   @service a11y;
@@ -40,6 +45,19 @@ export default class HubspotSyncConfiguration extends Component {
 
   get title() {
     return this.configuration.name || i18n(`${PREFIX}.default_name`);
+  }
+
+  get comingSoonObjects() {
+    return COMING_SOON_OBJECTS.map((object) => ({
+      value: object.value,
+      label: i18n("salesforce.guided_sync.coming_soon", {
+        name: i18n(`salesforce.guided_sync.pull_objects.${object.label}`),
+      }),
+    }));
+  }
+
+  get objectLabel() {
+    return i18n("salesforce.guided_sync.pull_objects.hubspot_contact");
   }
 
   get selectedProperties() {
@@ -234,6 +252,25 @@ export default class HubspotSyncConfiguration extends Component {
           <p class="hubspot-sync-configuration__description">{{i18n
               "salesforce.guided_sync.hubspot.pull_description"
             }}</p>
+          <form.Field
+            @disabled={{@record.id}}
+            @name="object"
+            @title={{i18n "salesforce.guided_sync.pull_target"}}
+            @type="menu"
+            @validation="required"
+            as |field|
+          >
+            <field.Control @selection={{this.objectLabel}} as |menu|>
+              <menu.Item @value="contact">{{this.objectLabel}}</menu.Item>
+              {{#each this.comingSoonObjects as |object|}}
+                <menu.Item
+                  data-test-coming-soon-object={{object.value}}
+                  disabled={{true}}
+                  @value={{object.value}}
+                >{{object.label}}</menu.Item>
+              {{/each}}
+            </field.Control>
+          </form.Field>
           <DConditionalLoadingSpinner
             data-test-properties-loading
             aria-busy={{this.loadingProperties}}

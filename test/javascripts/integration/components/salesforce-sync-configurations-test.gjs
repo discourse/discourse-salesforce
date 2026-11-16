@@ -357,7 +357,7 @@ module(
         .exists("keeps the other configuration");
     });
 
-    test("offers HubSpot contact pull only while the provider is enabled and unconfigured", async function (assert) {
+    test("offers the CRM pull only while HubSpot is enabled and unconfigured", async function (assert) {
       pretender.get("/salesforce/admin/hubspot/contact-properties.json", () => [
         200,
         { "Content-Type": "application/json" },
@@ -376,8 +376,8 @@ module(
         </template>
       );
       assert
-        .dom("[data-test-sync-contacts]")
-        .doesNotExist("hides HubSpot while the provider is disabled");
+        .dom("[data-test-pull-crm]")
+        .doesNotExist("hides the pull while HubSpot is disabled");
 
       await render(
         <template>
@@ -390,9 +390,9 @@ module(
         </template>
       );
       assert
-        .dom("[data-test-sync-contacts]")
-        .hasText("Pull contacts from HubSpot", "offers the HubSpot pull");
-      await click("[data-test-sync-contacts]");
+        .dom("[data-test-pull-crm]")
+        .hasText("Pull from CRM", "offers the pull");
+      await click("[data-test-pull-crm]");
       assert
         .dom(".hubspot-sync-configuration .d-page-subheader__title")
         .hasText(
@@ -419,12 +419,15 @@ module(
         </template>
       );
       assert
-        .dom("[data-test-sync-contacts]")
+        .dom("[data-test-pull-crm]")
         .isDisabled("allows a single HubSpot pull");
-      assert.dom("[data-test-sync-contacts]").hasText("Already configured");
+      assert.dom("[data-test-pull-crm]").hasText("Already configured");
       assert
         .dom('[data-test-configuration="hubspot"]')
-        .includesText("Pull contacts from HubSpot", "labels the type");
+        .includesText("Pull from CRM", "labels the type");
+      assert
+        .dom('[data-test-configuration="hubspot"]')
+        .includesText("HubSpot - Contacts", "labels the CRM object");
       assert
         .dom(
           '[data-test-configuration="hubspot"] [data-test-configuration-scope]'

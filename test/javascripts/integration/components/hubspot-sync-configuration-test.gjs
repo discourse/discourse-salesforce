@@ -54,6 +54,18 @@ module("Integration | Component | HubspotSyncConfiguration", function (hooks) {
       "requests HubSpot contact properties"
     );
     assert
+      .dom('[data-name="object"] .form-kit__control-menu-trigger')
+      .hasText("HubSpot - Contacts", "pulls HubSpot contacts");
+    await click('[data-name="object"] .form-kit__control-menu-trigger');
+    assert
+      .dom("[data-test-coming-soon-object]")
+      .exists({ count: 3 }, "lists the objects that cannot be pulled yet");
+    assert
+      .dom('[data-test-coming-soon-object="company"]')
+      .hasText("HubSpot - Companies (coming soon)")
+      .isDisabled("marks them as coming soon");
+    await click('.form-kit__control-menu-item[data-value="contact"] .btn');
+    assert
       .dom("[data-test-user-pull-note]")
       .exists("notes that users are also matched individually");
     assert

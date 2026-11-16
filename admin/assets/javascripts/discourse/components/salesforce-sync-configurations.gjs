@@ -86,7 +86,7 @@ export default class SalesforceSyncConfigurations extends Component {
             : (record.groups || []).join(", "),
       objectLabel:
         record.provider === "hubspot"
-          ? i18n("salesforce.guided_sync.hubspot.contacts")
+          ? i18n("salesforce.guided_sync.pull_objects.hubspot_contact")
           : record.object,
       typeLabel: i18n(
         `salesforce.guided_sync.types.${record.direction}_${record.kind}`
@@ -250,12 +250,12 @@ export default class SalesforceSyncConfigurations extends Component {
           </AdminConfigAreaCard>
           {{#if this.hubspotProvider}}
             <AdminConfigAreaCard
-              @heading="salesforce.guided_sync.hubspot.pull_contacts"
-              @description="salesforce.guided_sync.hubspot.description"
+              @heading="salesforce.guided_sync.pull_from_crm"
+              @description="salesforce.guided_sync.pull_description"
             >
               <:content><DButton
                   class="btn-primary"
-                  data-test-sync-contacts
+                  data-test-pull-crm
                   @action={{fn this.add "hubspot"}}
                   @disabled={{or
                     (not this.hubspotProvider.credentials_configured)
@@ -265,7 +265,7 @@ export default class SalesforceSyncConfigurations extends Component {
                   @label={{if
                     this.hubspotConfigured
                     "salesforce.guided_sync.hubspot.already_configured"
-                    "salesforce.guided_sync.hubspot.pull_contacts"
+                    "salesforce.guided_sync.pull_from_crm"
                   }}
                 /></:content>
             </AdminConfigAreaCard>

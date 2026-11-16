@@ -5,7 +5,6 @@ import { action } from "@ember/object";
 import DFilterInput from "discourse/ui-kit/d-filter-input";
 import dConcatClass from "discourse/ui-kit/helpers/d-concat-class";
 import { i18n } from "discourse-i18n";
-import { sourceLabel } from "discourse/plugins/discourse-salesforce/discourse/lib/sync-configuration";
 
 export default class SalesforceFieldMenu extends Component {
   @tracked filter = "";
@@ -34,6 +33,9 @@ export default class SalesforceFieldMenu extends Component {
             mapping.id !== this.args.mappingId &&
             mapping.destination === field.id
         );
+        const source = this.args.sources?.find(
+          (item) => item.id === assigned?.source
+        );
         return {
           ...field,
           selected: field.id === this.args.value,
@@ -41,7 +43,7 @@ export default class SalesforceFieldMenu extends Component {
           custom: (field.label || field.id).endsWith("__c"),
           description: assigned
             ? i18n("salesforce.guided_sync.mapped_to", {
-                source: sourceLabel(assigned, this.args.sources ?? []),
+                source: source?.label || assigned.source,
               })
             : null,
         };

@@ -203,8 +203,7 @@ RSpec.describe Jobs::SyncSalesforceUser do
         configuration.mappings +
           [
             {
-              "source" => "custom_field",
-              "value" => "account_tier",
+              "source" => "custom_field:account_tier",
               "destination" => "Tier__c",
               "policy" => "overwrite",
             },

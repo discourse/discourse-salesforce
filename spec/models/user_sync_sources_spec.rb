@@ -243,8 +243,7 @@ RSpec.describe Salesforce::UserSyncSources do
           "sf_multi" => "List__c",
         }.map do |name, destination|
           {
-            "source" => "custom_field",
-            "value" => name,
+            "source" => "custom_field:#{name}",
             "destination" => destination,
             "policy" => "overwrite",
           }

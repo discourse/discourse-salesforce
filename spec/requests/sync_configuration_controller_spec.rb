@@ -119,7 +119,7 @@ RSpec.describe Salesforce::SyncConfigurationController do
       end
     end
 
-    it "lists known user custom field names without admin user fields, link fields or blanks" do
+    it "lists user custom fields as sources without admin user field keys, link fields or blanks" do
       sign_in(admin)
       stub_request(:get, "#{api_path}/Lead/describe").to_return(body: { fields: [] }.to_json)
       admin_field = Fabricate(:user_field)
@@ -132,7 +132,9 @@ RSpec.describe Salesforce::SyncConfigurationController do
         UserCustomField.create!(user_id: admin.id, name: name, value: "x")
       end
       get "/salesforce/admin/guided-sync/fields.json", params: { object: "Lead" }
-      expect(response.parsed_body.fetch("custom_field_names")).to eq(%w[account_tier region])
+      expect(response.parsed_body.fetch("custom_sources").map { |source| source["id"] }).to eq(
+        ["user_field_#{admin_field.id}", "custom_field:account_tier", "custom_field:region"],
+      )
     end
 
     it "returns a safe error when Salesforce is unavailable" do
@@ -334,11 +336,11 @@ RSpec.describe Salesforce::SyncConfigurationController do
       end
     end
 
-    it "persists a custom field mapping and rejects invalid names" do
+    it "persists a listed custom field mapping and rejects unlisted ones" do
       sign_in(admin)
+      UserCustomField.create!(user_id: admin.id, name: "account_tier", value: "gold")
       configuration[:mappings][1] = {
-        source: "custom_field",
-        value: "account_tier",
+        source: "custom_field:account_tier",
         destination: "Company",
         policy: "overwrite",
       }
@@ -348,19 +350,17 @@ RSpec.describe Salesforce::SyncConfigurationController do
            },
            as: :json
       expect(response).to have_http_status(:created)
-      expect(response.parsed_body.dig("configuration", "mappings", 1)).to include(
-        "source" => "custom_field",
-        "value" => "account_tier",
+      expect(response.parsed_body.dig("configuration", "mappings", 1, "source")).to eq(
+        "custom_field:account_tier",
       )
-      [nil, "  ", 5, "a" * 257].each do |value|
-        configuration[:mappings][1][:value] = value
-        post "/salesforce/admin/guided-sync/configurations.json",
-             params: {
-               configuration: configuration,
-             },
-             as: :json
-        expect(response).to have_http_status(:bad_request)
-      end
+
+      configuration[:mappings][1][:source] = "custom_field:missing"
+      post "/salesforce/admin/guided-sync/configurations.json",
+           params: {
+             configuration: configuration,
+           },
+           as: :json
+      expect(response).to have_http_status(:bad_request)
     end
 
     it "validates mappings before activating and does not requeue backfill on ordinary edits" do

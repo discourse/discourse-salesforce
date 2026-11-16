@@ -150,7 +150,7 @@ to `LeadSource`. Static values must contain 1–1,000 characters and use the sam
 keep/overwrite rules as other mappings. Choose Discourse under **Keep value from**
 to replace an existing Salesforce value.
 
-Other user custom fields are listed under **Custom fields**; choose **Other…** to type a name that is not listed. Values are sent as text: lists are joined and other non-text values are sent as JSON.
+User custom fields that have a value for at least one user are listed under **Custom fields**. Values are sent as text: lists are joined and other non-text values are sent as JSON.
 
 When Salesforce confirms a linked Lead was deleted (and not converted), sync matches
 by email again and creates a replacement if no active match exists. Missing or

@@ -9,6 +9,7 @@ import Form from "discourse/components/form";
 import DTooltip from "discourse/float-kit/components/d-tooltip";
 import { ajax } from "discourse/lib/ajax";
 import { extractError } from "discourse/lib/ajax-error";
+import { eq } from "discourse/truth-helpers";
 import DButton from "discourse/ui-kit/d-button";
 import DConditionalLoadingSpinner from "discourse/ui-kit/d-conditional-loading-spinner";
 import DMultiSelect from "discourse/ui-kit/d-multi-select";
@@ -21,12 +22,8 @@ import SalesforceSourceMenu from "discourse/plugins/discourse-salesforce/discour
 import {
   createCompanyMapping,
   createSyncConfiguration,
-  customFieldSources,
-  sourceLabel,
-  sourceOption,
   updateMapping,
   USER_SYNC_SOURCES,
-  valueInputFor,
 } from "discourse/plugins/discourse-salesforce/discourse/lib/sync-configuration";
 
 const PREFIX = "salesforce.guided_sync";
@@ -44,7 +41,6 @@ export default class SalesforceSyncConfiguration extends Component {
   @tracked saving = false;
   @tracked salesforceFields = [];
   @tracked customSources = [];
-  @tracked customFieldNames = [];
   @tracked fieldsObject;
   @tracked loadingFields = false;
   @tracked fieldsError;
@@ -128,7 +124,6 @@ export default class SalesforceSyncConfiguration extends Component {
         group: "custom",
         label: source.name,
       })),
-      ...customFieldSources(this.customFieldNames),
     ];
   }
 
@@ -266,7 +261,7 @@ export default class SalesforceSyncConfiguration extends Component {
       );
       if (source && source.type !== field.type) {
         message = i18n(`${PREFIX}.errors.incompatible`, {
-          source: sourceLabel(mapping, this.sources),
+          source: source.label,
           source_type: source.type,
           destination: field.id,
           destination_type: field.type,
@@ -279,36 +274,15 @@ export default class SalesforceSyncConfiguration extends Component {
   }
 
   @action
-  valueInput(mapping) {
-    const input = valueInputFor(mapping, this.customFieldNames);
-    return (
-      input && {
-        label: i18n(`${PREFIX}.${input.id}`),
-        error: i18n(`${PREFIX}.errors.${input.id}`),
-        description:
-          input.description && i18n(`${PREFIX}.${input.description}`),
-        maxLength: input.maxLength,
-      }
-    );
-  }
-
-  @action
-  selectedSource(mapping) {
-    return sourceOption(mapping, this.customFieldNames);
-  }
-
-  @action
-  validateSourceValue(name, value, { data, addError }) {
-    const input = this.valueInput(data.mappings[Number(name.split(".")[1])]);
-    if (!input || value === null || value === undefined || value === "") {
+  validateStaticValue(name, value, { addError }) {
+    if (value === null || value === undefined || value === "") {
       return;
     }
-    if (
-      typeof value !== "string" ||
-      !value.trim() ||
-      value.length > input.maxLength
-    ) {
-      addError(name, { title: input.label, message: input.error });
+    if (typeof value !== "string" || !value.trim() || value.length > 1000) {
+      addError(name, {
+        title: i18n(`${PREFIX}.static_value`),
+        message: i18n(`${PREFIX}.errors.static_value`),
+      });
     }
   }
 
@@ -365,7 +339,6 @@ export default class SalesforceSyncConfiguration extends Component {
         return;
       }
       this.customSources = result.custom_sources || [];
-      this.customFieldNames = result.custom_field_names || [];
       this.salesforceFields = result.fields.map((field) => ({
         id: field.name,
         label: field.name,
@@ -493,13 +466,7 @@ export default class SalesforceSyncConfiguration extends Component {
   @action
   setMapping(property, value, { index }) {
     this.#setMappings(
-      updateMapping(
-        this.configuration,
-        index,
-        property,
-        value,
-        this.customFieldNames
-      )
+      updateMapping(this.configuration, index, property, value)
     );
   }
 
@@ -776,31 +743,32 @@ export default class SalesforceSyncConfiguration extends Component {
                         <SalesforceSourceMenu
                           @control={{field.Control}}
                           @sources={{this.sources}}
-                          @value={{this.selectedSource mapping}}
+                          @value={{mapping.source}}
                         />
                       </collection.Field>
-                      {{#let (this.valueInput mapping) as |input|}}
-                        {{#if input}}
-                          <collection.Field
-                            @description={{input.description}}
-                            @format="full"
-                            @name="value"
-                            @showTitle={{false}}
-                            @onSet={{fn this.setMapping "value"}}
-                            @validate={{this.validateSourceValue}}
-                            @title={{input.label}}
-                            @type="input"
-                            @validation="required"
-                            as |field|
-                          >
-                            <field.Control
-                              aria-label={{input.label}}
-                              maxlength={{input.maxLength}}
-                              placeholder={{input.label}}
-                            />
-                          </collection.Field>
-                        {{/if}}
-                      {{/let}}
+                      {{#if (eq mapping.source "static")}}
+                        <collection.Field
+                          @format="full"
+                          @name="value"
+                          @showTitle={{false}}
+                          @onSet={{fn this.setMapping "value"}}
+                          @validate={{this.validateStaticValue}}
+                          @title={{i18n "salesforce.guided_sync.static_value"}}
+                          @type="input"
+                          @validation="required"
+                          as |field|
+                        >
+                          <field.Control
+                            aria-label={{i18n
+                              "salesforce.guided_sync.static_value"
+                            }}
+                            maxlength="1000"
+                            placeholder={{i18n
+                              "salesforce.guided_sync.static_value"
+                            }}
+                          />
+                        </collection.Field>
+                      {{/if}}
                     </div>
                     <span
                       class="salesforce-sync-configuration__mapping-arrow"

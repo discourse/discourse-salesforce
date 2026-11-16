@@ -20,11 +20,9 @@ module Salesforce
       "seen" => "date",
       "first_seen" => "date",
       "static" => "text",
-      "custom_field" => "text",
     }.freeze
 
-    CUSTOM_FIELD_KEY_PREFIX = "custom_field:"
-    VALUE_MAX_LENGTHS = { "static" => 1000, "custom_field" => 256 }.freeze
+    CUSTOM_FIELD_PREFIX = "custom_field:"
     CUSTOM_FIELD_NAMES_LIMIT = 200
 
     PROFILE_COLUMNS = { "bio" => :bio_raw, "website" => :website }.freeze
@@ -36,15 +34,8 @@ module Salesforce
       "likes_received" => :likes_received,
     }.freeze
 
-    def self.source_key(mapping)
-      source = mapping["source"]
-      source == "custom_field" ? "#{CUSTOM_FIELD_KEY_PREFIX}#{mapping["value"]}" : source
-    end
-
-    def self.custom_field_name(key)
-      if key.to_s.start_with?(CUSTOM_FIELD_KEY_PREFIX)
-        key.to_s.delete_prefix(CUSTOM_FIELD_KEY_PREFIX)
-      end
+    def self.custom_field_name(source)
+      source.to_s.delete_prefix(CUSTOM_FIELD_PREFIX) if source.to_s.start_with?(CUSTOM_FIELD_PREFIX)
     end
 
     # Admin user fields are listed through custom_sources, so their storage keys are left out.
@@ -76,11 +67,14 @@ module Salesforce
                 "text"
               end,
           }
+        end +
+        custom_field_names.map do |name|
+          { id: "#{CUSTOM_FIELD_PREFIX}#{name}", name: name, type: "text" }
         end
     end
 
     def initialize(mappings, users)
-      sources = mappings.map { |mapping| self.class.source_key(mapping) }
+      sources = mappings.map { |mapping| mapping["source"] }
       user_ids = users.map(&:id)
       @recent_reads =
         if sources.include?("posts_read30")

@@ -155,6 +155,7 @@ RSpec.describe "Salesforce workflow events" do
 
       it "reports a created Lead" do
         stub_salesforce_person_lookup("Lead", user.email, fields: lead_fields)
+        stub_salesforce_person_lookup("Contact", user.email)
         stub_request(:post, "#{api_path}/Lead").to_return(
           status: 201,
           body: { id: "lead123" }.to_json,

@@ -161,7 +161,7 @@ RSpec.describe Salesforce::SyncConfiguration do
         backfill: true,
         mappings: [{ id: 1, source: "lifecyclestage" }, { id: 2, source: "jobtitle" }],
       }
-      Jobs::SyncHubspotConfiguration.clear
+      Jobs::Hubspot::SyncConfiguration.clear
 
       record = described_class.create_or_update!(params, id: nil, guardian: admin.guardian)
 
@@ -174,7 +174,7 @@ RSpec.describe Salesforce::SyncConfiguration do
       )
       expect(record.groups).to be_empty
       expect(
-        Jobs::SyncHubspotConfiguration.jobs.map { |job| job["args"].first },
+        Jobs::Hubspot::SyncConfiguration.jobs.map { |job| job["args"].first },
       ).to contain_exactly(hash_including("configuration_id" => record.id, "reason" => "backfill"))
 
       [

@@ -1,7 +1,8 @@
 # frozen_string_literal: true
 
 module Jobs
-  class SyncHubspotConfiguration < ::Jobs::Base
+  module Hubspot
+    class SyncConfiguration < ::Jobs::Base
     sidekiq_options retry: 5
 
     SEARCH_CURSOR_LIMIT = 10_000
@@ -13,7 +14,7 @@ module Jobs
       return unless configuration&.reason_enabled?(args[:reason])
 
       started_at = args[:started_at] ? Time.zone.parse(args[:started_at]) : Time.zone.now
-      import = Hubspot::ContactImport.new(configuration)
+      import = ::Hubspot::ContactImport.new(configuration)
       since = search_window(configuration, args)
       page =
         if since
@@ -41,17 +42,17 @@ module Jobs
           .update_all(last_synced_at: started_at, last_error: nil, last_error_at: nil)
       elsif since && next_after.to_i >= SEARCH_CURSOR_LIMIT
         restart = restart_window(results, since)
-        Jobs.enqueue(:sync_hubspot_configuration, **next_args, since: restart.iso8601)
+        Jobs.enqueue(::Jobs::Hubspot::SyncConfiguration, **next_args, since: restart.iso8601)
       else
         Jobs.enqueue(
-          :sync_hubspot_configuration,
+          ::Jobs::Hubspot::SyncConfiguration,
           **next_args.merge(after: next_after, since: since&.iso8601).compact,
         )
       end
-    rescue Hubspot::RateLimited => error
+    rescue ::Hubspot::RateLimited => error
       Jobs.enqueue_in(
         error.retry_after || RATE_LIMIT_DELAY,
-        :sync_hubspot_configuration,
+        ::Jobs::Hubspot::SyncConfiguration,
         args.to_h.symbolize_keys,
       )
     rescue => error
@@ -65,7 +66,7 @@ module Jobs
     private
 
     def import_api
-      @import_api ||= Hubspot::Api.new
+      @import_api ||= ::Hubspot::Api.new
     end
 
     def search_window(configuration, args)
@@ -76,14 +77,15 @@ module Jobs
     end
 
     def restart_window(results, since)
-      value = results.last&.dig("properties", Hubspot::Api::LAST_MODIFIED_PROPERTY)
+      value = results.last&.dig("properties", ::Hubspot::Api::LAST_MODIFIED_PROPERTY)
       restart = value.present? ? Time.zone.parse(value) : nil
       if restart.nil? || restart <= since
-        raise Hubspot::InvalidApiResponse.new(
+        raise ::Hubspot::InvalidApiResponse.new(
                 "Search reached #{SEARCH_CURSOR_LIMIT} results without a later modified date",
               )
       end
       restart
+    end
     end
   end
 end

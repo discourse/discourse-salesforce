@@ -1,8 +1,8 @@
 # frozen_string_literal: true
 
-require_relative "../spec_helper"
+require_relative "../../spec_helper"
 
-RSpec.describe Jobs::SyncHubspotConfiguration do
+RSpec.describe Jobs::Hubspot::SyncConfiguration do
   include_context "with hubspot spec helper"
 
   let!(:configuration) { Fabricate(:hubspot_sync_configuration) }
@@ -10,10 +10,10 @@ RSpec.describe Jobs::SyncHubspotConfiguration do
   fab!(:user) { Fabricate(:verified_user, email: "ada@example.com") }
 
   def enqueued_args
-    Jobs::SyncHubspotConfiguration.jobs.map { |job| job["args"].first.except("current_site_id") }
+    Jobs::Hubspot::SyncConfiguration.jobs.map { |job| job["args"].first.except("current_site_id") }
   end
 
-  before { Jobs::SyncHubspotConfiguration.clear }
+  before { Jobs::Hubspot::SyncConfiguration.clear }
 
   it "lists every contact on backfill, follows the cursor and records the run start as the sync time" do
     freeze_time Time.utc(2026, 11, 2, 12)
@@ -193,7 +193,7 @@ RSpec.describe Jobs::SyncHubspotConfiguration do
 
     described_class.new.execute(configuration_id: configuration.id, reason: "scheduled")
 
-    expect(Jobs::SyncHubspotConfiguration.jobs.map { |job| job["at"] - Time.now.to_f }).to all(
+    expect(Jobs::Hubspot::SyncConfiguration.jobs.map { |job| job["at"] - Time.now.to_f }).to all(
       be_within(1).of(17),
     )
     expect(configuration.reload.last_error).to be_nil

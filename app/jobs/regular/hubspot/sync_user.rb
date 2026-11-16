@@ -1,7 +1,8 @@
 # frozen_string_literal: true
 
 module Jobs
-  class SyncHubspotUser < ::Jobs::Base
+  module Hubspot
+    class SyncUser < ::Jobs::Base
     sidekiq_options retry: 5
 
     def execute(args)
@@ -10,7 +11,7 @@ module Jobs
       user = Salesforce::Person.eligible_users.find_by(id: args[:user_id])
       return unless user
 
-      Hubspot::ContactImport.new(configuration).import_user(user)
+      ::Hubspot::ContactImport.new(configuration).import_user(user)
       Salesforce::SyncState.where(configuration_id: configuration.id, user_id: user.id).update_all(
         error: nil,
         error_at: nil,
@@ -25,6 +26,7 @@ module Jobs
       Rails.logger.warn(
         "HubSpot user import stopped: configuration_id=#{args[:configuration_id]} user_id=#{args[:user_id]} error=#{error.class.name}",
       )
+    end
     end
   end
 end

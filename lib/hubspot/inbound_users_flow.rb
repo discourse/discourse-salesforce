@@ -29,11 +29,11 @@ module ::Hubspot
     end
 
     def self.configuration_job
-      :sync_hubspot_configuration
+      Jobs::Hubspot::SyncConfiguration
     end
 
     def self.user_job
-      :sync_hubspot_user
+      Jobs::Hubspot::SyncUser
     end
   end
 end

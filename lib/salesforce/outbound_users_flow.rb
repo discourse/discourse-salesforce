@@ -26,11 +26,11 @@ module ::Salesforce
     end
 
     def self.configuration_job
-      :sync_salesforce_configuration
+      Jobs::SyncSalesforceConfiguration
     end
 
     def self.user_job
-      :sync_salesforce_user
+      Jobs::SyncSalesforceUser
     end
   end
 end

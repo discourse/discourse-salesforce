@@ -1,8 +1,8 @@
 # frozen_string_literal: true
 
-require_relative "../spec_helper"
+require_relative "../../spec_helper"
 
-RSpec.describe Jobs::SyncHubspotUser do
+RSpec.describe Jobs::Hubspot::SyncUser do
   include_context "with hubspot spec helper"
 
   let!(:configuration) do

@@ -82,7 +82,7 @@ RSpec.describe Salesforce::ConfigurationScheduler do
 
     it "dispatches scheduled and backfill runs to the provider's job" do
       freeze_time Time.utc(2026, 10, 26, 2)
-      Jobs::SyncHubspotConfiguration.clear
+      Jobs::Hubspot::SyncConfiguration.clear
       Jobs::SyncSalesforceConfiguration.clear
 
       described_class.enqueue_due
@@ -93,7 +93,7 @@ RSpec.describe Salesforce::ConfigurationScheduler do
 
       expect(Jobs::SyncSalesforceConfiguration.jobs).to be_empty
       expect(
-        Jobs::SyncHubspotConfiguration.jobs.map do |job|
+        Jobs::Hubspot::SyncConfiguration.jobs.map do |job|
           job["args"].first.slice("configuration_id", "reason")
         end,
       ).to contain_exactly(
@@ -104,7 +104,7 @@ RSpec.describe Salesforce::ConfigurationScheduler do
 
     it "enqueues user matching for every user change except group-driven ones" do
       user = Fabricate(:user)
-      Jobs::SyncHubspotUser.clear
+      Jobs::Hubspot::SyncUser.clear
       Jobs::SyncSalesforceUser.clear
 
       described_class.enqueue_user(user, reason: "change", inbound: true)
@@ -118,7 +118,7 @@ RSpec.describe Salesforce::ConfigurationScheduler do
       )
 
       expect(Jobs::SyncSalesforceUser.jobs).to be_empty
-      expect(Jobs::SyncHubspotUser.jobs.map { |job| job["args"].first }).to contain_exactly(
+      expect(Jobs::Hubspot::SyncUser.jobs.map { |job| job["args"].first }).to contain_exactly(
         hash_including(
           "configuration_id" => hubspot.id,
           "user_id" => user.id,
@@ -131,18 +131,18 @@ RSpec.describe Salesforce::ConfigurationScheduler do
     it "matches users on email changes and sign-ups but not on other profile or group changes" do
       user = Fabricate(:user)
       group = Fabricate(:group)
-      Jobs::SyncHubspotUser.clear
+      Jobs::Hubspot::SyncUser.clear
 
       DiscourseEvent.trigger(:user_updated, user, %w[bio_raw])
       DiscourseEvent.trigger(:user_updated, user)
       DiscourseEvent.trigger(:user_added_to_group, user, group)
       DiscourseEvent.trigger(:user_removed_from_group, user, group)
-      expect(Jobs::SyncHubspotUser.jobs).to be_empty
+      expect(Jobs::Hubspot::SyncUser.jobs).to be_empty
 
       DiscourseEvent.trigger(:user_updated, user, %w[email])
       DiscourseEvent.trigger(:user_confirmed_email, user, EmailToken.scopes[:email_change])
       DiscourseEvent.trigger(:user_first_logged_in, user)
-      expect(Jobs::SyncHubspotUser.jobs.map { |job| job["args"].first["reason"] }).to eq(
+      expect(Jobs::Hubspot::SyncUser.jobs.map { |job| job["args"].first["reason"] }).to eq(
         %w[change change change],
       )
     end

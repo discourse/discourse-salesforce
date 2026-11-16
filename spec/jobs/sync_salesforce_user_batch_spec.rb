@@ -336,6 +336,242 @@ RSpec.describe Jobs::SyncSalesforceUserBatch do
     expect(configuration.record_link_for(user.id).converted_to_id).to eq("contact-123")
   end
 
+  it "creates Leads only for batch members without an existing Contact" do
+    configuration.update!(
+      object: "Lead",
+      mappings: [
+        { "source" => "last", "destination" => "LastName", "policy" => "keep" },
+        {
+          "source" => "static",
+          "value" => "Unknown",
+          "destination" => "Company",
+          "policy" => "keep",
+        },
+      ],
+    )
+    lead_fields =
+      %w[Email LastName Company].map do |name|
+        { name: name, type: "string", createable: true, updateable: true }
+      end
+    stub_request(:get, "#{api_path}/Lead/describe").to_return(body: { fields: lead_fields }.to_json)
+    stub_request(:get, query_path).with(
+      query: hash_including("q" => /FROM Lead WHERE Email IN/),
+    ).to_return(body: { records: [] }.to_json)
+    contact_lookup =
+      stub_request(:get, query_path).with(
+        query: {
+          q: "SELECT Email FROM Contact WHERE Email IN ('#{user.email}','#{other_user.email}')",
+        },
+      ).to_return(
+        body: {
+          records: [],
+          nextRecordsUrl: "/services/data/v49.0/query/contacts-next-page",
+        }.to_json,
+      )
+    contact_page =
+      stub_request(:get, "#{query_path}contacts-next-page").to_return(
+        body: { records: [{ Email: user.email.upcase }, { Email: user.email }] }.to_json,
+      )
+    create =
+      stub_request(:post, collection_url).with(
+        body: {
+          allOrNone: false,
+          records: [
+            {
+              attributes: {
+                type: "Lead",
+              },
+              Email: other_user.email,
+              LastName: "Chen",
+              Company: "Unknown",
+            },
+          ],
+        },
+      ).to_return(body: [{ id: "new-lead", success: true }].to_json)
+
+    run_batch
+
+    expect(contact_lookup).to have_been_requested.once
+    expect(contact_page).to have_been_requested.once
+    expect(create).to have_been_requested.once
+    expect(user.reload.salesforce_lead_id).to be_nil
+    expect(user.salesforce_contact_id).to be_nil
+    expect(configuration.record_link_for(user.id)).to be_nil
+    expect(other_user.reload.salesforce_lead_id).to eq("new-lead")
+    expect(a_request(:patch, collection_url)).not_to have_been_made
+    expect(Jobs::SyncSalesforceUser.jobs).to be_empty
+  end
+
+  context "when checking Contacts before creating Leads" do
+    before do
+      configuration.update!(
+        object: "Lead",
+        mappings: [
+          { "source" => "last", "destination" => "LastName", "policy" => "keep" },
+          {
+            "source" => "static",
+            "value" => "Unknown",
+            "destination" => "Company",
+            "policy" => "keep",
+          },
+        ],
+      )
+      lead_fields =
+        %w[Email LastName Company].map do |name|
+          { name: name, type: "string", createable: true, updateable: true }
+        end
+      stub_request(:get, "#{api_path}/Lead/describe").to_return(
+        body: { fields: lead_fields }.to_json,
+      )
+    end
+
+    it "clears a saved fingerprint for a Contact match so later changes can create a Lead" do
+      Salesforce::SyncState.store(
+        configuration.id,
+        user.id,
+        fingerprint: "previous",
+        error: "previous-error",
+      )
+      stub_request(:get, query_path).with(
+        query: hash_including("q" => /FROM Lead WHERE/),
+      ).to_return(body: { records: [] }.to_json)
+      stub_request(:get, query_path).with(
+        query: hash_including("q" => /SELECT Email FROM Contact WHERE/),
+      ).to_return(body: { records: [{ Email: user.email }, { Email: other_user.email }] }.to_json)
+
+      run_batch
+
+      state = Salesforce::SyncState.find_by!(configuration: configuration, user_id: user.id)
+      expect(state.fingerprint).to be_nil
+      expect(state.error).to be_nil
+      expect(a_request(:post, collection_url)).not_to have_been_made
+      stub_salesforce_person_lookup("Lead", user.email, fields: %w[LastName Company])
+      stub_salesforce_converted_lead_lookup(user.email)
+      stub_salesforce_person_lookup("Contact", user.email)
+      create =
+        stub_request(:post, "#{api_path}/Lead").to_return(
+          status: 201,
+          body: { id: "new-lead" }.to_json,
+        )
+
+      Jobs::SyncSalesforceUser.new.execute(
+        configuration_id: configuration.id,
+        user_id: user.id,
+        reason: "change",
+      )
+
+      expect(create).to have_been_requested.once
+      expect(state.reload.fingerprint).to be_present
+    end
+
+    [503, 400].each do |status|
+      it "updates existing Leads but does not create Leads when Contact lookup returns #{status}" do
+        stub_request(:get, query_path).with(
+          query: hash_including("q" => /FROM Lead WHERE/),
+        ).to_return(
+          body: {
+            records: [{ Id: "existing", Email: other_user.email, LastName: "Chen", Company: nil }],
+          }.to_json,
+        )
+        stub_request(:get, query_path).with(
+          query: {
+            q: "SELECT Email FROM Contact WHERE Email IN ('#{user.email}')",
+          },
+        ).to_return(status: status, body: [{ errorCode: "INVALID_TYPE" }].to_json)
+        update =
+          stub_request(:patch, collection_url).with(
+            body: {
+              allOrNone: false,
+              records: [{ attributes: { type: "Lead" }, Id: "existing", Company: "Unknown" }],
+            },
+          ).to_return(body: [{ id: "existing", success: true }].to_json)
+
+        expect { run_batch }.to raise_error(Salesforce::InvalidApiResponse)
+
+        expect(update).to have_been_requested.once
+        expect(other_user.reload.salesforce_lead_id).to eq("existing")
+        expect(a_request(:post, collection_url)).not_to have_been_made
+        expect(configuration.reload.last_error).to eq("Salesforce::InvalidApiResponse")
+      end
+    end
+
+    it "does not create Leads when a Contact page fails and rechecks on retry" do
+      stub_request(:get, query_path).with(
+        query: hash_including("q" => /FROM Lead WHERE/),
+      ).to_return(body: { records: [] }.to_json)
+      lookup =
+        stub_request(:get, query_path).with(
+          query: hash_including("q" => /SELECT Email FROM Contact WHERE/),
+        ).to_return(
+          body: {
+            records: [{ Email: user.email }],
+            nextRecordsUrl: "/services/data/v49.0/query/contact-page",
+          }.to_json,
+        )
+      page =
+        stub_request(:get, "#{query_path}contact-page")
+          .to_return(status: 503)
+          .then
+          .to_return(body: { records: [{ Email: other_user.email }] }.to_json)
+
+      expect { run_batch }.to raise_error(Salesforce::InvalidApiResponse)
+      expect(a_request(:post, collection_url)).not_to have_been_made
+      run_batch
+
+      expect(lookup).to have_been_requested.twice
+      expect(page).to have_been_requested.twice
+      expect(a_request(:post, collection_url)).not_to have_been_made
+      expect(configuration.reload.last_error).to be_nil
+    end
+  end
+
+  it "checks Contacts in chunks of 25 emails for Lead creation" do
+    configuration.update!(
+      object: "Lead",
+      mappings: [
+        { "source" => "last", "destination" => "LastName", "policy" => "keep" },
+        {
+          "source" => "static",
+          "value" => "Unknown",
+          "destination" => "Company",
+          "policy" => "keep",
+        },
+      ],
+    )
+    fields << { name: "Company", type: "string", createable: true, updateable: true }
+    stub_request(:get, "#{api_path}/Lead/describe").to_return(body: { fields: fields }.to_json)
+    members = [user, other_user] + Fabricate.times(24, :user)
+    members.each do |member|
+      member.activate
+      group.add(member)
+    end
+    stub_request(:get, query_path).with(
+      query: hash_including("q" => /FROM Lead WHERE Email IN/),
+    ).to_return(body: { records: [] }.to_json)
+    lookups =
+      members
+        .each_slice(25)
+        .map do |batch|
+          emails = batch.map { |member| "'#{member.email}'" }.join(",")
+          stub_request(:get, query_path).with(
+            query: {
+              q: "SELECT Email FROM Contact WHERE Email IN (#{emails})",
+            },
+          ).to_return(body: { records: batch.map { |member| { Email: member.email } } }.to_json)
+        end
+
+    described_class.new.execute(
+      configuration_id: configuration.id,
+      user_ids: members.map(&:id),
+      reason: "backfill",
+    )
+
+    lookups.each { |lookup| expect(lookup).to have_been_requested.once }
+    expect(a_request(:post, collection_url)).not_to have_been_made
+    expect(a_request(:patch, collection_url)).not_to have_been_made
+    expect(configuration.record_links).to be_empty
+  end
+
   it "skips Lead batches with only already-converted users without contacting Salesforce" do
     configuration.update!(object: "Lead")
     [user, other_user].each do |member|
@@ -475,7 +711,7 @@ RSpec.describe Jobs::SyncSalesforceUserBatch do
     end
   end
 
-  it "only queues affected updates when creation succeeded before a server failure" do
+  it "only retries failed updates while still creating other records" do
     stub_request(:get, query_path).with(query: hash_including("q" => /SELECT/)).to_return(
       body: {
         records: [{ Id: "existing", Email: other_user.email, LastName: "Chen", LeadSource: nil }],

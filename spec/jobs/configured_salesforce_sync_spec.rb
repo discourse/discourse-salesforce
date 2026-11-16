@@ -40,6 +40,7 @@ RSpec.describe Jobs::SyncSalesforceUser do
     SiteSetting.enable_guided_sync_configuration = true
     user.activate
     group.add(user)
+    stub_salesforce_person_lookup("Contact", user.email)
     stub_request(:get, "#{api_path}/Lead/describe").to_return(body: { fields: fields }.to_json)
     stub_request(:get, query_path).with(
       query: {
@@ -132,6 +133,41 @@ RSpec.describe Jobs::SyncSalesforceUser do
     run_sync
     expect(create).to have_been_requested.once
     expect(a_request(:patch, %r{/sobjects/})).not_to have_been_made
+  end
+
+  it "skips Lead creation when Contacts already match the email without linking or updating them" do
+    stub_salesforce_person_lookup("Lead", user.email, fields: %w[LastName Company Trust__c])
+    stub_salesforce_person_lookup(
+      "Contact",
+      user.email,
+      records: [{ Id: "contact1" }, { Id: "contact2" }],
+    )
+
+    run_sync
+
+    expect(a_request(:post, "#{api_path}/Lead")).not_to have_been_made
+    expect(a_request(:patch, %r{/sobjects/})).not_to have_been_made
+    expect(configuration.record_link_for(user.id)).to be_nil
+    expect(user.reload.salesforce_lead_id).to be_nil
+    expect(user.salesforce_contact_id).to be_nil
+    expect(configuration.reload.sync_status["error"]).to be_nil
+    expect(configuration.last_synced_at).to be_present
+  end
+
+  [503, 400].each do |status|
+    it "does not create a Lead when the Contact lookup returns #{status}" do
+      stub_salesforce_person_lookup("Lead", user.email, fields: %w[LastName Company Trust__c])
+      stub_request(:get, query_path).with(
+        query: {
+          q: "SELECT Id FROM Contact WHERE Email = '#{user.email}'",
+        },
+      ).to_return(status: status, body: [{ errorCode: "INVALID_TYPE" }].to_json)
+
+      expect { run_sync }.to raise_error(Salesforce::InvalidApiResponse)
+
+      expect(a_request(:post, "#{api_path}/Lead")).not_to have_been_made
+      expect(configuration.reload.sync_status["error"]).to eq("Salesforce::InvalidApiResponse")
+    end
   end
 
   it "sends static text on creation and respects ownership on updates" do
@@ -238,6 +274,51 @@ RSpec.describe Jobs::SyncSalesforceUser do
     expect(create).to have_been_requested.once
   end
 
+  it "rechecks unchanged sources after skipping recreation of a deleted Lead with a Contact" do
+    lead_id = "00Qbm00000v6wJpEAI"
+    stub_salesforce_person_lookup(
+      "Lead",
+      user.email,
+      record: {
+        Id: lead_id,
+        LastName: "Morgan",
+        Company: "Unknown",
+        Trust__c: user.trust_level,
+      },
+      fields: %w[LastName Company Trust__c],
+    )
+    run_sync("change")
+    state = Salesforce::SyncState.find_by!(configuration: configuration, user_id: user.id)
+    expect(state.fingerprint).to be_present
+
+    stub_request(:get, "#{api_path}/Lead/#{lead_id}").to_return(status: 404, body: "[]")
+    stub_request(:get, "#{instance_url}services/data/v49.0/queryAll/").with(
+      query: {
+        q:
+          "SELECT Id, IsDeleted, IsConverted, ConvertedContactId FROM Lead WHERE Id = '#{lead_id}'",
+      },
+    ).to_return(body: { records: [{ Id: lead_id, IsDeleted: true, IsConverted: false }] }.to_json)
+    stub_salesforce_person_lookup("Lead", user.email, fields: %w[LastName Company Trust__c])
+    stub_salesforce_person_lookup("Contact", user.email, id: "existing-contact")
+
+    run_sync("scheduled")
+
+    expect(state.reload.fingerprint).to be_nil
+    expect(a_request(:post, "#{api_path}/Lead")).not_to have_been_made
+    stub_salesforce_person_lookup("Contact", user.email)
+    create =
+      stub_request(:post, "#{api_path}/Lead").to_return(
+        status: 201,
+        body: { id: "replacement" }.to_json,
+      )
+
+    run_sync("change")
+
+    expect(create).to have_been_requested.once
+    expect(user.reload.salesforce_lead_id).to eq("replacement")
+    expect(state.reload.fingerprint).to be_present
+  end
+
   it "does not recreate inaccessible or converted Leads" do
     old_id = "00Qbm00000v6wJpEAI"
     Salesforce::RecordLink.link!(
@@ -336,6 +417,13 @@ RSpec.describe Jobs::SyncSalesforceUser do
       ).to_return(status: 201, body: { id: "contact123" }.to_json)
     run_sync
     expect(create).to have_been_requested.once
+    expect(
+      a_request(:get, query_path).with(
+        query: {
+          q: "SELECT Id FROM Contact WHERE Email = '#{user.email}'",
+        },
+      ),
+    ).not_to have_been_made
     expect(user.reload.salesforce_contact_id).to eq("contact123")
     expect(user.salesforce_lead_id).to be_nil
   end
@@ -480,6 +568,7 @@ RSpec.describe Jobs::SyncSalesforceUser do
   end
 
   it "preserves nonempty Salesforce values, fills blanks, and overwrites selected fields" do
+    contact_lookup = stub_salesforce_person_lookup("Contact", user.email, id: "existing-contact")
     stub_salesforce_person_lookup(
       "Lead",
       user.email,
@@ -497,6 +586,7 @@ RSpec.describe Jobs::SyncSalesforceUser do
       ).to_return(status: 204)
     run_sync
     expect(update).to have_been_requested.once
+    expect(contact_lookup).not_to have_been_requested
     expect(configuration.reload.last_synced_at).to be_present
   end
 

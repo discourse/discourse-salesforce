@@ -230,7 +230,7 @@ RSpec.describe Salesforce::UserSyncSources do
 
     after { User.send(:custom_field_meta_data).delete("sf_json") }
 
-    it "sends non-text and list values as text" do
+    it "sends non-text and list values as text and skips users without the field" do
       User.register_custom_field_type("sf_json", :json)
       user.custom_fields["sf_text"] = "plain"
       user.custom_fields["sf_json"] = { "a" => 1 }
@@ -249,16 +249,20 @@ RSpec.describe Salesforce::UserSyncSources do
             "policy" => "overwrite",
           }
         end
-      sources = described_class.new(mappings, [user])
-      mapped =
-        Salesforce::FieldMapping.new(mappings, fields) do |mapping, _field|
-          sources.value(described_class.source_key(mapping), user)
+      configuration = Salesforce::SyncConfiguration.new(object: "Contact", mappings: mappings)
+      data = described_class.new(mappings, [user, other_user])
+      values =
+        [user, other_user].map do |synced_user|
+          Salesforce::ConfiguredUserSync.new(
+            configuration,
+            synced_user,
+            api: Object.new,
+            source_data: data,
+          ).mapped_values(fields, nil)
         end
 
-      expect(mapped.values(nil)).to eq(
-        "Text__c" => "plain",
-        "Object__c" => '{"a":1}',
-        "List__c" => "One, Two",
+      expect(values).to eq(
+        [{ "Text__c" => "plain", "Object__c" => '{"a":1}', "List__c" => "One, Two" }, {}],
       )
     end
   end

@@ -580,43 +580,8 @@ module(
         .hasValue("Unknown", "restores the explicit Lead default");
     });
 
-    test("picks a listed user custom field without asking for a name", async function (assert) {
+    test("saves a typed or listed custom field name as a custom field source", async function (assert) {
       this.customFieldNames = ["account_tier", "region"];
-      const saved = [];
-      this.save = (configuration) => saved.push(structuredClone(configuration));
-      await render(
-        <template>
-          <SalesforceSyncConfiguration
-            @groups={{this.groups}}
-            @onSave={{this.save}}
-          />
-        </template>
-      );
-      await selectSyncGroups("customers");
-      await click("[data-test-add-mapping]");
-      await click(
-        '[data-name="mappings.4.source"] .form-kit__control-menu-trigger'
-      );
-      await click(
-        '.form-kit__control-menu-item[data-value="listed_custom_field:region"] button'
-      );
-      assert
-        .dom('[data-name="mappings.4.source"]')
-        .includesText("region", "shows the picked name");
-      assert
-        .dom('[data-name="mappings.4.value"]')
-        .doesNotExist("does not ask for a name");
-      await formKit().field("mappings.4.destination").select("LeadSource");
-      await click("[data-test-save]");
-      assert.propContains(
-        saved[0].mappings[4],
-        { source: "custom_field", value: "region" },
-        "saves the field name as the value"
-      );
-    });
-
-    test("Other… takes a typed custom field name", async function (assert) {
-      this.customFieldNames = ["account_tier"];
       const saved = [];
       this.save = (configuration) => saved.push(structuredClone(configuration));
       await render(
@@ -635,6 +600,12 @@ module(
       assert
         .dom('[data-name="mappings.3.value"] input')
         .hasValue("", "does not carry the static text into the name");
+      assert
+        .dom('[data-name="mappings.3.value"] .form-kit__container-description')
+        .hasText(
+          "Reads the user custom field with this name.",
+          "explains what the name reads"
+        );
       await click("[data-test-save]");
       assert.dom(".form-kit__errors-summary").exists("requires a name");
       assert.strictEqual(saved.length, 0, "does not submit a blank name");
@@ -642,11 +613,31 @@ module(
       assert
         .dom('[data-name="mappings.3.value"] input')
         .hasValue("account_tier", "keeps the input when the name is listed");
+
+      await click("[data-test-add-mapping]");
+      await click(
+        '[data-name="mappings.4.source"] .form-kit__control-menu-trigger'
+      );
+      await click(
+        '.form-kit__control-menu-item[data-value="listed_custom_field:region"] button'
+      );
+      assert
+        .dom('[data-name="mappings.4.source"]')
+        .includesText("region", "shows the picked name");
+      assert
+        .dom('[data-name="mappings.4.value"]')
+        .doesNotExist("does not ask for a listed name");
+      await formKit().field("mappings.4.destination").select("LeadSource");
       await click("[data-test-save]");
       assert.propContains(
         saved[0].mappings[3],
         { source: "custom_field", value: "account_tier" },
         "saves the typed name"
+      );
+      assert.propContains(
+        saved[0].mappings[4],
+        { source: "custom_field", value: "region" },
+        "saves the picked name"
       );
     });
 

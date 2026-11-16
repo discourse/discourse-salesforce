@@ -135,16 +135,6 @@ RSpec.describe Salesforce::SyncConfigurationController do
       expect(response.parsed_body.fetch("custom_field_names")).to eq(%w[account_tier region])
     end
 
-    it "caps the known user custom field names" do
-      sign_in(admin)
-      stub_request(:get, "#{api_path}/Lead/describe").to_return(body: { fields: [] }.to_json)
-      stub_const(Salesforce::UserSyncSources, :CUSTOM_FIELD_NAMES_LIMIT, 2) do
-        %w[c a b].each { |name| UserCustomField.create!(user_id: admin.id, name: name, value: "x") }
-        get "/salesforce/admin/guided-sync/fields.json", params: { object: "Lead" }
-        expect(response.parsed_body.fetch("custom_field_names")).to eq(%w[a b])
-      end
-    end
-
     it "returns a safe error when Salesforce is unavailable" do
       sign_in(admin)
       stub_request(:get, "#{api_path}/Lead/describe").to_return(

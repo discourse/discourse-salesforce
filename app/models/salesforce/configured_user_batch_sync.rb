@@ -120,8 +120,9 @@ module Salesforce
           creates << [user, sync, values.merge("Email" => user.email)]
         end
       end
-      write_collection(:post, creates)
       write_collection(:patch, updates)
+      creates = exclude_existing_contacts(creates) if @object == "Lead"
+      write_collection(:post, creates)
     end
 
     private
@@ -142,22 +143,48 @@ module Salesforce
           ids = user_batch.filter_map { |user| links[user.id]&.external_id }.uniq
           conditions = ["Email IN (#{quoted(user_batch.map(&:email))})"]
           conditions << "Id IN (#{quoted(ids)})" if ids.present?
-          result =
-            @api.query(
-              "SELECT #{fields.join(",")} FROM #{@object} WHERE #{conditions.join(" OR ")}",
-            )
-          records = result.fetch("records")
-          while result["nextRecordsUrl"]
-            path = result.fetch("nextRecordsUrl")
-            unless path.start_with?("#{@api.prefix}/query/")
-              raise InvalidApiResponse.new("Invalid query continuation")
-            end
-            result = @api.get(path.delete_prefix("#{@api.prefix}/"))
-            records.concat(result.fetch("records"))
-          end
-          records
+          query_records(
+            "SELECT #{fields.join(",")} FROM #{@object} WHERE #{conditions.join(" OR ")}",
+          )
         end
         .uniq { |record| record["Id"] }
+    end
+
+    def exclude_existing_contacts(creates)
+      contact_emails =
+        creates
+          .each_slice(25)
+          .flat_map do |entries|
+            emails = entries.map { |user, _, _| user.email }
+            query_records(
+              "SELECT Email FROM Contact WHERE Email IN (#{quoted(emails)})",
+            ).map { |record| record.fetch("Email").downcase }
+          end
+          .to_set
+
+      creates.reject do |user, _, _|
+        next false if contact_emails.exclude?(user.email.downcase)
+
+        SyncState.where(configuration_id: @configuration.id, user_id: user.id).update_all(
+          fingerprint: nil,
+        )
+        SyncConfiguration.record_result(@configuration.id, user.id)
+        true
+      end
+    end
+
+    def query_records(query)
+      result = @api.query(query)
+      records = result.fetch("records")
+      while result["nextRecordsUrl"]
+        path = result.fetch("nextRecordsUrl")
+        unless path.start_with?("#{@api.prefix}/query/")
+          raise InvalidApiResponse.new("Invalid query continuation")
+        end
+        result = @api.get(path.delete_prefix("#{@api.prefix}/"))
+        records.concat(result.fetch("records"))
+      end
+      records
     end
 
     def quoted(values)

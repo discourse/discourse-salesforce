@@ -2,22 +2,16 @@
 
 module Salesforce
   class ConfigurationScheduler
-    def self.enqueue_user(user, reason:, group_id: nil, excluding_group_id: nil)
+    def self.enqueue_user(user, reason:, inbound:, group_id: nil, excluding_group_id: nil)
       member_group_ids = GroupUser.where(user_id: user.id).select(:group_id)
       configurations = SyncConfiguration.active.where(id: configuration_ids_for(member_group_ids))
       configurations = configurations.where(id: configuration_ids_for(group_id)) if group_id
       if excluding_group_id
         configurations = configurations.where.not(id: configuration_ids_for(excluding_group_id))
       end
-      configurations.find_each do |configuration|
-        next unless configuration.reason_enabled?(reason)
-        Jobs.enqueue(
-          :sync_salesforce_user,
-          user_id: user.id,
-          configuration_id: configuration.id,
-          reason: reason,
-        )
-      end
+      enqueue_user_jobs(configurations, user, reason)
+      return unless inbound
+      enqueue_user_jobs(SyncConfiguration.active.inbound, user, reason)
     end
 
     def self.configuration_saved(configuration, group_ids_changed:)
@@ -32,7 +26,7 @@ module Salesforce
       if activated || connection_changed || group_ids_changed ||
            configuration.saved_change_to_backfill?(from: false, to: true)
         Jobs.enqueue(
-          :sync_salesforce_configuration,
+          configuration.flow.configuration_job,
           configuration_id: configuration.id,
           reason: "backfill",
         )
@@ -62,12 +56,25 @@ module Salesforce
               .update_all(last_scheduled_at: now)
           next if claimed == 0
           Jobs.enqueue(
-            :sync_salesforce_configuration,
+            configuration.flow.configuration_job,
             configuration_id: configuration.id,
             reason: "scheduled",
           )
         end
     end
+
+    def self.enqueue_user_jobs(configurations, user, reason)
+      configurations.find_each do |configuration|
+        next unless configuration.reason_enabled?(reason)
+        Jobs.enqueue(
+          configuration.flow.user_job,
+          user_id: user.id,
+          configuration_id: configuration.id,
+          reason: reason,
+        )
+      end
+    end
+    private_class_method :enqueue_user_jobs
 
     def self.configuration_ids_for(group_ids)
       SyncConfigurationGroup.where(group_id: group_ids).select(:configuration_id)

@@ -7,7 +7,7 @@ RSpec.describe Salesforce::ConnectionError do
     error = Salesforce::InvalidApiResponse.new("secret token and private response", status: 403)
     logger = track_log_messages { described_class.log(error, operation: "fields") }
     expect(logger.warnings).to eq(
-      ["Salesforce request failed: operation=fields category=permissions status=403"],
+      ["CRM request failed: operation=fields category=permissions status=403"],
     )
   end
 

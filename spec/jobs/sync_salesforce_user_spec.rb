@@ -258,7 +258,7 @@ RSpec.describe Jobs::SyncSalesforceUser do
       logger = track_log_messages { described_class.new.execute(user_id: user.id) }
 
       expect(logger.warnings).to include(
-        "Salesforce request failed: operation=api category=invalid_response status=400",
+        "CRM request failed: operation=api category=invalid_response status=400",
       )
     end
 

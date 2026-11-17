@@ -31,6 +31,27 @@ RSpec.describe Salesforce::RecordLink do
     )
   end
 
+  context "with pulled hubspot records" do
+    include_context "with hubspot spec helper"
+
+    it "exposes them through users and configurations" do
+      user = Fabricate(:user)
+      configuration = Fabricate(:hubspot_sync_configuration)
+      link_scope = { provider: "hubspot", account: "12345", object: "contact", user_id: user.id }
+      described_class.link_many!(
+        [link_scope.merge(external_id: "501"), link_scope.merge(external_id: "502")],
+      )
+      described_class.link!(**scope, external_id: "contact-1", user_id: user.id)
+      pulled = Fabricate(:crm_record, external_id: "501", data: { "jobtitle" => "Engineer" })
+
+      expect(user.crm_records.hubspot).to eq([pulled])
+      expect(user.crm_record_links.map(&:external_id)).to contain_exactly("501", "502", "contact-1")
+      expect(configuration.record_links.map(&:external_id)).to contain_exactly("501", "502")
+      expect(described_class.find_by(external_id: "502").record).to be_nil
+      expect(pulled.record_links.map(&:user_id)).to eq([user.id])
+    end
+  end
+
   it "preserves conversion metadata without rewriting an unchanged link" do
     described_class.link!(**scope, external_id: "contact-1", converted_from_id: "lead-1")
 
@@ -86,5 +107,29 @@ RSpec.describe Salesforce::RecordLink do
       "converted_from_id" => "lead-1",
     )
     expect(described_class.unlink!(**lead_scope, external_id: "lead-1")).to eq(false)
+  end
+
+  it "allows several hubspot contacts per user while keeping salesforce to one record per user" do
+    hubspot_scope = { provider: "hubspot", account: "12345", object: "contact", user_id: 42 }
+
+    described_class.link_many!(
+      [
+        hubspot_scope.merge(external_id: "501"),
+        hubspot_scope.merge(external_id: "877"),
+        hubspot_scope.merge(external_id: "501"),
+      ],
+    )
+    described_class.link_many!([hubspot_scope.merge(external_id: "877")])
+
+    expect(described_class.where(**hubspot_scope).pluck(:external_id)).to contain_exactly(
+      "501",
+      "877",
+    )
+    described_class.link!(**scope, external_id: "contact-1")
+    expect { described_class.create!(**scope, external_id: "contact-2") }.to raise_error(
+      ActiveRecord::RecordNotUnique,
+    )
+    described_class.link!(**scope, external_id: "contact-2")
+    expect(described_class.where(**scope).pluck(:external_id)).to eq(["contact-2"])
   end
 end

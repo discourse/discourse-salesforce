@@ -4,6 +4,11 @@ module Salesforce
   module UserExtension
     extend ActiveSupport::Concern
 
+    prepended do
+      has_many :crm_record_links, class_name: "Salesforce::RecordLink"
+      has_many :crm_records, through: :crm_record_links, source: :record
+    end
+
     def salesforce_contact_id
       custom_fields[::Salesforce::Contact::ID_FIELD]
     end

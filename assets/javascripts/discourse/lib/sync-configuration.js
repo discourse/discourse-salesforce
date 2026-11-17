@@ -30,6 +30,9 @@ export function createCompanyMapping(id) {
 
 export function createSyncConfiguration() {
   return {
+    provider: "salesforce",
+    direction: "outbound",
+    kind: "users",
     group_ids: [],
     groups: [],
     object: "Lead",
@@ -41,6 +44,18 @@ export function createSyncConfiguration() {
       { id: 3, source: "profile", destination: "Description", policy: "keep" },
       createCompanyMapping(6),
     ],
+  };
+}
+
+export function createHubspotSyncConfiguration() {
+  return {
+    provider: "hubspot",
+    direction: "inbound",
+    kind: "users",
+    object: "contact",
+    schedule: "daily",
+    backfill: true,
+    mappings: [{ id: 1, source: "lifecyclestage" }],
   };
 }
 

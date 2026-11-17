@@ -233,6 +233,51 @@ RSpec.describe Jobs::SyncSalesforceUser do
     expect(update).to have_been_requested.once
   end
 
+  it "sends a mapped custom field and syncs on change only when its value changed" do
+    configuration.update!(
+      mappings:
+        configuration.mappings +
+          [
+            {
+              "source" => "custom_field:account_tier",
+              "destination" => "Tier__c",
+              "policy" => "overwrite",
+            },
+          ],
+    )
+    fields << { name: "Tier__c", type: "string", createable: true, updateable: true }
+    stub_request(:get, "#{api_path}/Lead/describe").to_return(body: { fields: fields }.to_json)
+    user.custom_fields["account_tier"] = "gold"
+    user.save_custom_fields
+    record = {
+      Id: "lead123",
+      LastName: "Morgan",
+      Company: "Unknown",
+      Trust__c: user.trust_level,
+      Tier__c: "gold",
+    }
+    stub_salesforce_person_lookup(
+      "Lead",
+      user.email,
+      record: record,
+      fields: %w[LastName Company Trust__c Tier__c],
+    )
+    stub_request(:get, "#{api_path}/Lead/lead123").to_return(body: record.to_json)
+    run_sync("change")
+    user.update_columns(locale: "fr")
+    run_sync("change")
+    expect(a_request(:get, "#{api_path}/Lead/lead123")).not_to have_been_made
+
+    user.custom_fields["account_tier"] = "silver"
+    user.save_custom_fields
+    update =
+      stub_request(:patch, "#{api_path}/Lead/lead123").with(body: { Tier__c: "silver" }).to_return(
+        status: 204,
+      )
+    run_sync("change")
+    expect(update).to have_been_requested.once
+  end
+
   it "recreates a confirmed deleted Lead and relinks subsequent retries" do
     old_id = "00Qbm00000v6wJpEAI"
     Salesforce::RecordLink.link!(

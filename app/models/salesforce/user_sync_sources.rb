@@ -22,6 +22,9 @@ module Salesforce
       "static" => "text",
     }.freeze
 
+    CUSTOM_FIELD_PREFIX = "custom_field:"
+    CUSTOM_FIELD_NAMES_LIMIT = 200
+
     PROFILE_COLUMNS = { "bio" => :bio_raw, "website" => :website }.freeze
 
     STAT_COLUMNS = {
@@ -30,6 +33,22 @@ module Salesforce
       "likes_given" => :likes_given,
       "likes_received" => :likes_received,
     }.freeze
+
+    def self.custom_field_name(source)
+      source.to_s.delete_prefix(CUSTOM_FIELD_PREFIX) if source.to_s.start_with?(CUSTOM_FIELD_PREFIX)
+    end
+
+    # Admin user fields are listed through custom_sources, so their storage keys are left out.
+    def self.custom_field_names
+      UserCustomField
+        .where("TRIM(name) <> ''")
+        .where.not(name: [Contact::ID_FIELD, Lead::ID_FIELD])
+        .where.not("name LIKE ?", "#{UserCustomField.sanitize_sql_like("user_field_")}%")
+        .distinct
+        .order(:name)
+        .limit(CUSTOM_FIELD_NAMES_LIMIT)
+        .pluck(:name)
+    end
 
     def self.custom_sources
       UserField
@@ -48,6 +67,9 @@ module Salesforce
                 "text"
               end,
           }
+        end +
+        custom_field_names.map do |name|
+          { id: "#{CUSTOM_FIELD_PREFIX}#{name}", name: name, type: "text" }
         end
     end
 
@@ -127,7 +149,7 @@ module Salesforce
           .pluck(:id, :field_type)
           .to_h
           .transform_keys { |id| "user_field_#{id}" }
-      custom_keys = @field_types.keys
+      custom_keys = @field_types.keys + sources.filter_map { |s| self.class.custom_field_name(s) }
       @custom_values = User.custom_fields_for_ids(user_ids, custom_keys)
     end
 
@@ -164,6 +186,13 @@ module Salesforce
       end
       if column = STAT_COLUMNS[source]
         return @stats.dig(user.id, column) || 0
+      end
+
+      if name = self.class.custom_field_name(source)
+        value = @custom_values.dig(user.id, name)
+        return nil if value.nil? || value == ""
+        text = ->(item) { item.is_a?(String) ? item : item.to_json }
+        return value.is_a?(Array) ? value.map(&text) : text.call(value)
       end
 
       type = @field_types[source]

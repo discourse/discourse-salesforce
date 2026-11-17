@@ -69,7 +69,7 @@ module(
 
       assert
         .dom(".d-page-subheader__title")
-        .hasText("Send users", "provides a default name");
+        .hasText("Send users as leads", "provides a default name");
       assert
         .dom('[data-name="name"]')
         .doesNotExist("keeps naming out of Choose users");
@@ -117,6 +117,90 @@ module(
       assert
         .dom(".d-page-subheader__title")
         .hasText("Customer contacts", "Escape discards the inline edit");
+    });
+
+    test("generates and saves names from the selected groups and object", async function (assert) {
+      let saved;
+      this.save = (configuration) => {
+        saved = configuration;
+        return true;
+      };
+      await render(
+        <template>
+          <SalesforceSyncConfiguration
+            @groups={{this.groups}}
+            @onSave={{this.save}}
+          />
+        </template>
+      );
+
+      for (const [object, label] of [
+        ["Lead", "leads"],
+        ["Contact", "contacts"],
+      ]) {
+        await formKit().field("object").select(object);
+        await selectSyncGroups();
+        assert
+          .dom(".d-page-subheader__title")
+          .hasText(`Send users as ${label}`);
+        await selectSyncGroups("customers");
+        assert
+          .dom(".d-page-subheader__title")
+          .hasText(`Send customers as ${label}`);
+        await selectSyncGroups("customers", "partners");
+        assert
+          .dom(".d-page-subheader__title")
+          .hasText(`Send groups as ${label}`);
+      }
+
+      await click("[data-test-edit-name]");
+      await click('.sync-configuration-heading__form button[type="submit"]');
+      await selectSyncGroups("partners");
+      assert
+        .dom(".d-page-subheader__title")
+        .hasText(
+          "Send partners as contacts",
+          "confirming the default keeps it automatic"
+        );
+      await click("[data-test-save]");
+      assert.strictEqual(saved.name, "Send partners as contacts");
+    });
+
+    test("shortens generated names and recognizes them when editing", async function (assert) {
+      const groupName = "a".repeat(60);
+      this.groups = [{ id: 1, name: groupName }];
+      this.record = {
+        ...createSyncConfiguration(),
+        id: "saved",
+        object: "Contact",
+        group_ids: [1],
+        groups: [groupName],
+        name: `Send ${"a".repeat(42)}… as contacts`,
+      };
+      let saved;
+      this.save = (configuration) => {
+        saved = configuration;
+        return true;
+      };
+      await render(
+        <template>
+          <SalesforceSyncConfiguration
+            @record={{this.record}}
+            @groups={{this.groups}}
+            @onSave={{this.save}}
+          />
+        </template>
+      );
+      assert.dom(".d-page-subheader__title").hasText(this.record.name);
+      await click("[data-test-save]");
+      assert.strictEqual(saved.name.length, 60);
+      assert.strictEqual(saved.name, this.record.name);
+      await selectSyncGroups();
+      assert
+        .dom(".d-page-subheader__title")
+        .hasText("Send users as contacts", "recognizes the shortened default");
+      await selectSyncGroups(groupName);
+      assert.dom(".d-page-subheader__title").hasText(this.record.name);
     });
 
     test("creates a group in a modal and adds it to the selected groups", async function (assert) {

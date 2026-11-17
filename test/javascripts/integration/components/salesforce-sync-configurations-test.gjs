@@ -103,11 +103,21 @@ module(
       await click("[data-test-save]");
       assert
         .dom('[data-test-configuration="saved"]')
-        .exists("shows the saved configuration in the list");
+        .includesText(
+          "Send customers as leads",
+          "shows the generated name in the list"
+        );
       assert
         .dom(".salesforce-sync-configuration")
         .doesNotExist("closes the editor after creation");
       assert.strictEqual(closes, 1, "clears the configuration query parameter");
+      await click('[data-test-configuration="saved"] button');
+      await selectSyncGroups("partners");
+      assert.dom(".d-page-subheader__title").hasText("Send partners as leads");
+      await click("[data-test-save]");
+      assert
+        .dom('[data-test-configuration="saved"]')
+        .includesText("Send partners as leads");
       await click('[data-test-configuration="saved"] button');
       await click("[data-test-edit-name]");
       await fillIn('[data-name="name"] input', "Updated user export");
@@ -116,7 +126,10 @@ module(
       assert
         .dom('[data-test-configuration="saved"]')
         .includesText("Updated user export", "shows the updated configuration");
-      assert.strictEqual(closes, 2, "returns to the index after editing too");
+      assert.strictEqual(closes, 3, "returns to the index after editing too");
+      await click('[data-test-configuration="saved"] button');
+      await selectSyncGroups("customers");
+      assert.dom(".d-page-subheader__title").hasText("Updated user export");
     });
 
     test("opens independent saved Lead and Contact configurations", async function (assert) {
@@ -173,7 +186,10 @@ module(
         .hasText("Lead", "starts a new Lead configuration");
       assert
         .dom(".salesforce-sync-configuration__heading")
-        .includesText("Send users", "provides a default configuration name");
+        .includesText(
+          "Send users as leads",
+          "provides a default configuration name"
+        );
       await click("[data-test-configurations-back]");
       await click(".dialog-footer .btn-danger");
       assert

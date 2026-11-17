@@ -22,10 +22,7 @@ const PROVIDERS = {
   salesforce: {
     newKey: "new-salesforce-users",
     editor: SalesforceSyncConfiguration,
-    create: () => ({
-      ...createSyncConfiguration(),
-      name: i18n("salesforce.guided_sync.default_users_name"),
-    }),
+    create: createSyncConfiguration,
   },
   hubspot: {
     newKey: "new-hubspot-users",

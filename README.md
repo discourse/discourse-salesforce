@@ -88,7 +88,10 @@ Admin → Upcoming changes. Configure the existing JWT API credentials, then ope
 `/admin/plugins/discourse-salesforce/configurations`.
 
 Choose **Send users to Salesforce** to create or update Salesforce leads and contacts using
-Discourse user data. New configurations default to **Send users**. These configurations send data
+Discourse user data. New configuration names reflect the selected group and Salesforce object, such as
+**Send support-team as contacts** or **Send groups as leads** for multiple groups. You can
+set a custom name from the configuration heading. Generated names continue to follow group
+changes when editing a saved configuration; custom names stay unchanged. These configurations send data
 from Discourse to Salesforce; they do not import Salesforce fields into Discourse user profiles.
 Saving validates the fields against Salesforce and activates updates for members of any selected
 group. New configurations with existing-member sending enabled use **Save and send**; otherwise,

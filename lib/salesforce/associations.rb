@@ -33,7 +33,7 @@ module ::Salesforce
           next false unless removed_fields > 0 || removed_link
 
           configuration_ids =
-            SyncConfiguration.for_current_account.where(object: Contact::OBJECT_NAME)
+            SyncConfiguration.for_provider("salesforce").where(object: Contact::OBJECT_NAME)
           SyncState.where(
             configuration_id: configuration_ids.select(:id),
             user_id: user.id,

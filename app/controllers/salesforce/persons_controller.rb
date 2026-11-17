@@ -21,7 +21,8 @@ module Salesforce
 
       begin
         klass = "::Salesforce::#{type}".constantize
-        salesforce_id = klass.create!(user) || user.custom_fields[klass::ID_FIELD]
+        salesforce_id =
+          klass.create!(user, acting_user: current_user) || user.custom_fields[klass::ID_FIELD]
         publish_person_synced(klass::ID_FIELD, salesforce_id) if salesforce_id.present?
         render json: success_json
       rescue => e

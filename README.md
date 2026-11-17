@@ -382,11 +382,11 @@ and outbound users. Configuration validation and scheduling use those flow defin
 both push providers, then enqueues the provider’s batch job. HubSpot import jobs remain
 under `Jobs::Hubspot`. Existing Salesforce job names remain available for queued work.
 
-Both HubSpot editors load metadata from
-`/salesforce/admin/hubspot/contact-properties.json`. The endpoint returns readable
-properties, writable fields, and Discourse sources. Both views derive from one cached
-HubSpot property response, keyed by database, portal, and token. Refreshing either editor
-refreshes that catalogue. Metadata is fetched synchronously through `Hubspot::Api`;
+Both HubSpot editors load metadata from `/salesforce/admin/hubspot/properties.json`,
+passing an `object` of `contact` or `company`. For contacts the endpoint returns readable
+properties, writable fields, and Discourse sources; for companies it returns readable
+properties only. Both views derive from one cached HubSpot property response per object,
+keyed by database, portal, and token. Refreshing either editor refreshes that catalogue. Metadata is fetched synchronously through `Hubspot::Api`;
 there is no separate metadata job or duplicate push metadata endpoint.
 
 HubSpot uses the canonical object name `contact` in both directions. Inbound links can

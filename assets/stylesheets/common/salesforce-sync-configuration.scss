@@ -472,8 +472,13 @@
 }
 
 .hubspot-sync-configuration__properties .d-multi-select-trigger {
-  max-width: 100%;
+  width: 100%;
+  max-width: 40em;
   min-width: 0;
+
+  .d-multi-select-trigger__selection-label {
+    max-width: 12em;
+  }
 }
 
 .hubspot-sync-configuration__property {
@@ -491,8 +496,26 @@
   }
 }
 
-.hubspot-sync-configuration__retry-properties {
-  margin-block-start: 1em;
+.hubspot-sync-configuration__pull-fields {
+  display: flex;
+  flex-direction: column;
+  gap: 1em;
+
+  > .form-kit__field {
+    margin: 0;
+  }
+}
+
+.hubspot-sync-configuration__object-properties {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 0.5em;
+
+  > .form-kit__field {
+    width: 100%;
+    margin: 0;
+  }
 }
 
 .salesforce-sync-configuration__scope-fields {

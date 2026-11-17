@@ -33,7 +33,7 @@ module DiscourseCrm
             :schedule,
             :backfill,
             group_ids: [],
-            mappings: %i[id source destination policy value],
+            mappings: %i[id object source destination policy value],
           )
           .to_h
       record =

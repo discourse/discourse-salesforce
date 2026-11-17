@@ -86,7 +86,7 @@ RSpec.describe Jobs::Hubspot::SyncConfiguration do
       a_request(:get, hubspot_url("objects/contacts")).with(
         query: {
           limit: 100,
-          properties: "email,lastmodifieddate,lifecyclestage,jobtitle",
+          properties: "email,lastmodifieddate,associatedcompanyid,lifecyclestage,jobtitle",
         },
       ),
     ).to have_been_made.once
@@ -270,6 +270,155 @@ RSpec.describe Jobs::Hubspot::SyncConfiguration do
     }.to raise_error(Hubspot::InvalidApiResponse)
 
     expect(configuration.reload.last_error).to eq("Hubspot::InvalidApiResponse")
+  end
+
+  context "with company properties" do
+    let!(:configuration) do
+      Fabricate(
+        :hubspot_sync_configuration,
+        last_synced_at: Time.utc(2026, 11, 1, 12),
+        mappings: [{ "id" => 1, "object" => "company", "source" => "name" }],
+      )
+    end
+
+    def store_companies(count)
+      DiscourseCrm::Record.store_many!(
+        (1..count).map do |index|
+          {
+            provider: "hubspot",
+            account: "12345",
+            object: "company",
+            external_id: format("c%03d", index),
+            company_external_id: nil,
+            data: {
+            },
+          }
+        end,
+      )
+    end
+
+    def company_batch_of(size)
+      a_request(:post, hubspot_url("objects/companies/batch/read")).with do |request|
+        JSON.parse(request.body).fetch("inputs").size == size
+      end
+    end
+
+    it "refreshes stored companies one chunk at a time after the last page of a scheduled run" do
+      freeze_time Time.utc(2026, 11, 2, 12)
+      store_companies(101)
+      stub_hubspot_contact_search([])
+      stub_hubspot_company_batch_read([])
+
+      described_class.new.execute(configuration_id: configuration.id, reason: "scheduled")
+
+      expect(configuration.reload.last_synced_at).to eq_time(Time.utc(2026, 11, 1, 12))
+      expect(enqueued_args).to eq(
+        [
+          {
+            "configuration_id" => configuration.id,
+            "reason" => "scheduled",
+            "started_at" => Time.zone.now.iso8601,
+            "companies_after" => "",
+          },
+        ],
+      )
+
+      described_class.new.execute(enqueued_args.first.symbolize_keys)
+      expect(enqueued_args.last["companies_after"]).to eq("c100")
+      described_class.new.execute(enqueued_args.last.symbolize_keys)
+      expect(enqueued_args.last["companies_after"]).to eq("c101")
+      expect(configuration.reload.last_synced_at).to eq_time(Time.utc(2026, 11, 1, 12))
+
+      described_class.new.execute(enqueued_args.last.symbolize_keys)
+
+      expect(configuration.reload.last_synced_at).to eq_time(Time.utc(2026, 11, 2, 12))
+      expect(company_batch_of(100)).to have_been_made.once
+      expect(company_batch_of(1)).to have_been_made.once
+      expect(enqueued_args.size).to eq(3)
+    end
+
+    it "retries only the rate limited company chunk" do
+      store_companies(1)
+      stub_request(:post, hubspot_url("objects/companies/batch/read")).to_return(
+        status: 429,
+        headers: {
+          "Retry-After" => "9",
+        },
+      )
+      freeze_time
+
+      described_class.new.execute(
+        configuration_id: configuration.id,
+        reason: "scheduled",
+        started_at: Time.zone.now.iso8601,
+        companies_after: "",
+      )
+
+      job = Jobs::Hubspot::SyncConfiguration.jobs.sole
+      expect(job["at"] - Time.now.to_f).to be_within(1).of(9)
+      expect(job["args"].first).to include("companies_after" => "")
+      expect(a_request(:post, hubspot_url("objects/contacts/search"))).not_to have_been_made
+    end
+
+    it "records a failing company chunk on the configuration without moving the sync time" do
+      store_companies(1)
+      stub_request(:post, hubspot_url("objects/companies/batch/read")).to_return(
+        status: 500,
+        body: "boom",
+      )
+
+      expect {
+        described_class.new.execute(
+          configuration_id: configuration.id,
+          reason: "scheduled",
+          started_at: Time.zone.now.iso8601,
+          companies_after: "",
+        )
+      }.to raise_error(Hubspot::InvalidApiResponse)
+
+      expect(configuration.reload.slice(:last_synced_at, :last_error)).to eq(
+        "last_synced_at" => Time.utc(2026, 11, 1, 12),
+        "last_error" => "Hubspot::InvalidApiResponse",
+      )
+      expect(enqueued_args).to be_empty
+    end
+
+    it "enters the company phase after a search window restart finishes" do
+      freeze_time Time.utc(2026, 11, 2, 12)
+      stub_hubspot_contact_search([])
+
+      described_class.new.execute(
+        configuration_id: configuration.id,
+        reason: "scheduled",
+        since: Time.utc(2026, 11, 2, 9, 30).iso8601,
+        started_at: Time.zone.now.iso8601,
+      )
+
+      expect(enqueued_args.sole).to include("companies_after" => "")
+    end
+
+    it "skips the company phase on a backfill" do
+      freeze_time Time.utc(2026, 11, 2, 12)
+      store_companies(1)
+      stub_hubspot_contact_list([])
+
+      described_class.new.execute(configuration_id: configuration.id, reason: "backfill")
+
+      expect(configuration.reload.last_synced_at).to eq_time(Time.utc(2026, 11, 2, 12))
+      expect(enqueued_args).to be_empty
+      expect(a_request(:post, hubspot_url("objects/companies/batch/read"))).not_to have_been_made
+    end
+  end
+
+  it "finishes a scheduled run without a company phase when only contact properties are selected" do
+    freeze_time Time.utc(2026, 11, 2, 12)
+    configuration.update!(last_synced_at: Time.utc(2026, 11, 1, 12))
+    stub_hubspot_contact_search([])
+
+    described_class.new.execute(configuration_id: configuration.id, reason: "scheduled")
+
+    expect(configuration.reload.last_synced_at).to eq_time(Time.utc(2026, 11, 2, 12))
+    expect(enqueued_args).to be_empty
   end
 
   it "does nothing for inactive configurations, disabled reasons or a disabled provider" do

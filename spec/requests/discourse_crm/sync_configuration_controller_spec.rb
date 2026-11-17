@@ -564,7 +564,10 @@ RSpec.describe DiscourseCrm::SyncConfigurationController do
         name: "Import contacts",
         schedule: "daily",
         backfill: true,
-        mappings: [{ id: 1, source: "lifecyclestage" }, { id: 2, source: "jobtitle" }],
+        mappings: [
+          { id: 1, object: "contact", source: "lifecyclestage" },
+          { id: 2, object: "contact", source: "jobtitle" },
+        ],
       }
     end
 
@@ -672,8 +675,8 @@ RSpec.describe DiscourseCrm::SyncConfigurationController do
         "object" => "contact",
         "group_ids" => [],
         "mappings" => [
-          { "id" => 1, "source" => "lifecyclestage" },
-          { "id" => 2, "source" => "jobtitle" },
+          { "id" => 1, "object" => "contact", "source" => "lifecyclestage" },
+          { "id" => 2, "object" => "contact", "source" => "jobtitle" },
         ],
       )
       get "/salesforce/admin/guided-sync/configurations.json"

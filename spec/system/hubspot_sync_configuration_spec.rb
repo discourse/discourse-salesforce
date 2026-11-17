@@ -11,6 +11,7 @@ RSpec.describe "HubSpot sync configuration" do
 
   before do
     stub_hubspot_properties(%w[lifecyclestage jobtitle city])
+    stub_hubspot_properties(%w[name plan_tier], object: "company")
     sign_in(admin)
   end
 
@@ -19,8 +20,14 @@ RSpec.describe "HubSpot sync configuration" do
 
     expect(configurations_page).to have_pull_object("HubSpot - Contacts")
     expect(configurations_page).to have_selected_properties("Lifecyclestage")
+    expect(configurations_page).to have_no_company_properties
 
-    configurations_page.select_property("Jobtitle").choose_schedule("weekly").save
+    configurations_page
+      .select_property("Jobtitle")
+      .enable_company_pull
+      .select_property("Plan tier", object: "company")
+      .choose_schedule("weekly")
+      .save
 
     expect(configurations_page).to have_configuration(
       "Pull contacts",
@@ -40,6 +47,8 @@ RSpec.describe "HubSpot sync configuration" do
     configurations_page.open_configuration("Pull contacts")
 
     expect(configurations_page).to have_selected_properties("Lifecyclestage", "Jobtitle")
+    expect(configurations_page).to have_company_pull
+    expect(configurations_page).to have_selected_properties("Plan tier", object: "company")
     expect(configurations_page).to have_schedule("weekly")
   end
 end

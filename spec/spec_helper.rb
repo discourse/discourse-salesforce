@@ -116,14 +116,30 @@ RSpec.shared_context "with hubspot spec helper" do
     }
   end
 
-  def stub_hubspot_properties(names)
-    stub_request(:get, hubspot_url("properties/contacts")).to_return(
+  def hubspot_company(id, **properties)
+    { "id" => id.to_s, "properties" => properties.stringify_keys }
+  end
+
+  def stub_hubspot_properties(names, object: "contact")
+    stub_request(
+      :get,
+      hubspot_url("properties/#{::Hubspot::Api::OBJECT_PATHS.fetch(object)}"),
+    ).to_return(
       body: {
         results:
           names.map do |name|
-            { name: name, label: name.humanize, type: "string", groupName: "contactinformation" }
+            { name: name, label: name.humanize, type: "string", groupName: "#{object}information" }
           end,
       }.to_json,
+    )
+  end
+
+  def stub_hubspot_company_batch_read(results, ids: nil, errors: [])
+    stub = stub_request(:post, hubspot_url("objects/companies/batch/read"))
+    stub = stub.with(body: hash_including("inputs" => ids.map { |id| { "id" => id } })) if ids
+    stub.to_return(
+      status: errors.any? ? 207 : 200,
+      body: { results: results, errors: errors }.to_json,
     )
   end
 

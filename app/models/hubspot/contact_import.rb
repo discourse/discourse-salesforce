@@ -11,7 +11,11 @@ module ::Hubspot
     end
 
     def requested_properties
-      ["email", Api::LAST_MODIFIED_PROPERTY, *selected_properties].uniq
+      ["email", Api::LAST_MODIFIED_PROPERTY, Api::COMPANY_PROPERTY, *contact_properties].uniq
+    end
+
+    def pulls_companies?
+      company_properties.any?
     end
 
     def import_page(contacts)
@@ -32,12 +36,14 @@ module ::Hubspot
         links << scope.merge(direction: "inbound", user_id: user_id, external_id: contact["id"])
         records[contact["id"]] ||= scope.merge(
           external_id: contact["id"],
-          data: contact.fetch("properties").slice(*selected_properties),
+          company_external_id: contact.dig("properties", Api::COMPANY_PROPERTY).presence,
+          data: contact.fetch("properties").slice(*contact_properties),
         )
       end
+      contact_ids = by_email.values.map { |contact| contact["id"] }
+      previous_company_ids = company_ids_of(contact_ids)
       DiscourseCrm::RecordLink.link_many!(links)
       DiscourseCrm::Record.store_many!(records.values)
-      contact_ids = by_email.values.map { |contact| contact["id"] }
       keep = links.map { |link| [link[:user_id], link[:external_id]] }
       stale_links =
         @configuration
@@ -46,7 +52,12 @@ module ::Hubspot
           .pluck(:id, :user_id, :external_id)
           .filter_map { |id, user_id, external_id| id if keep.exclude?([user_id, external_id]) }
       DiscourseCrm::RecordLink.where(id: stale_links).delete_all if stale_links.any?
-      remove_orphan_records(contact_ids)
+      if pulls_companies?
+        refresh_companies(records.values.filter_map { |record| record[:company_external_id] }.uniq)
+      else
+        company_records.delete_all
+      end
+      remove_orphans(contact_ids, previous_company_ids)
       links
     end
 
@@ -57,8 +68,33 @@ module ::Hubspot
       stale = @configuration.record_links.where(user_id: user.id).where.not(external_id: kept)
       stale_ids = stale.pluck(:external_id)
       return if stale_ids.empty?
+      previous_company_ids = company_ids_of(stale_ids)
       stale.delete_all
-      remove_orphan_records(stale_ids)
+      remove_orphans(stale_ids, previous_company_ids)
+    end
+
+    def refresh_companies(ids)
+      return if ids.empty?
+      results, missing = @api.batch_read_companies(ids, properties: company_properties)
+      rows =
+        results.map do |company|
+          scope.merge(
+            object: "company",
+            external_id: company["id"],
+            company_external_id: nil,
+            data: company.fetch("properties").slice(*company_properties),
+          )
+        end
+      DiscourseCrm::Record.store_many!(rows)
+      company_records.where(external_id: missing).delete_all if missing.any?
+    end
+
+    def stored_company_ids(after:, limit: Api::PAGE_SIZE)
+      company_records
+        .where("external_id > ?", after)
+        .order(:external_id)
+        .limit(limit)
+        .pluck(:external_id)
     end
 
     private
@@ -67,13 +103,48 @@ module ::Hubspot
       @configuration.slice(:provider, :account, :object).symbolize_keys
     end
 
-    def selected_properties
-      @configuration.mappings.map { |mapping| mapping["source"] }
+    def contact_properties
+      sources("contact")
     end
 
-    def remove_orphan_records(contact_ids)
-      return if contact_ids.empty?
-      @configuration.records.where(external_id: contact_ids).where.missing(:record_links).delete_all
+    def company_properties
+      sources("company")
+    end
+
+    def sources(object)
+      @configuration.mappings.filter_map do |mapping|
+        mapping["source"] if mapping["object"] == object
+      end
+    end
+
+    def company_records
+      DiscourseCrm::Record.within(**scope.merge(object: "company"))
+    end
+
+    def company_ids_of(contact_ids)
+      @configuration
+        .records
+        .where(external_id: contact_ids)
+        .where.not(company_external_id: nil)
+        .distinct
+        .pluck(:company_external_id)
+    end
+
+    def remove_orphans(contact_ids, company_ids)
+      if contact_ids.any?
+        @configuration
+          .records
+          .where(external_id: contact_ids)
+          .where
+          .missing(:record_links)
+          .delete_all
+      end
+      return if company_ids.empty?
+      referenced = @configuration.records.where.not(company_external_id: nil)
+      company_records
+        .where(external_id: company_ids)
+        .where.not(external_id: referenced.select(:company_external_id))
+        .delete_all
     end
   end
 end

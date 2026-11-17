@@ -131,7 +131,7 @@ RSpec.describe DiscourseCrm::SyncConfiguration do
         object: "contact",
         name: "Import contacts",
         schedule: "daily",
-        mappings: [{ id: 1, source: "lifecyclestage" }],
+        mappings: [{ id: 1, object: "contact", source: "lifecyclestage" }],
       }
 
       expect {
@@ -159,7 +159,10 @@ RSpec.describe DiscourseCrm::SyncConfiguration do
         name: "Import contacts",
         schedule: "weekly",
         backfill: true,
-        mappings: [{ id: 1, source: "lifecyclestage" }, { id: 2, source: "jobtitle" }],
+        mappings: [
+          { id: 1, object: "contact", source: "lifecyclestage" },
+          { id: 2, object: "contact", source: "jobtitle" },
+        ],
       }
       Jobs::Hubspot::SyncConfiguration.clear
 
@@ -178,9 +181,14 @@ RSpec.describe DiscourseCrm::SyncConfiguration do
       ).to contain_exactly(hash_including("configuration_id" => record.id, "reason" => "backfill"))
 
       [
-        [{ id: 1, source: "missing_property" }],
-        [{ id: 1, source: "jobtitle" }, { id: 2, source: "jobtitle" }],
-        [{ id: 1, destination: "jobtitle" }],
+        [{ id: 1, object: "contact", source: "missing_property" }],
+        [
+          { id: 1, object: "contact", source: "jobtitle" },
+          { id: 2, object: "contact", source: "jobtitle" },
+        ],
+        [{ id: 1, object: "contact", destination: "jobtitle" }],
+        [{ id: 1, source: "jobtitle" }],
+        [{ id: 1, object: "deal", source: "jobtitle" }],
       ].each do |mappings|
         expect {
           described_class.create_or_update!(
@@ -190,6 +198,7 @@ RSpec.describe DiscourseCrm::SyncConfiguration do
           )
         }.to raise_error(Discourse::InvalidParameters, /mappings/)
       end
+      expect(a_request(:get, hubspot_url("properties/companies"))).not_to have_been_made
       expect {
         described_class.create_or_update!(
           params.merge(name: "Second import"),
@@ -197,6 +206,51 @@ RSpec.describe DiscourseCrm::SyncConfiguration do
           guardian: admin.guardian,
         )
       }.to raise_error(Discourse::InvalidParameters, /configuration/)
+    end
+
+    it "checks company properties against the portal's company list" do
+      stub_hubspot_properties(%w[lifecyclestage name])
+      stub_hubspot_properties(%w[name plan_tier], object: "company")
+      admin = Fabricate(:admin)
+      params = {
+        provider: "hubspot",
+        direction: "inbound",
+        kind: "users",
+        object: "contact",
+        name: "Pull contacts",
+        schedule: "daily",
+        backfill: false,
+        mappings: [
+          { id: 1, object: "contact", source: "name" },
+          { id: 2, object: "company", source: "name" },
+          { id: 3, object: "company", source: "plan_tier" },
+        ],
+      }
+
+      record = described_class.create_or_update!(params, id: nil, guardian: admin.guardian)
+
+      expect(record.mappings.map { |mapping| mapping.slice("object", "source") }).to eq(
+        [
+          { "object" => "contact", "source" => "name" },
+          { "object" => "company", "source" => "name" },
+          { "object" => "company", "source" => "plan_tier" },
+        ],
+      )
+      [
+        [{ id: 1, object: "company", source: "lifecyclestage" }],
+        [
+          { id: 1, object: "company", source: "name" },
+          { id: 2, object: "company", source: "name" },
+        ],
+      ].each do |mappings|
+        expect {
+          described_class.create_or_update!(
+            params.merge(mappings: mappings),
+            id: record.id,
+            guardian: admin.guardian,
+          )
+        }.to raise_error(Discourse::InvalidParameters, /mappings/)
+      end
     end
 
     it "keeps links and records when the configuration is removed" do

@@ -439,7 +439,7 @@ module("Integration | Component | CrmSyncConfigurations", function (hooks) {
   });
 
   test("offers the CRM pull only while HubSpot is enabled and unconfigured", async function (assert) {
-    pretender.get("/salesforce/admin/hubspot/contact-properties.json", () => [
+    pretender.get("/salesforce/admin/hubspot/properties.json", () => [
       200,
       { "Content-Type": "application/json" },
       JSON.stringify({
@@ -521,7 +521,7 @@ module("Integration | Component | CrmSyncConfigurations", function (hooks) {
   });
 
   test("opens a new HubSpot configuration from a direct link", async function (assert) {
-    pretender.get("/salesforce/admin/hubspot/contact-properties.json", () => [
+    pretender.get("/salesforce/admin/hubspot/properties.json", () => [
       200,
       { "Content-Type": "application/json" },
       JSON.stringify({ properties: [] }),
@@ -555,7 +555,7 @@ module("Integration | Component | CrmSyncConfigurations", function (hooks) {
         sync_status: { error: "Hubspot::MissingContact" },
       },
     ];
-    pretender.get("/salesforce/admin/hubspot/contact-properties.json", () => [
+    pretender.get("/salesforce/admin/hubspot/properties.json", () => [
       200,
       { "Content-Type": "application/json" },
       JSON.stringify({

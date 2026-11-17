@@ -19,13 +19,22 @@ module ::Hubspot
     end
 
     def self.validate_mappings!(configuration)
-      sources = configuration.mappings.map { |mapping| mapping["source"] }
-      unless sources.all? { |source| source.is_a?(String) && source.present? } &&
-               sources.uniq.size == sources.size
+      mappings = configuration.mappings
+      unless mappings.all? { |mapping|
+               Api::OBJECT_PATHS.key?(mapping["object"]) && mapping["source"].is_a?(String) &&
+                 mapping["source"].present?
+             }
         raise Discourse::InvalidParameters.new(:mappings)
       end
-      available = Api.cached_properties(refresh: true).map { |property| property[:name] }
-      raise Discourse::InvalidParameters.new(:mappings) if (sources - available).any?
+      mappings
+        .group_by { |mapping| mapping["object"] }
+        .each do |object, group|
+          sources = group.map { |mapping| mapping["source"] }
+          raise Discourse::InvalidParameters.new(:mappings) if sources.uniq.size != sources.size
+          available =
+            Api.cached_properties(object, refresh: true).map { |property| property[:name] }
+          raise Discourse::InvalidParameters.new(:mappings) if (sources - available).any?
+        end
     end
 
     def self.configuration_job

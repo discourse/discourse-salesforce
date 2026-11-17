@@ -9,13 +9,23 @@ module DiscourseCrm
              class_name: "DiscourseCrm::RecordLink",
              primary_key: %i[provider account object external_id],
              foreign_key: %i[provider account object external_id]
+    belongs_to :company,
+               -> { where(object: "company") },
+               class_name: "DiscourseCrm::Record",
+               primary_key: %i[provider account external_id],
+               foreign_key: %i[provider account company_external_id],
+               optional: true
 
     scope :within, ->(provider:, account:, object:) { where(provider:, account:, object:) }
     scope :hubspot, -> { where(provider: "hubspot") }
 
     def self.store_many!(rows)
       return if rows.empty?
-      upsert_all(rows, unique_by: %i[provider account object external_id], update_only: %i[data])
+      upsert_all(
+        rows,
+        unique_by: %i[provider account object external_id],
+        update_only: %i[data company_external_id],
+      )
     end
   end
 end
@@ -24,16 +34,18 @@ end
 #
 # Table name: crm_records
 #
-#  id          :bigint           not null, primary key
-#  account     :string           not null
-#  data        :jsonb            not null
-#  object      :string           not null
-#  provider    :string           not null
-#  created_at  :datetime         not null
-#  updated_at  :datetime         not null
-#  external_id :string           not null
+#  id                  :bigint           not null, primary key
+#  account             :string           not null
+#  data                :jsonb            not null
+#  object              :string           not null
+#  provider            :string           not null
+#  created_at          :datetime         not null
+#  updated_at          :datetime         not null
+#  company_external_id :string
+#  external_id         :string           not null
 #
 # Indexes
 #
-#  idx_on_provider_account_object_external_id_e63c7950a7  (provider,account,object,external_id) UNIQUE
+#  idx_on_provider_account_company_external_id_f3a61016eb  (provider,account,company_external_id)
+#  idx_on_provider_account_object_external_id_e63c7950a7   (provider,account,object,external_id) UNIQUE
 #

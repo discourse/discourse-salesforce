@@ -7,14 +7,17 @@ module Jobs
 
       SEARCH_CURSOR_LIMIT = 10_000
       OVERLAP = 5.minutes
-      RATE_LIMIT_DELAY = 60
 
       def execute(args)
-        configuration = Salesforce::SyncConfiguration.active.find_by(id: args[:configuration_id])
+        configuration =
+          ::DiscourseCrm::SyncConfiguration.active.inbound.find_by(
+            id: args[:configuration_id],
+            provider: "hubspot",
+          )
         return unless configuration&.reason_enabled?(args[:reason])
 
         started_at = args[:started_at] ? Time.zone.parse(args[:started_at]) : Time.zone.now
-        import = ::Hubspot::ContactImport.new(configuration)
+        import = ::Hubspot::ContactImport.new(configuration, api: import_api)
         since = search_window(configuration, args)
         page =
           if since
@@ -27,7 +30,11 @@ module Jobs
             import_api.list_contacts(after: args[:after], properties: import.requested_properties)
           end
         results = page.fetch("results")
-        import.import_page(results)
+        links = import.import_page(results)
+        configuration
+          .sync_states
+          .where(user_id: links.map { |link| link[:user_id] })
+          .update_all(error: nil, error_at: nil)
 
         next_after = page.dig("paging", "next", "after")
         next_args = {
@@ -36,7 +43,7 @@ module Jobs
           started_at: started_at.iso8601,
         }
         if next_after.blank?
-          Salesforce::SyncConfiguration
+          ::DiscourseCrm::SyncConfiguration
             .where(id: configuration.id)
             .where("last_synced_at IS NULL OR last_synced_at < ?", started_at)
             .update_all(last_synced_at: started_at, last_error: nil, last_error_at: nil)
@@ -51,13 +58,16 @@ module Jobs
         end
       rescue ::Hubspot::RateLimited => error
         Jobs.enqueue_in(
-          error.retry_after || RATE_LIMIT_DELAY,
+          error.retry_after,
           ::Jobs::Hubspot::SyncConfiguration,
           args.to_h.symbolize_keys,
         )
       rescue => error
-        Salesforce::SyncConfiguration.record_result(args[:configuration_id], error: error)
-        raise unless error.is_a?(Discourse::InvalidParameters)
+        ::DiscourseCrm::SyncConfiguration.record_result(args[:configuration_id], error: error)
+        unless error.is_a?(Discourse::InvalidParameters) ||
+                 error.is_a?(::Hubspot::DailyQuotaExceeded)
+          raise
+        end
         Rails.logger.warn(
           "HubSpot import stopped: configuration_id=#{args[:configuration_id]} error=#{error.class.name}",
         )

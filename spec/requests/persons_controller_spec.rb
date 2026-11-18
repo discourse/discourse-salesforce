@@ -137,7 +137,7 @@ RSpec.describe ::Salesforce::PersonsController do
       expect(user.reload.salesforce_contact_id).to eq(params[:expected_contact_id])
 
       guided_link =
-        Salesforce::RecordLink.link!(
+        DiscourseCrm::RecordLink.link!(
           provider: "salesforce",
           account: instance_url,
           object: "Contact",

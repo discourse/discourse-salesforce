@@ -15,6 +15,10 @@ require "base64"
 
 enabled_site_setting :salesforce_enabled
 
+def self.enabled?
+  super || SiteSetting.hubspot_enabled
+end
+
 module ::Salesforce
   PLUGIN_NAME = "discourse-salesforce"
 end
@@ -78,33 +82,37 @@ after_initialize do
   end
 
   on(:user_created) do |user, opts|
-    Jobs.enqueue(:sync_salesforce_user, user_id: user.id) if ::Salesforce::Api.has_credentials?
+    if SiteSetting.salesforce_enabled && ::Salesforce::Api.has_credentials?
+      Jobs.enqueue(:sync_salesforce_user, user_id: user.id)
+    end
   end
 
   on(:user_confirmed_email) do |user, scope|
-    Salesforce::ConfigurationScheduler.enqueue_user(user, reason: "change", inbound: true)
-    if scope == EmailToken.scopes[:signup] && ::Salesforce::Api.has_credentials?
+    DiscourseCrm::ConfigurationScheduler.enqueue_user(user, reason: "change", inbound: true)
+    if scope == EmailToken.scopes[:signup] && SiteSetting.salesforce_enabled &&
+         ::Salesforce::Api.has_credentials?
       Jobs.enqueue(:sync_salesforce_user, user_id: user.id)
     end
   end
 
   add_model_callback(User, :after_commit, on: :update) do
     if saved_change_to_active?(from: false, to: true)
-      Salesforce::ConfigurationScheduler.enqueue_user(self, reason: "join", inbound: true)
+      DiscourseCrm::ConfigurationScheduler.enqueue_user(self, reason: "join", inbound: true)
     end
-    if saved_change_to_active?(from: false, to: true) && ::Salesforce::Api.has_credentials?
+    if saved_change_to_active?(from: false, to: true) && SiteSetting.salesforce_enabled &&
+         ::Salesforce::Api.has_credentials?
       Jobs.enqueue(:sync_salesforce_user, user_id: self.id)
     end
   end
 
   on(:user_added_to_group) do |user, group, **opts|
-    Salesforce::ConfigurationScheduler.enqueue_user(
+    DiscourseCrm::ConfigurationScheduler.enqueue_user(
       user,
       reason: "join",
       group_id: group.id,
       inbound: false,
     )
-    Salesforce::ConfigurationScheduler.enqueue_user(
+    DiscourseCrm::ConfigurationScheduler.enqueue_user(
       user,
       reason: "change",
       excluding_group_id: group.id,
@@ -113,7 +121,7 @@ after_initialize do
   end
 
   on(:user_updated) do |user, changed_fields = []|
-    Salesforce::ConfigurationScheduler.enqueue_user(
+    DiscourseCrm::ConfigurationScheduler.enqueue_user(
       user,
       reason: "change",
       inbound: Array(changed_fields).include?("email"),
@@ -121,14 +129,15 @@ after_initialize do
   end
 
   on(:user_removed_from_group) do |user, group, *args|
-    Salesforce::ConfigurationScheduler.enqueue_user(user, reason: "change", inbound: false)
+    DiscourseCrm::ConfigurationScheduler.enqueue_user(user, reason: "change", inbound: false)
   end
 
   on(:user_first_logged_in) do |user|
-    Salesforce::ConfigurationScheduler.enqueue_user(user, reason: "change", inbound: true)
+    DiscourseCrm::ConfigurationScheduler.enqueue_user(user, reason: "change", inbound: true)
   end
 
   on(:post_created) do |post, opts|
+    next unless SiteSetting.salesforce_enabled
     topic = post.topic
 
     if topic.has_salesforce_case
@@ -139,6 +148,7 @@ after_initialize do
   end
 
   automatic_case_sync = ->(topic, *extras) do
+    next unless SiteSetting.salesforce_enabled
     sync_tags = SiteSetting.salesforce_automatic_case_sync_tags.split("|")
 
     return if sync_tags.empty?
@@ -151,6 +161,7 @@ after_initialize do
   on(:post_edited) { |post| automatic_case_sync.call(post.topic) }
 
   reloadable_patch do |plugin|
+    User.prepend(DiscourseCrm::UserExtension)
     User.prepend(Salesforce::UserExtension)
     Topic.prepend(Salesforce::TopicExtension)
     TopicListItemSerializer.include(CaseMixin)

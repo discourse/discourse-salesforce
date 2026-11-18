@@ -102,37 +102,43 @@ RSpec.describe Jobs::SyncSalesforceUser do
     expect(user.reload.salesforce_lead_id).to eq("confirmed-lead")
   end
 
-  it "creates a Lead and retains its link for idempotent retries and email changes" do
-    stub_salesforce_person_lookup(
-      "Lead",
-      user.email,
-      records: [],
-      fields: %w[LastName Company Trust__c],
-    )
-    create =
-      stub_request(:post, "#{api_path}/Lead").with(
+  [false, true].each do |hubspot_enabled|
+    it "creates and retains a Salesforce Lead with HubSpot #{hubspot_enabled ? "enabled but unconfigured" : "disabled"}" do
+      SiteSetting.hubspot_enabled = hubspot_enabled
+      SiteSetting.hubspot_portal_id = ""
+      SiteSetting.hubspot_access_token = ""
+      stub_salesforce_person_lookup(
+        "Lead",
+        user.email,
+        records: [],
+        fields: %w[LastName Company Trust__c],
+      )
+      create =
+        stub_request(:post, "#{api_path}/Lead").with(
+          body: {
+            Email: user.email,
+            LastName: "Morgan",
+            Company: "Unknown",
+            Trust__c: user.trust_level,
+          },
+        ).to_return(status: 201, body: { id: "lead123" }.to_json)
+      run_sync
+      expect(user.reload.salesforce_lead_id).to eq("lead123")
+      stub_request(:get, "#{api_path}/Lead/lead123").to_return(
         body: {
-          Email: user.email,
+          Id: "lead123",
           LastName: "Morgan",
           Company: "Unknown",
           Trust__c: user.trust_level,
-        },
-      ).to_return(status: 201, body: { id: "lead123" }.to_json)
-    run_sync
-    expect(user.reload.salesforce_lead_id).to eq("lead123")
-    stub_request(:get, "#{api_path}/Lead/lead123").to_return(
-      body: {
-        Id: "lead123",
-        LastName: "Morgan",
-        Company: "Unknown",
-        Trust__c: user.trust_level,
-      }.to_json,
-    )
-    user.primary_email.update!(email: "new-address@example.com")
-    user.reload.activate
-    run_sync
-    expect(create).to have_been_requested.once
-    expect(a_request(:patch, %r{/sobjects/})).not_to have_been_made
+        }.to_json,
+      )
+      user.primary_email.update!(email: "new-address@example.com")
+      user.reload.activate
+      run_sync
+      expect(create).to have_been_requested.once
+      expect(a_request(:patch, %r{/sobjects/})).not_to have_been_made
+      expect(a_request(:any, /api\.hubapi\.com/)).not_to have_been_made
+    end
   end
 
   it "skips Lead creation when Contacts already match the email without linking or updating them" do
@@ -280,7 +286,7 @@ RSpec.describe Jobs::SyncSalesforceUser do
 
   it "recreates a confirmed deleted Lead and relinks subsequent retries" do
     old_id = "00Qbm00000v6wJpEAI"
-    Salesforce::RecordLink.link!(
+    DiscourseCrm::RecordLink.link!(
       provider: "salesforce",
       account: instance_url,
       object: "Lead",
@@ -333,7 +339,7 @@ RSpec.describe Jobs::SyncSalesforceUser do
       fields: %w[LastName Company Trust__c],
     )
     run_sync("change")
-    state = Salesforce::SyncState.find_by!(configuration: configuration, user_id: user.id)
+    state = DiscourseCrm::SyncState.find_by!(configuration: configuration, user_id: user.id)
     expect(state.fingerprint).to be_present
 
     stub_request(:get, "#{api_path}/Lead/#{lead_id}").to_return(status: 404, body: "[]")
@@ -366,7 +372,7 @@ RSpec.describe Jobs::SyncSalesforceUser do
 
   it "does not recreate inaccessible or converted Leads" do
     old_id = "00Qbm00000v6wJpEAI"
-    Salesforce::RecordLink.link!(
+    DiscourseCrm::RecordLink.link!(
       provider: "salesforce",
       account: instance_url,
       object: "Lead",
@@ -397,7 +403,7 @@ RSpec.describe Jobs::SyncSalesforceUser do
     lead_id = "00Qbm00000v6wJpEAI"
     lead_scope = { provider: "salesforce", account: instance_url, object: "Lead", user_id: user.id }
     contact_scope = lead_scope.merge(object: "Contact")
-    Salesforce::RecordLink.link!(**lead_scope, external_id: lead_id)
+    DiscourseCrm::RecordLink.link!(**lead_scope, external_id: lead_id)
     linked_lead =
       stub_request(:get, "#{api_path}/Lead/#{lead_id}").to_return(
         body: { Id: lead_id, IsConverted: true, ConvertedContactId: "contact-123" }.to_json,
@@ -407,8 +413,8 @@ RSpec.describe Jobs::SyncSalesforceUser do
     run_sync
 
     expect(linked_lead).to have_been_requested.once
-    expect(Salesforce::RecordLink.find_by(**lead_scope).converted_to_id).to eq("contact-123")
-    expect(Salesforce::RecordLink.find_by(**contact_scope).external_id).to eq("contact-123")
+    expect(DiscourseCrm::RecordLink.find_by(**lead_scope).converted_to_id).to eq("contact-123")
+    expect(DiscourseCrm::RecordLink.find_by(**contact_scope).external_id).to eq("contact-123")
     expect(user.reload.salesforce_lead_id).to be_nil
     expect(user.salesforce_contact_id).to eq("contact-123")
     expect(a_request(:post, "#{api_path}/Lead")).not_to have_been_made
@@ -437,7 +443,7 @@ RSpec.describe Jobs::SyncSalesforceUser do
     expect(user.salesforce_contact_id).to eq("contact-456")
     expect(a_request(:post, "#{api_path}/Lead")).not_to have_been_made
     expect(
-      Salesforce::RecordLink.find_by(
+      DiscourseCrm::RecordLink.find_by(
         provider: "salesforce",
         account: instance_url,
         object: "Lead",
@@ -471,6 +477,41 @@ RSpec.describe Jobs::SyncSalesforceUser do
     ).not_to have_been_made
     expect(user.reload.salesforce_contact_id).to eq("contact123")
     expect(user.salesforce_lead_id).to be_nil
+  end
+
+  it "retries a failed linked user after the batch cannot find its record" do
+    stub_salesforce_person_lookup("Lead", user.email, fields: %w[LastName Company Trust__c])
+    stub_request(:post, "#{api_path}/Lead").to_return(status: 201, body: { id: "lead123" }.to_json)
+    run_sync
+    DiscourseCrm::SyncConfiguration.record_result(
+      configuration.id,
+      user.id,
+      error: Salesforce::InvalidApiResponse.new("failed"),
+    )
+    Jobs::SyncSalesforceUserBatch.clear
+    Jobs::SyncSalesforceUser.clear
+    DiscourseCrm::ConfigurationScheduler.configuration_saved(
+      configuration.reload,
+      group_ids_changed: false,
+    )
+    stub_request(:get, %r{/query/}).to_return(body: { totalSize: 0, records: [] }.to_json)
+    Jobs::SyncSalesforceUserBatch.new.execute(
+      Jobs::SyncSalesforceUserBatch.jobs.first["args"].first.symbolize_keys,
+    )
+    fetch =
+      stub_request(:get, "#{api_path}/Lead/lead123").to_return(
+        body: {
+          Id: "lead123",
+          LastName: "Morgan",
+          Company: "Unknown",
+          Trust__c: user.trust_level,
+        }.to_json,
+      )
+    Jobs::SyncSalesforceUser.new.execute(
+      Jobs::SyncSalesforceUser.jobs.first["args"].first.symbolize_keys,
+    )
+    expect(fetch).to have_been_requested.once
+    expect(configuration.reload.sync_status["error"]).to be_nil
   end
 
   it "propagates transient failures for retry and clears the affected user's error after success" do
@@ -593,6 +634,30 @@ RSpec.describe Jobs::SyncSalesforceUser do
     expect(linked).to have_been_requested.times(3)
   end
 
+  it "retries an unchanged profile event after a scheduled refresh fails" do
+    record = { Id: "lead123", LastName: "Morgan", Company: "Unknown", Trust__c: user.trust_level }
+    stub_salesforce_person_lookup(
+      "Lead",
+      user.email,
+      record: record,
+      fields: %w[LastName Company Trust__c],
+    )
+    run_sync("change")
+    linked =
+      stub_request(:get, "#{api_path}/Lead/lead123")
+        .to_return(status: 503, body: "unavailable")
+        .then
+        .to_return(body: record.to_json)
+
+    expect { run_sync("scheduled") }.to raise_error(Salesforce::InvalidApiResponse)
+    expect(configuration.reload.sync_status["error"]).to be_present
+    run_sync("change")
+    run_sync("change")
+
+    expect(linked).to have_been_requested.twice
+    expect(configuration.reload.sync_status["error"]).to be_nil
+  end
+
   it "reuses metadata while refreshing the linked Salesforce record on every scheduled run" do
     allow(Rails).to receive(:cache).and_return(ActiveSupport::Cache::MemoryStore.new)
     record = { Id: "lead123", LastName: "CRM", Company: "CRM", Trust__c: user.trust_level }
@@ -682,7 +747,7 @@ RSpec.describe Jobs::SyncSalesforceUser do
     group.add(Discourse.system_user)
     Jobs::SyncSalesforceUser.clear
     Jobs::SyncSalesforceUserBatch.clear
-    Jobs::SyncSalesforceConfiguration.new.execute(
+    Jobs::DiscourseCrm::SyncOutboundConfiguration.new.execute(
       configuration_id: configuration.id,
       reason: "backfill",
     )
@@ -692,26 +757,34 @@ RSpec.describe Jobs::SyncSalesforceUser do
     ).to contain_exactly(user.id, newcomer.id)
   end
 
-  it "limits scheduled refreshes to members with a linked Salesforce record" do
+  it "schedules linked members and failed first pushes without backfilling untouched members" do
     existing = Fabricate(:user)
     group.add(existing)
-    Salesforce::RecordLink.link!(
+    DiscourseCrm::RecordLink.link!(
       provider: "salesforce",
       account: instance_url,
       object: "Lead",
       user_id: existing.id,
       external_id: "lead-existing",
     )
+    failed = Fabricate(:verified_user)
+    group.add(failed)
+    DiscourseCrm::SyncConfiguration.record_result(
+      configuration.id,
+      failed.id,
+      error: Salesforce::InvalidCredentials.new,
+    )
+    configuration.update!(backfill: false)
     Jobs::SyncSalesforceUserBatch.clear
 
-    Jobs::SyncSalesforceConfiguration.new.execute(
+    Jobs::DiscourseCrm::SyncOutboundConfiguration.new.execute(
       configuration_id: configuration.id,
       reason: "scheduled",
     )
 
     expect(
       Jobs::SyncSalesforceUserBatch.jobs.flat_map { |job| job["args"].first["user_ids"] },
-    ).to contain_exactly(existing.id)
+    ).to contain_exactly(existing.id, failed.id)
   end
 
   it "syncs the union of groups once and continues syncing members of another selected group" do
@@ -729,7 +802,7 @@ RSpec.describe Jobs::SyncSalesforceUser do
     expect(jobs).to contain_exactly(hash_including("user_id" => newcomer.id, "reason" => "join"))
 
     Jobs::SyncSalesforceUserBatch.clear
-    Jobs::SyncSalesforceConfiguration.new.execute(
+    Jobs::DiscourseCrm::SyncOutboundConfiguration.new.execute(
       configuration_id: configuration.id,
       reason: "backfill",
     )
@@ -776,11 +849,11 @@ RSpec.describe Jobs::SyncSalesforceUser do
 
   it "schedules a daily refresh once after 02:00 UTC" do
     freeze_time Time.utc(2026, 10, 23, 1)
-    Jobs::SyncSalesforceConfiguration.clear
+    Jobs::DiscourseCrm::SyncOutboundConfiguration.clear
     Jobs::SyncSalesforceConfigurations.new.execute({})
-    expect(Jobs::SyncSalesforceConfiguration.jobs).to be_empty
+    expect(Jobs::DiscourseCrm::SyncOutboundConfiguration.jobs).to be_empty
     freeze_time Time.utc(2026, 10, 23, 2)
     2.times { Jobs::SyncSalesforceConfigurations.new.execute({}) }
-    expect(Jobs::SyncSalesforceConfiguration.jobs.size).to eq(1)
+    expect(Jobs::DiscourseCrm::SyncOutboundConfiguration.jobs.size).to eq(1)
   end
 end

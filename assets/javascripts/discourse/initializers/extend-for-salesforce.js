@@ -102,6 +102,9 @@ async function unlinkCase(topic, dialog, toasts) {
 }
 
 function initializeWithApi(api, container) {
+  if (!container.lookup("service:site-settings").salesforce_enabled) {
+    return;
+  }
   const currentUser = api.getCurrentUser();
   const isStaff = currentUser?.staff;
 

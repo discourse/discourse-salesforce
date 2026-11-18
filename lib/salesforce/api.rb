@@ -82,7 +82,7 @@ module ::Salesforce
             status: response.status,
           )
         e.set_backtrace(caller)
-        ConnectionError.log(e, operation: "api")
+        DiscourseCrm::ConnectionError.log(e, operation: "api")
         raise e
       end
     end

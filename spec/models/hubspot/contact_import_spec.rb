@@ -116,8 +116,10 @@ RSpec.describe ::Hubspot::ContactImport do
           hubspot_contact(503, "grace@example.com"),
         ],
       )
-      Salesforce::RecordLink.link_many!([scope.merge(user_id: user.id, external_id: "502")])
-      Salesforce::Record.store_many!([scope.merge(external_id: "502", data: {})])
+      DiscourseCrm::RecordLink.link_many!(
+        [scope.merge(direction: "inbound", user_id: user.id, external_id: "502")],
+      )
+      DiscourseCrm::Record.store_many!([scope.merge(external_id: "502", data: {})])
       stub_hubspot_batch_read([hubspot_contact(501, "ada@example.com")])
 
       described_class.new(configuration).import_user(user)

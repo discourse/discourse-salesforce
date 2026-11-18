@@ -55,15 +55,16 @@ RSpec.describe "salesforce:prune_dead_associations" do
     ).not_to have_been_made
   end
 
-  it "reports guided-only links in a dry run and removes the same links during cleanup" do
+  it "reports and prunes guided-only links and fingerprints while Salesforce is disabled" do
+    SiteSetting.salesforce_enabled = false
     user.user_custom_fields.where(name: Salesforce::Contact::ID_FIELD).delete_all
     salesforce_case.destroy!
     scope = { provider: "salesforce", account: instance_url, object: "Contact", user_id: user.id }
-    Salesforce::RecordLink.link!(**scope, external_id: contact_id)
+    DiscourseCrm::RecordLink.link!(**scope, external_id: contact_id)
     configuration = Fabricate(:sync_configuration, object: "Contact", account: instance_url)
-    Salesforce::SyncState.store(configuration.id, user.id, fingerprint: "previous")
+    DiscourseCrm::SyncState.store(configuration.id, user.id, fingerprint: "previous")
     fingerprint = -> do
-      Salesforce::SyncState.find_by(configuration: configuration, user_id: user.id).fingerprint
+      DiscourseCrm::SyncState.find_by(configuration: configuration, user_id: user.id).fingerprint
     end
 
     dry_run_output =
@@ -73,7 +74,7 @@ RSpec.describe "salesforce:prune_dead_associations" do
 
     expect(dry_run_output).to include("dead contact #{contact_id}", "Dry run: nothing removed.")
     expect(dry_run_output).not_to include("No dead links found.")
-    expect(Salesforce::RecordLink.find_by(**scope).external_id).to eq(contact_id)
+    expect(DiscourseCrm::RecordLink.find_by(**scope).external_id).to eq(contact_id)
     expect(fingerprint.call).to eq("previous")
 
     output =
@@ -82,7 +83,7 @@ RSpec.describe "salesforce:prune_dead_associations" do
       end
 
     expect(output).to include("dead contact #{contact_id}", "Pruned 1 user links")
-    expect(Salesforce::RecordLink.find_by(**scope)).to be_nil
+    expect(DiscourseCrm::RecordLink.find_by(**scope)).to be_nil
     expect(fingerprint.call).to be_nil
   end
 

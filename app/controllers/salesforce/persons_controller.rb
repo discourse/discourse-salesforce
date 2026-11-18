@@ -5,6 +5,8 @@ module Salesforce
     requires_login
     requires_plugin PLUGIN_NAME
 
+    before_action { raise Discourse::NotFound unless SiteSetting.salesforce_enabled }
+
     before_action :ensure_admin, except: :unlink_contact
     before_action(only: :unlink_contact) { guardian.ensure_can_unlink_salesforce_contacts! }
 

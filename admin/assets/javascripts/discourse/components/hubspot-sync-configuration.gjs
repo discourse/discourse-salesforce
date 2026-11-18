@@ -12,6 +12,7 @@ import DConditionalLoadingSpinner from "discourse/ui-kit/d-conditional-loading-s
 import DMultiSelect from "discourse/ui-kit/d-multi-select";
 import { i18n } from "discourse-i18n";
 import SyncConfigurationHeading from "discourse/plugins/discourse-salesforce/discourse/components/sync-configuration-heading";
+import hubspotProvider from "discourse/plugins/discourse-salesforce/discourse/lib/hubspot/sync-provider";
 import { createHubspotSyncConfiguration } from "discourse/plugins/discourse-salesforce/discourse/lib/sync-configuration";
 
 const PREFIX = "salesforce.guided_sync.hubspot";
@@ -99,10 +100,9 @@ export default class HubspotSyncConfiguration extends Component {
     this.loadingProperties = true;
     this.propertiesError = null;
     try {
-      const result = await ajax(
-        "/salesforce/admin/hubspot/contact-properties.json",
-        { data: { refresh: force } }
-      );
+      const result = await ajax(hubspotProvider.metadataUrl, {
+        data: { refresh: force },
+      });
       if (this.#stale(request)) {
         return;
       }
@@ -110,10 +110,10 @@ export default class HubspotSyncConfiguration extends Component {
       this.#form.removeError("mappings");
     } catch (error) {
       if (!this.#stale(request)) {
-        this.propertiesError = (error.jqXHR || error).responseJSON?.errors
-          ?.length
-          ? extractError(error)
-          : i18n(`${PREFIX}.properties_failed`);
+        this.propertiesError = extractError(
+          error,
+          i18n(`${PREFIX}.properties_failed`)
+        );
       }
     } finally {
       if (!this.#stale(request)) {

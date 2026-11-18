@@ -5,17 +5,21 @@ module ::Jobs
     sidekiq_options retry: 5
 
     def execute(args)
-      return unless SiteSetting.salesforce_enabled
-
       if args[:configuration_id]
         begin
+          configuration =
+            ::DiscourseCrm::SyncConfiguration.active.outbound.find_by(
+              id: args[:configuration_id],
+              provider: "salesforce",
+            )
+          return unless configuration
           ::Salesforce::ConfiguredUserSync.sync(
             args[:configuration_id],
             args[:user_id],
             reason: args[:reason],
           )
         rescue => error
-          ::Salesforce::SyncConfiguration.record_result(
+          ::DiscourseCrm::SyncConfiguration.record_result(
             args[:configuration_id],
             args[:user_id],
             error: error,
@@ -25,12 +29,13 @@ module ::Jobs
             raise
           end
           Rails.logger.warn(
-            "Salesforce configured sync stopped: configuration_id=#{args[:configuration_id]} user_id=#{args[:user_id]} error=#{error.class.name}",
+            "CRM configured sync stopped: configuration_id=#{args[:configuration_id]} user_id=#{args[:user_id]} error=#{error.class.name}",
           )
         end
         return
       end
 
+      return unless SiteSetting.salesforce_enabled
       user = User.find(args[:user_id])
       lock_key = "salesforce_person_create_#{user.id}"
       return if DistributedMutex.synchronize(lock_key) { ::Salesforce::Contact.sync(user) }
@@ -53,7 +58,7 @@ module ::Jobs
           ::Salesforce::Lead.link!(user, lead_id, created: false)
         end
       elsif SiteSetting.salesforce_contact_auto_create_on_signup &&
-            ::Salesforce::Person.auto_create_eligible?(user)
+            ::DiscourseCrm::UserEligibility.auto_create_eligible?(user)
         user.create_salesforce_contact
       end
     rescue Salesforce::AmbiguousEmailMatch => error

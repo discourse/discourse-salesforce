@@ -50,6 +50,31 @@ RSpec.describe Jobs::SyncSalesforceUserBatch do
     )
   end
 
+  it "retries only the failed batch members when backfill is disabled" do
+    configuration.update!(schedule: "manual", backfill: false)
+    Salesforce::ConfiguredUserBatchSync.stubs(:sync).raises(Salesforce::InvalidCredentials)
+    expect {
+      described_class.new.execute(
+        configuration_id: configuration.id,
+        user_ids: [user.id],
+        reason: "change",
+      )
+    }.to raise_error(Salesforce::InvalidCredentials)
+    expect(configuration.sync_states.pluck(:user_id)).to eq([user.id])
+    described_class.clear
+    Jobs::DiscourseCrm::SyncOutboundConfiguration.clear
+
+    DiscourseCrm::ConfigurationScheduler.configuration_saved(
+      configuration.reload,
+      group_ids_changed: false,
+    )
+
+    expect(Jobs::DiscourseCrm::SyncOutboundConfiguration.jobs).to be_empty
+    expect(described_class.jobs.map { |job| job["args"].first }).to contain_exactly(
+      hash_including("user_ids" => [user.id], "reason" => "retry"),
+    )
+  end
+
   it "excludes an unconfirmed email while syncing verified users" do
     user.email_tokens.delete_all
     user.email_tokens.create!(email: user.email, scope: EmailToken.scopes[:signup])
@@ -85,14 +110,14 @@ RSpec.describe Jobs::SyncSalesforceUserBatch do
       }.to_json,
     )
     stub_request(:patch, collection_url).to_timeout
-    Salesforce::SyncState.store(configuration.id, user.id, fingerprint: "previous")
+    DiscourseCrm::SyncState.store(configuration.id, user.id, fingerprint: "previous")
 
     run_batch
 
     expect(configuration.record_link_for(user.id).external_id).to eq("contact1")
     expect(user.reload.salesforce_contact_id).to be_nil
     expect(
-      Salesforce::SyncState.find_by(configuration: configuration, user_id: user.id).fingerprint,
+      DiscourseCrm::SyncState.find_by(configuration: configuration, user_id: user.id).fingerprint,
     ).to eq("previous")
     user.primary_email.update!(email: "changed@example.com")
     user.reload.activate
@@ -253,7 +278,7 @@ RSpec.describe Jobs::SyncSalesforceUserBatch do
   end
 
   it "defers ambiguous matches and missing linked records to individual jobs" do
-    Salesforce::RecordLink.link!(
+    DiscourseCrm::RecordLink.link!(
       provider: "salesforce",
       account: instance_url,
       object: "Contact",
@@ -292,7 +317,7 @@ RSpec.describe Jobs::SyncSalesforceUserBatch do
       end
     stub_request(:get, "#{api_path}/Lead/describe").to_return(body: { fields: lead_fields }.to_json)
     lead_id = "00Qbm00000v6wJpEAI"
-    Salesforce::RecordLink.link!(
+    DiscourseCrm::RecordLink.link!(
       provider: "salesforce",
       account: instance_url,
       object: "Lead",
@@ -426,7 +451,7 @@ RSpec.describe Jobs::SyncSalesforceUserBatch do
     end
 
     it "clears a saved fingerprint for a Contact match so later changes can create a Lead" do
-      Salesforce::SyncState.store(
+      DiscourseCrm::SyncState.store(
         configuration.id,
         user.id,
         fingerprint: "previous",
@@ -441,7 +466,7 @@ RSpec.describe Jobs::SyncSalesforceUserBatch do
 
       run_batch
 
-      state = Salesforce::SyncState.find_by!(configuration: configuration, user_id: user.id)
+      state = DiscourseCrm::SyncState.find_by!(configuration: configuration, user_id: user.id)
       expect(state.fingerprint).to be_nil
       expect(state.error).to be_nil
       expect(a_request(:post, collection_url)).not_to have_been_made
@@ -575,7 +600,7 @@ RSpec.describe Jobs::SyncSalesforceUserBatch do
   it "skips Lead batches with only already-converted users without contacting Salesforce" do
     configuration.update!(object: "Lead")
     [user, other_user].each do |member|
-      Salesforce::RecordLink.mark_converted!(
+      DiscourseCrm::RecordLink.mark_converted!(
         provider: "salesforce",
         account: instance_url,
         object: "Lead",
@@ -606,7 +631,7 @@ RSpec.describe Jobs::SyncSalesforceUserBatch do
   end
 
   it "follows query pages and uses saved IDs after an email change" do
-    Salesforce::RecordLink.link!(
+    DiscourseCrm::RecordLink.link!(
       provider: "salesforce",
       account: instance_url,
       object: "Contact",
@@ -760,6 +785,30 @@ RSpec.describe Jobs::SyncSalesforceUserBatch do
     end
   end
 
+  it "preserves a successful update when creating another contact fails" do
+    DiscourseCrm::SyncConfiguration.record_result(
+      configuration.id,
+      user.id,
+      error: Salesforce::InvalidCredentials.new,
+    )
+    stub_request(:get, query_path).with(query: hash_including("q" => /SELECT/)).to_return(
+      body: {
+        records: [{ Id: "existing", Email: user.email, LastName: "Morgan", LeadSource: "Web" }],
+      }.to_json,
+    )
+    stub_request(:patch, collection_url).to_return(
+      body: [{ id: "existing", success: true }].to_json,
+    )
+    stub_request(:post, collection_url).to_return(status: 403, body: "Rejected")
+
+    expect { run_batch }.to raise_error(Salesforce::InvalidApiResponse)
+
+    expect(user.reload.salesforce_contact_id).to eq("existing")
+    expect(configuration.sync_states.find_by!(user_id: user.id).error).to be_nil
+    expect(configuration.sync_states.where.not(error: nil).pluck(:user_id)).to eq([other_user.id])
+    expect(configuration.reload.last_error).to eq("Salesforce::InvalidApiResponse")
+  end
+
   it "records invalid mappings without retrying the batch" do
     configuration.update!(mappings: [])
 
@@ -777,7 +826,10 @@ RSpec.describe Jobs::SyncSalesforceUserBatch do
 
     expect { run_batch }.to raise_error(Salesforce::InvalidApiResponse)
     expect(configuration.reload.last_error).to eq("Salesforce::InvalidApiResponse")
-    expect(configuration.sync_states.where.not(error: nil)).to be_empty
+    expect(configuration.sync_states.where.not(error: nil).pluck(:user_id)).to contain_exactly(
+      user.id,
+      other_user.id,
+    )
     expect(Jobs::SyncSalesforceUser.jobs).to be_empty
     expect(a_request(:post, collection_url)).not_to have_been_made
   end

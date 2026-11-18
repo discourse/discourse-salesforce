@@ -25,8 +25,16 @@ module ::Salesforce
       )
     end
 
+    def self.permanent_sync_errors
+      %w[Discourse::InvalidParameters Salesforce::AmbiguousEmailMatch]
+    end
+
     def self.configuration_job
-      Jobs::SyncSalesforceConfiguration
+      Jobs::DiscourseCrm::SyncOutboundConfiguration
+    end
+
+    def self.batch_job
+      Jobs::SyncSalesforceUserBatch
     end
 
     def self.user_job

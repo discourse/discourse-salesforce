@@ -32,6 +32,34 @@ RSpec.describe Hubspot::ContactPropertiesController do
       )
     end
 
+    it "shares cached metadata between pull properties and push fields with Salesforce disabled" do
+      SiteSetting.salesforce_enabled = false
+      sign_in(admin)
+      stub_request(:get, hubspot_url("properties/contacts")).to_return(
+        body: {
+          results: [
+            { name: "email", label: "Email", type: "string" },
+            { name: "firstname", label: "First name", type: "string" },
+            { name: "calculated", label: "Calculated", type: "number", calculated: true },
+          ],
+        }.to_json,
+      )
+
+      2.times { get "/salesforce/admin/hubspot/contact-properties.json" }
+
+      expect(response).to have_http_status(:ok)
+      expect(response.parsed_body["properties"].map { |field| field["name"] }).to contain_exactly(
+        "email",
+        "firstname",
+        "calculated",
+      )
+      expect(response.parsed_body["fields"].map { |field| field["name"] }).to contain_exactly(
+        "email",
+        "firstname",
+      )
+      expect(a_request(:get, hubspot_url("properties/contacts"))).to have_been_made.once
+    end
+
     it "is unavailable while the provider or the configurations feature is disabled" do
       sign_in(admin)
       stub_hubspot_properties(%w[lifecyclestage])

@@ -11,6 +11,15 @@ ja:
         categories:
           discourse_salesforce: "Discourse Salesforce"
   js:
+    discourse_workflows:
+      salesforce_person_linked:
+        objects: "物"
+        objects_contact: "連絡先"
+        objects_lead: "リード"
+      salesforce_record:
+        operations:
+          update: "更新"
+        value_placeholder: "値"
     login:
       salesforce:
         name: "Salesforce"
@@ -18,6 +27,7 @@ ja:
     salesforce:
       title: Salesforce
       guided_sync:
+        all_users: "すべてのユーザー"
         discard_changes: "変更を破棄"
         keep_editing: "編集を続ける"
         cancel_setup: "キャンセル"

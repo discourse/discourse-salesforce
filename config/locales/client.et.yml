@@ -6,6 +6,12 @@
 
 et:
   js:
+    discourse_workflows:
+      salesforce_person_linked:
+        objects: "Objektid"
+        objects_contact: "Kontakt"
+      salesforce_record:
+        value_placeholder: "Väärtus"
     salesforce:
       guided_sync:
         cancel_setup: "Tühista"

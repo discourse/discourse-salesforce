@@ -6,8 +6,18 @@
 
 uk:
   js:
+    discourse_workflows:
+      salesforce_person_linked:
+        objects: "Обʼєкти"
+        objects_contact: "Контакти"
+      salesforce_record:
+        operation: "Операція"
+        operations:
+          update: "Оновити"
+        value_placeholder: "Значення"
     salesforce:
       guided_sync:
+        all_users: "Всі користувачі"
         discard_changes: "Скасувати зміни"
         keep_editing: "Продовжити редагування"
         cancel_setup: "Скасувати"

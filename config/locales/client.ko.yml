@@ -6,8 +6,17 @@
 
 ko:
   js:
+    discourse_workflows:
+      salesforce_person_linked:
+        objects: "사물"
+        objects_contact: "연락처"
+      salesforce_record:
+        operations:
+          update: "업데이트"
+        value_placeholder: "값"
     salesforce:
       guided_sync:
+        all_users: "모든 사용자"
         keep_editing: "편집 유지"
         cancel_setup: "취소"
         group_name: "그룹 이름"

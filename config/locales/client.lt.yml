@@ -6,6 +6,14 @@
 
 lt:
   js:
+    discourse_workflows:
+      salesforce_person_linked:
+        objects: "Objektai"
+        objects_contact: "Susisiekite"
+      salesforce_record:
+        operations:
+          update: "Atnaujinti"
+        value_placeholder: "Reikšmė"
     salesforce:
       guided_sync:
         discard_changes: "Atmesti pakeitimus"

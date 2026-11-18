@@ -6,8 +6,16 @@
 
 ug:
   js:
+    discourse_workflows:
+      salesforce_person_linked:
+        objects: "جىسىم"
+      salesforce_record:
+        operations:
+          update: "يېڭىلا"
+        value_placeholder: "قىممەت"
     salesforce:
       guided_sync:
+        all_users: "بارلىق ئىشلەتكۈچى"
         discard_changes: "ئۆزگەرتىشنى تاشلىۋەت"
         keep_editing: "تەھرىرلەشنى داۋاملاشتۇر"
         cancel_setup: "ۋاز كەچ"

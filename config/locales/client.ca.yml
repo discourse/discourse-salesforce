@@ -6,6 +6,12 @@
 
 ca:
   js:
+    discourse_workflows:
+      salesforce_person_linked:
+        objects: "Objectes"
+        objects_contact: "Contacte"
+      salesforce_record:
+        value_placeholder: "Valor"
     salesforce:
       guided_sync:
         cancel_setup: "Cancel·la"

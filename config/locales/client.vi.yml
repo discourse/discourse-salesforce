@@ -6,8 +6,16 @@
 
 vi:
   js:
+    discourse_workflows:
+      salesforce_person_linked:
+        objects: "Vật thể"
+      salesforce_record:
+        operations:
+          update: "Cập nhật"
+        value_placeholder: "Giá trị"
     salesforce:
       guided_sync:
+        all_users: "Tất cả Thành viên"
         discard_changes: "Hủy bỏ các thay đổi"
         keep_editing: "Tiếp tục chỉnh sửa"
         cancel_setup: "Hủy"

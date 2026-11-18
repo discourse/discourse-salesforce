@@ -6,8 +6,17 @@
 
 ro:
   js:
+    discourse_workflows:
+      salesforce_person_linked:
+        objects: "Obiecte"
+        objects_contact: "Contact"
+      salesforce_record:
+        operations:
+          update: "Actualizează"
+        value_placeholder: "Valoare"
     salesforce:
       guided_sync:
+        all_users: "Toți utilizatorii"
         discard_changes: "Renunță la modificări"
         keep_editing: "Continuă editarea"
         cancel_setup: "Anulare"

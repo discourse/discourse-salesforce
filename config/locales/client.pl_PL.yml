@@ -6,8 +6,18 @@
 
 pl_PL:
   js:
+    discourse_workflows:
+      salesforce_person_linked:
+        objects: "Obiekty"
+        objects_contact: "Dane kontaktowe"
+      salesforce_record:
+        operation: "Działanie"
+        operations:
+          update: "Aktualizuj"
+        value_placeholder: "Wartość"
     salesforce:
       guided_sync:
+        all_users: "Wszyscy użytkownicy"
         discard_changes: "Odrzuć zmiany"
         keep_editing: "Kontynuuj edycję"
         cancel_setup: "Anuluj"

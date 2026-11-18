@@ -6,8 +6,17 @@
 
 da:
   js:
+    discourse_workflows:
+      salesforce_person_linked:
+        objects: "Objekter"
+        objects_contact: "Kontakt"
+      salesforce_record:
+        operations:
+          update: "Opdater"
+        value_placeholder: "værdi"
     salesforce:
       guided_sync:
+        all_users: "Alle brugere"
         keep_editing: "Fortsæt redigering"
         cancel_setup: "Annuller"
         group_name: "Gruppe navn"

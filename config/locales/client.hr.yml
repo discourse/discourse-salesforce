@@ -6,8 +6,16 @@
 
 hr:
   js:
+    discourse_workflows:
+      salesforce_person_linked:
+        objects: "Objekti"
+      salesforce_record:
+        operations:
+          update: "Ažuriraj"
+        value_placeholder: "Vrijednost"
     salesforce:
       guided_sync:
+        all_users: "Svi korisnici"
         keep_editing: "Nastavite uređivati"
         cancel_setup: "Odustani"
         group_name: "Ime grupe"

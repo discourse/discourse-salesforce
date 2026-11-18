@@ -62,7 +62,7 @@ RSpec.describe ::Salesforce::Api do
   end
 
   it "returns invalid credentials error when Salesforce client ID is blank" do
-    SiteSetting.salesforce_client_id = ""
+    SiteSetting.salesforce_consumer_key = ""
 
     expect { described_class.new }.to raise_error(::Salesforce::InvalidCredentials)
 
@@ -76,7 +76,7 @@ RSpec.describe ::Salesforce::Api do
     let(:api_response_body) { "user hasn't approved this consumer" }
 
     it "creates an admin notice if the app is not approved" do
-      SiteSetting.salesforce_client_id = "client_id"
+      SiteSetting.salesforce_consumer_key = "client_id"
 
       expect { described_class.new }.to raise_error(::Salesforce::InvalidCredentials)
 
@@ -89,7 +89,7 @@ RSpec.describe ::Salesforce::Api do
   end
 
   it "resets invalid credentials error when Salesforce client ID is present" do
-    SiteSetting.salesforce_client_id = "client_id"
+    SiteSetting.salesforce_consumer_key = "client_id"
     ProblemCheckTracker["salesforce_invalid_credentials"].problem!
     ProblemCheckTracker["salesforce_app_not_approved"].problem!
 

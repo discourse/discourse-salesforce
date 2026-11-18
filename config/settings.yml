@@ -19,13 +19,13 @@ discourse_salesforce:
     default: false
     client: true
     validator: 'AuthProviderCredentialsValidator'
-  salesforce_client_id:
+  salesforce_consumer_key:
     default: ''
     client: true
   salesforce_client_secret:
     default: ''
     secret: true
-  salesforce_rsa_private_key:
+  salesforce_server_key_contents:
     default: ''
     textarea: true
   salesforce_authorization_server_url:

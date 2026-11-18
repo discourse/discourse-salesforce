@@ -19,7 +19,7 @@ RSpec.describe ::Salesforce::AdminController do
       )
 
       params = URI.decode_www_form(uri.query).to_h
-      expect(params["client_id"]).to eq("SALESFORCE_CLIENT_ID")
+      expect(params["client_id"]).to eq("SALESFORCE_CONSUMER_KEY")
       expect(params["redirect_uri"]).to eq(Discourse.base_url)
       expect(params["response_type"]).to eq("code")
       expect(params["code_challenge_method"]).to eq("S256")

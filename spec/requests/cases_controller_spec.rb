@@ -252,7 +252,7 @@ RSpec.describe ::Salesforce::CasesController do
 
     it "unlinks locally even when Salesforce credentials are unavailable" do
       SiteSetting.salesforce_case_unlink_allowed_groups = "admins"
-      SiteSetting.salesforce_client_id = ""
+      SiteSetting.salesforce_consumer_key = ""
       sign_in(admin)
 
       delete "/salesforce/cases/#{salesforce_case.id}.json"

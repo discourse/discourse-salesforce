@@ -6,6 +6,12 @@
 
 sw:
   js:
+    discourse_workflows:
+      salesforce_person_linked:
+        objects: "Vitu"
+        objects_contact: "Wasiliana"
+      salesforce_record:
+        value_placeholder: "Thamani"
     salesforce:
       guided_sync:
         cancel_setup: "Ghairi"

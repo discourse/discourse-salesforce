@@ -6,6 +6,14 @@
 
 gl:
   js:
+    discourse_workflows:
+      salesforce_person_linked:
+        objects: "Obxectos"
+        objects_contact: "Contacto"
+      salesforce_record:
+        operations:
+          update: "Actualizar"
+        value_placeholder: "Valor"
     salesforce:
       guided_sync:
         keep_editing: "Seguir editando"

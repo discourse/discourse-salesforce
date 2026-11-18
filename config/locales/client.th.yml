@@ -6,6 +6,13 @@
 
 th:
   js:
+    discourse_workflows:
+      salesforce_person_linked:
+        objects: "วัตถุ"
+      salesforce_record:
+        operations:
+          update: "อัปเดต"
+        value_placeholder: "ค่า"
     salesforce:
       guided_sync:
         cancel_setup: "ยกเลิก"

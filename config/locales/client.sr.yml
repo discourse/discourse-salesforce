@@ -6,6 +6,9 @@
 
 sr:
   js:
+    discourse_workflows:
+      salesforce_record:
+        value_placeholder: "Vriednost"
     salesforce:
       guided_sync:
         cancel_setup: "Odustani"

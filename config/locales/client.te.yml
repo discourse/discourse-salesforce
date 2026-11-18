@@ -6,6 +6,13 @@
 
 te:
   js:
+    discourse_workflows:
+      salesforce_person_linked:
+        objects: "వస్తువులు"
+      salesforce_record:
+        operations:
+          update: "నవీకరించండి"
+        value_placeholder: "విలువ"
     salesforce:
       guided_sync:
         keep_editing: "సవరించడం కొనసాగించండి"

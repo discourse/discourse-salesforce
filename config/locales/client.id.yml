@@ -6,6 +6,11 @@
 
 id:
   js:
+    discourse_workflows:
+      salesforce_person_linked:
+        objects: "Objek"
+        objects_contact: "Kontak"
+        objects_lead: "Prospek"
     login:
       salesforce:
         name: "Salesforce"

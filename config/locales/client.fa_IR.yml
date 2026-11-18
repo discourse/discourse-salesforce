@@ -6,6 +6,14 @@
 
 fa_IR:
   js:
+    discourse_workflows:
+      salesforce_person_linked:
+        objects: "اشیا"
+        objects_contact: "تماس"
+      salesforce_record:
+        operations:
+          update: "به روز رسانی"
+        value_placeholder: "مقدار"
     login:
       salesforce:
         name: "سلزفورس"
@@ -13,6 +21,7 @@ fa_IR:
     salesforce:
       title: سلزفورس
       guided_sync:
+        all_users: "همه کاربران"
         keep_editing: "ادامه ویرایش"
         cancel_setup: "انصراف"
         group_name: "نام گروه"

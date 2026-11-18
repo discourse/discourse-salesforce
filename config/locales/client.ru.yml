@@ -11,6 +11,15 @@ ru:
         categories:
           discourse_salesforce: "Плагин Discourse Salesforce"
   js:
+    discourse_workflows:
+      salesforce_person_linked:
+        objects: "Объекты"
+        objects_contact: "Контакты"
+        objects_lead: "Интерес"
+      salesforce_record:
+        operations:
+          update: "Обновить"
+        value_placeholder: "Значение"
     login:
       salesforce:
         name: "Salesforce"
@@ -18,6 +27,7 @@ ru:
     salesforce:
       title: Salesforce
       guided_sync:
+        all_users: "Все пользователи"
         discard_changes: "Отменить изменения"
         keep_editing: "Продолжить редактирование"
         cancel_setup: "Нет"

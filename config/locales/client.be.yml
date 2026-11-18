@@ -6,6 +6,11 @@
 
 be:
   js:
+    discourse_workflows:
+      salesforce_person_linked:
+        objects_contact: "кантакт"
+      salesforce_record:
+        value_placeholder: "Значэнне"
     salesforce:
       guided_sync:
         cancel_setup: "Скасаваць"

@@ -6,6 +6,14 @@
 
 hy:
   js:
+    discourse_workflows:
+      salesforce_person_linked:
+        objects: "Օբյեկտներ"
+        objects_contact: "Կապ"
+      salesforce_record:
+        operations:
+          update: "Թարմացնել"
+        value_placeholder: "Արժեք"
     salesforce:
       guided_sync:
         keep_editing: "Շարունակել խմբագրումը"

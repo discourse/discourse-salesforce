@@ -6,8 +6,17 @@
 
 hu:
   js:
+    discourse_workflows:
+      salesforce_person_linked:
+        objects: "Tárgyak"
+        objects_contact: "Kapcsolat"
+      salesforce_record:
+        operations:
+          update: "Frissítés"
+        value_placeholder: "Érték"
     salesforce:
       guided_sync:
+        all_users: "Minden felhasználó"
         discard_changes: "Változások elvetése"
         keep_editing: "Szerkesztés tovább"
         cancel_setup: "Mégse"

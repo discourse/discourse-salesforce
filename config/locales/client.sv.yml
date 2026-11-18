@@ -6,6 +6,15 @@
 
 sv:
   js:
+    discourse_workflows:
+      salesforce_person_linked:
+        objects: "Objekt"
+        objects_contact: "Kontakt"
+        objects_lead: "Lead"
+      salesforce_record:
+        operations:
+          update: "Uppdatera"
+        value_placeholder: "Värde"
     login:
       salesforce:
         name: "Salesforce"
@@ -13,6 +22,7 @@ sv:
     salesforce:
       title: Salesforce
       guided_sync:
+        all_users: "Alla användare"
         keep_editing: "Fortsätt redigera"
         cancel_setup: "Avbryt"
         group_name: "Gruppnamn"

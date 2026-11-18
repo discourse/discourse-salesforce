@@ -6,8 +6,16 @@
 
 sk:
   js:
+    discourse_workflows:
+      salesforce_person_linked:
+        objects: "Objekty"
+      salesforce_record:
+        operations:
+          update: "Aktualizovať"
+        value_placeholder: "Hodnota"
     salesforce:
       guided_sync:
+        all_users: "Všetci používatelia"
         discard_changes: "Zahodenie zmien"
         keep_editing: "Pokračujte v úpravách"
         cancel_setup: "Zrušiť"

@@ -11,6 +11,15 @@ pt:
         categories:
           discourse_salesforce: "Discourse Salesforce"
   js:
+    discourse_workflows:
+      salesforce_person_linked:
+        objects: "Objetos"
+        objects_contact: "Contacte-nos"
+        objects_lead: "Lead"
+      salesforce_record:
+        operations:
+          update: "Atualização"
+        value_placeholder: "Valor"
     login:
       salesforce:
         name: "Salesforce"

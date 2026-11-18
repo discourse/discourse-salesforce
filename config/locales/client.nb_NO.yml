@@ -6,6 +6,13 @@
 
 nb_NO:
   js:
+    discourse_workflows:
+      salesforce_person_linked:
+        objects: "Objekter"
+      salesforce_record:
+        operations:
+          update: "Oppdater"
+        value_placeholder: "Verdi"
     salesforce:
       guided_sync:
         keep_editing: "Fortsett å redigere"

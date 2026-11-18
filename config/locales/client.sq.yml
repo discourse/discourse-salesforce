@@ -6,6 +6,13 @@
 
 sq:
   js:
+    discourse_workflows:
+      salesforce_person_linked:
+        objects: "Objektet"
+      salesforce_record:
+        operations:
+          update: "Përditëso"
+        value_placeholder: "Vlera"
     salesforce:
       guided_sync:
         cancel_setup: "Anulo"

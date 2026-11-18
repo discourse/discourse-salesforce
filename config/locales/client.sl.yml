@@ -6,6 +6,11 @@
 
 sl:
   js:
+    discourse_workflows:
+      salesforce_person_linked:
+        objects: "Stvari"
+      salesforce_record:
+        value_placeholder: "Stanje"
     salesforce:
       guided_sync:
         keep_editing: "Nadaljuj z urejanjem"

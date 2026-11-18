@@ -11,6 +11,15 @@ es:
         categories:
           discourse_salesforce: "Salesforce de Discourse"
   js:
+    discourse_workflows:
+      salesforce_person_linked:
+        objects: "Objetos"
+        objects_contact: "Contacto"
+        objects_lead: "Cliente potencial"
+      salesforce_record:
+        operations:
+          update: "Actualizar"
+        value_placeholder: "Valor"
     login:
       salesforce:
         name: "Salesforce"
@@ -18,6 +27,7 @@ es:
     salesforce:
       title: Salesforce
       guided_sync:
+        all_users: "Todos los usuarios"
         discard_changes: "Descartar cambios"
         keep_editing: "Seguir editando"
         cancel_setup: "Cancelar"

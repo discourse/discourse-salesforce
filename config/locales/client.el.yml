@@ -6,8 +6,18 @@
 
 el:
   js:
+    discourse_workflows:
+      salesforce_person_linked:
+        objects: "Αντικείμενα"
+        objects_contact: "Επικοινωνία"
+      salesforce_record:
+        operation: "Λειτουργία"
+        operations:
+          update: "Ενημέρωση"
+        value_placeholder: "Τιμή"
     salesforce:
       guided_sync:
+        all_users: "Όλοι οι χρήστες"
         discard_changes: "Απόρριψη αλλαγών"
         keep_editing: "Συνέχιση επεξεργασίας"
         cancel_setup: "Ακύρωση"

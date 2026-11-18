@@ -6,6 +6,11 @@
 
 bs_BA:
   js:
+    discourse_workflows:
+      salesforce_person_linked:
+        objects: "Objekti"
+      salesforce_record:
+        value_placeholder: "Value"
     salesforce:
       guided_sync:
         cancel_setup: "Odustani"

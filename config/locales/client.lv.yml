@@ -6,6 +6,11 @@
 
 lv:
   js:
+    discourse_workflows:
+      salesforce_person_linked:
+        objects: "Priekšmeti"
+      salesforce_record:
+        value_placeholder: "Vērtība"
     salesforce:
       guided_sync:
         cancel_setup: "Atcelt"

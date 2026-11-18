@@ -26,6 +26,15 @@ import {
 } from "discourse/plugins/discourse-salesforce/discourse/lib/sync-configuration";
 
 const PREFIX = "salesforce.guided_sync";
+const MAX_NAME_LENGTH = 60;
+
+function truncateName(value, limit) {
+  const characters = Array.from(value);
+  if (characters.length <= limit) {
+    return value;
+  }
+  return limit > 0 ? characters.slice(0, limit - 1).join("") + "…" : "";
+}
 
 export default class SalesforceSyncConfiguration extends Component {
   @service a11y;
@@ -36,6 +45,9 @@ export default class SalesforceSyncConfiguration extends Component {
     this.args.record || createSyncConfiguration()
   );
   @tracked createdGroups = [];
+  @tracked hasCustomName = Boolean(
+    this.configuration.name && this.configuration.name !== this.defaultTitle
+  );
   @tracked saving = false;
   @tracked salesforceFields = [];
   @tracked customSources = [];
@@ -61,7 +73,20 @@ export default class SalesforceSyncConfiguration extends Component {
   }
 
   get title() {
-    return this.configuration.name || i18n(`${PREFIX}.default_users_name`);
+    return this.hasCustomName ? this.configuration.name : this.defaultTitle;
+  }
+
+  get defaultTitle() {
+    const groups = this.selectedGroups;
+    const scope =
+      groups.length === 1 ? "group" : groups.length ? "groups" : "users";
+    const key = `${PREFIX}.default_names.${this.configuration.object}.${scope}`;
+    const templateLength = Array.from(i18n(key, { group: "" })).length;
+    const group = truncateName(
+      groups[0]?.name || "",
+      Math.max(0, MAX_NAME_LENGTH - templateLength)
+    );
+    return truncateName(i18n(key, { group }), MAX_NAME_LENGTH);
   }
 
   get groups() {
@@ -291,7 +316,7 @@ export default class SalesforceSyncConfiguration extends Component {
     }
     this.saving = true;
     try {
-      if (await this.args.onSave(this.configuration)) {
+      if (await this.args.onSave({ ...this.configuration, name: this.title })) {
         this.a11y.announce(i18n(`${PREFIX}.save_success`));
       }
     } finally {
@@ -388,6 +413,7 @@ export default class SalesforceSyncConfiguration extends Component {
   @action
   applyName(value) {
     this.#form?.set("name", value);
+    this.hasCustomName = value !== this.defaultTitle;
     this.configuration = { ...this.configuration, name: value };
   }
 

@@ -52,7 +52,15 @@ en:
         configuration_name: "Configuration name"
         edit_name: "Edit configuration name"
         apply_name: "Apply name"
-        default_users_name: "Send users"
+        default_names:
+          Lead:
+            users: "Send users as leads"
+            group: "Send %{group} as leads"
+            groups: "Send groups as leads"
+          Contact:
+            users: "Send users as contacts"
+            group: "Send %{group} as contacts"
+            groups: "Send groups as contacts"
         send_users: "Send users to Salesforce"
         send_posts: "Send posts to Salesforce"
         pull_from_crm: "Pull from CRM"

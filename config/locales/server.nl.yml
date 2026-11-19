@@ -8,9 +8,7 @@ nl:
   site_settings:
     salesforce_enabled: 'Discourse-Salesforce-plug-in inschakelen'
     salesforce_login_enabled: 'Sociaal aanmelden met Salesforce inschakelen'
-    salesforce_client_id: "Client-ID van verbonden Salesforce-app"
     salesforce_client_secret: "Clientgeheim van verbonden Salesforce-app"
-    salesforce_rsa_private_key: "Private RSA-sleutel van verbonden Salesforce-app"
     salesforce_authorization_server_url: "URL van Salesforce-autorisatieserver"
     salesforce_username: "Gebruikersnaam van Salesforce-account"
     salesforce_case_tag_name: "Tagnaam om toe te voegen aan topics met een Salesforce-case"
@@ -22,8 +20,6 @@ nl:
   salesforce:
     error:
       invalid_response: "Ongeldig antwoord van Salesforce-API"
-      invalid_client_credentials: "Er was een probleem met de Salesforce-aanmeldgegevens. Bevestig de geldigheid van de instellingen voor de Salesforce-client-ID en het clientgeheim"
   dashboard:
     problem:
-      salesforce_invalid_credentials: "Er was een probleem met de Salesforce-aanmeldgegevens. Bevestig de geldigheid van de instellingen voor de Salesforce-client-ID en het clientgeheim"
       salesforce_app_not_approved: "De met Discourse verbonden app is nog niet geautoriseerd in Salesforce door de gebruiker vermeld in de site-instelling 'salesforce_username'. Volg <a href='%{base_path}/salesforce/admin/authorize'>deze link</a> om de gebruiker te autoriseren."

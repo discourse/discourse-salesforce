@@ -28,7 +28,6 @@ sv:
         group_name: "Gruppnamn"
         email: "E-postadress"
         custom_field: "Anpassad"
-        keep: "Salesforce"
         overwrite: "Discourse"
         source_groups:
           activity: "Aktivitet"

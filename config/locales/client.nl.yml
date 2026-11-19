@@ -35,7 +35,6 @@ nl:
         group_name: "Groepsnaam"
         email: "E-mail"
         custom_field: "Aangepast"
-        keep: "Salesforce"
         overwrite: "Discourse"
         retry_fields: "Opnieuw proberen"
         source_groups:

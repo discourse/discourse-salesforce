@@ -35,7 +35,6 @@ fi:
         group_name: "Ryhmän nimi"
         email: "Sähköpostiosoite"
         custom_field: "Mukautettu"
-        keep: "Salesforce"
         overwrite: "Discourse"
         retry_fields: "Yritä uudelleen"
         source_groups:

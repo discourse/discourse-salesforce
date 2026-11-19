@@ -36,7 +36,6 @@ de:
         group_name: "Gruppenname"
         email: "E-Mail"
         custom_field: "Benutzerdefiniert"
-        keep: "Salesforce"
         overwrite: "Discourse"
         retry_fields: "Erneut versuchen"
         source_groups:

@@ -21,7 +21,6 @@ id:
         cancel_setup: "Batal"
         group_name: "Nama grup"
         email: "Surel"
-        keep: "Salesforce"
         overwrite: "Discourse"
         source_groups:
           activity: "Activity"

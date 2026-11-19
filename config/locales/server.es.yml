@@ -8,9 +8,7 @@ es:
   site_settings:
     salesforce_enabled: 'Activar el plugin discourse-salesforce'
     salesforce_login_enabled: 'Habilitar el inicio de sesión con Salesforce'
-    salesforce_client_id: "ID de cliente de la aplicación conectada a Salesforce"
     salesforce_client_secret: "Secreto de cliente de la aplicación conectada de Salesforce"
-    salesforce_rsa_private_key: "Clave privada RSA de la aplicación conectada de Salesforce"
     salesforce_authorization_server_url: "URL del servidor de autorización de Salesforce"
     salesforce_username: "Nombre de usuario de la cuenta de Salesforce"
     salesforce_case_tag_name: "Nombre de la etiqueta para añadir en los temas con un caso de Salesforce"
@@ -22,8 +20,6 @@ es:
   salesforce:
     error:
       invalid_response: "Respuesta inválida de la API de Salesforce"
-      invalid_client_credentials: "Hubo un problema con las credenciales de Salesforce. Confirme la validez de la configuración de ID de cliente y secreto de cliente de Salesforce"
   dashboard:
     problem:
-      salesforce_invalid_credentials: "Hubo un problema con las credenciales de Salesforce. Confirma la validez de la configuración de ID de cliente y secreto de cliente de Salesforce"
       salesforce_app_not_approved: "La aplicación conectada a Discourse aún no está autorizada en Salesforce por el usuario mencionado en la configuración del sitio «salesforce_username». Haz clic en <a href='%{base_path}/salesforce/admin/authorize'>este enlace</a> para autorizarla."

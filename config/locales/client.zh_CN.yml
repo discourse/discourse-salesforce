@@ -37,7 +37,6 @@ zh_CN:
         group_name: "群组名称"
         email: "电子邮件"
         custom_field: "自定义"
-        keep: "Salesforce"
         overwrite: "Discourse"
         retry_fields: "重试"
         source_groups:

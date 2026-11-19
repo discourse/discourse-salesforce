@@ -35,7 +35,6 @@ ru:
         group_name: "Название группы"
         email: "Эл. почта"
         custom_field: "Другое"
-        keep: "Salesforce"
         overwrite: "Discourse"
         retry_fields: "Повторить"
         source_groups:

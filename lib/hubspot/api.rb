@@ -216,9 +216,11 @@ module ::Hubspot
       ].join(":")
       key = "hubspot:#{object}_properties:v2:#{Digest::SHA256.hexdigest(connection)}"
       Rails.cache.delete(key) if refresh
-      Rails.cache.fetch(key, expires_in: 2.hours) do
-        get("properties/#{OBJECT_PATHS.fetch(object)}").fetch("results")
-      end
+      Rails
+        .cache
+        .fetch(key, expires_in: 2.hours) do
+          get("properties/#{OBJECT_PATHS.fetch(object)}").fetch("results")
+        end
     end
 
     def writable_fields(properties)

@@ -13,7 +13,7 @@ end
 
 Fabricator(:verified_user, from: :user) { after_create { |user| user.activate } }
 
-Fabricator(:sync_configuration, class_name: ::Salesforce::SyncConfiguration) do
+Fabricator(:sync_configuration, class_name: ::DiscourseCrm::SyncConfiguration) do
   transient :groups
 
   provider "salesforce"
@@ -44,7 +44,7 @@ Fabricator(:sync_configuration, class_name: ::Salesforce::SyncConfiguration) do
   end
 end
 
-Fabricator(:hubspot_sync_configuration, class_name: ::Salesforce::SyncConfiguration) do
+Fabricator(:hubspot_sync_configuration, class_name: DiscourseCrm::SyncConfiguration) do
   provider "hubspot"
   direction "inbound"
   account { SiteSetting.hubspot_portal_id }
@@ -57,7 +57,7 @@ Fabricator(:hubspot_sync_configuration, class_name: ::Salesforce::SyncConfigurat
   mappings { [{ "source" => "lifecyclestage" }, { "source" => "jobtitle" }] }
 end
 
-Fabricator(:crm_record, class_name: ::Salesforce::Record) do
+Fabricator(:crm_record, class_name: DiscourseCrm::Record) do
   provider "hubspot"
   account { SiteSetting.hubspot_portal_id }
   object "contact"

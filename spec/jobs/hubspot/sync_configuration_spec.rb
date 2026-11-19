@@ -15,6 +15,66 @@ RSpec.describe Jobs::Hubspot::SyncConfiguration do
 
   before { Jobs::Hubspot::SyncConfiguration.clear }
 
+  it "clears recovered users' quota errors without clearing failures outside the imported page" do
+    other_user = Fabricate(:verified_user)
+    outbound =
+      Fabricate(:sync_configuration, provider: "hubspot", account: "12345", object: "contact")
+    stub_request(:post, hubspot_url("objects/contacts/batch/read")).to_return(
+      status: 429,
+      body: { policyName: "DAILY" }.to_json,
+    )
+    Jobs::Hubspot::SyncUser.new.execute(
+      configuration_id: configuration.id,
+      user_id: user.id,
+      reason: "change",
+    )
+    expect(configuration.reload.sync_status["error"]).to eq("Hubspot::DailyQuotaExceeded")
+    [[configuration, other_user], [outbound, user]].each do |record, member|
+      DiscourseCrm::SyncConfiguration.record_result(
+        record.id,
+        member.id,
+        error: Hubspot::DailyQuotaExceeded.new,
+      )
+    end
+    stub_hubspot_contact_list([hubspot_contact(501, user.email, jobtitle: "Engineer")])
+
+    described_class.new.execute(configuration_id: configuration.id, reason: "scheduled")
+
+    expect(configuration.record_link_for(user.id).external_id).to eq("501")
+    expect(configuration.reload.last_synced_at).to be_present
+    expect(configuration.sync_states.find_by(user_id: user.id).slice(:error, :error_at)).to eq(
+      "error" => nil,
+      "error_at" => nil,
+    )
+    expect(configuration.sync_states.find_by(user_id: other_user.id).error).to eq(
+      "Hubspot::DailyQuotaExceeded",
+    )
+    expect(outbound.sync_states.find_by(user_id: user.id).error).to eq(
+      "Hubspot::DailyQuotaExceeded",
+    )
+    expect(configuration.sync_status["error"]).to eq("Hubspot::DailyQuotaExceeded")
+    stub_hubspot_contact_search([hubspot_contact(502, other_user.email)])
+    described_class.new.execute(configuration_id: configuration.id, reason: "scheduled")
+    expect(configuration.reload.sync_status).not_to have_key("error")
+  end
+
+  it "records daily quota exhaustion without scheduling another import" do
+    stub_request(:get, %r{api.hubapi.com/crm/v3/objects/contacts}).to_return(
+      status: 429,
+      body: { policyName: "DAILY" }.to_json,
+    )
+    described_class.clear
+    expect {
+      described_class.new.execute(
+        configuration_id: configuration.id,
+        user_id: user.id,
+        reason: "backfill",
+      )
+    }.not_to raise_error
+    expect(described_class.jobs).to be_empty
+    expect(configuration.reload.sync_status["error"]).to eq("Hubspot::DailyQuotaExceeded")
+  end
+
   it "lists every contact on backfill, follows the cursor and records the run start as the sync time" do
     freeze_time Time.utc(2026, 11, 2, 12)
     started_at = Time.zone.now
@@ -30,7 +90,7 @@ RSpec.describe Jobs::Hubspot::SyncConfiguration do
         },
       ),
     ).to have_been_made.once
-    expect(Salesforce::RecordLink.where(user_id: user.id).pluck(:external_id)).to eq(["501"])
+    expect(DiscourseCrm::RecordLink.where(user_id: user.id).pluck(:external_id)).to eq(["501"])
     expect(configuration.reload.last_synced_at).to be_nil
     expect(enqueued_args).to eq(
       [

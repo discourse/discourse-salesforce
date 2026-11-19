@@ -72,7 +72,7 @@ module ::Salesforce
         account: SiteSetting.salesforce_instance_url,
         user_id: user.id,
       }
-      contact_link = Salesforce::RecordLink.find_by(**scope, object: "Contact")
+      contact_link = DiscourseCrm::RecordLink.find_by(**scope, object: "Contact")
       if contact_link && contact_link.external_id != contact_id
         Rails.logger.warn(
           "Skipping converted Salesforce Lead reconciliation for Discourse user #{user.id}: an existing Contact link conflicts",
@@ -80,7 +80,7 @@ module ::Salesforce
         return true
       end
 
-      lead_link = Salesforce::RecordLink.find_by(**scope, object: "Lead")
+      lead_link = DiscourseCrm::RecordLink.find_by(**scope, object: "Lead")
       if lead_link && lead_link.external_id != converted_lead["Id"]
         Rails.logger.warn(
           "Skipping converted Salesforce Lead reconciliation for Discourse user #{user.id}: an existing Lead link conflicts",
@@ -89,14 +89,14 @@ module ::Salesforce
       end
 
       UserCustomField.transaction do
-        Salesforce::RecordLink.mark_converted!(
+        DiscourseCrm::RecordLink.mark_converted!(
           **scope,
           object: "Lead",
           external_id: converted_lead["Id"],
           to_object: "Contact",
           to_id: contact_id,
         )
-        Salesforce::RecordLink.link!(
+        DiscourseCrm::RecordLink.link!(
           **scope,
           object: "Contact",
           external_id: contact_id,

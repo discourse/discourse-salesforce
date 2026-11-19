@@ -2,24 +2,25 @@
 
 module Salesforce
   class ConfiguredUserBatchSync
-    BATCH_SIZE = 100
+    BATCH_SIZE = DiscourseCrm::ConfigurationScheduler::BATCH_SIZE
 
-    def self.sync(configuration_id, user_ids, reason:)
-      return unless SyncConfiguration.enabled?
+    def self.sync(configuration_id, user_ids, reason:, &on_processed)
+      return unless DiscourseCrm::SyncConfiguration.enabled?
       ids = Array(user_ids).map(&:to_i).uniq.sort
       raise Discourse::InvalidParameters.new(:user_ids) if ids.size > BATCH_SIZE
       with_user_locks(ids) do
-        configuration = SyncConfiguration.active.find_by(id: configuration_id)
-        next unless configuration&.reason_enabled?(reason)
+        configuration =
+          DiscourseCrm::SyncConfiguration.active.outbound.find_by(id: configuration_id)
+        next unless configuration&.provider == "salesforce" && configuration.reason_enabled?(reason)
         users =
-          Person
+          DiscourseCrm::UserEligibility
             .eligible_group_members(configuration.configuration_groups.select(:group_id))
             .where(id: ids)
             .order(:id)
             .includes(:primary_email, :email_tokens, :single_sign_on_record)
-            .select { |user| Person.email_verified?(user) }
+            .select { |user| DiscourseCrm::UserEligibility.email_verified?(user) }
         next if users.empty?
-        new(configuration, users, reason).sync
+        new(configuration, users, reason).sync(&on_processed)
       end
     end
 
@@ -40,7 +41,8 @@ module Salesforce
       @object = configuration.object
     end
 
-    def sync
+    def sync(&on_processed)
+      @on_processed = on_processed
       if @configuration.connection_changed?
         raise Discourse::InvalidParameters.new(:salesforce_instance_url)
       end
@@ -48,7 +50,10 @@ module Salesforce
       users =
         @users.reject do |user|
           converted = @object == "Lead" && links[user.id]&.converted?
-          SyncConfiguration.record_result(@configuration.id, user.id) if converted
+          if converted
+            DiscourseCrm::SyncConfiguration.record_result(@configuration.id, user.id)
+            processed(user)
+          end
           converted
         end
       return if users.empty?
@@ -71,7 +76,7 @@ module Salesforce
       creates = []
       updates = []
       used_ids = Set.new
-      source_data = UserSyncSources.new(@configuration.mappings, users)
+      source_data = DiscourseCrm::UserSyncSources.new(@configuration.mappings, users)
       users.each do |user|
         link = links[user.id]
         if link && !by_id[link.external_id]
@@ -92,12 +97,14 @@ module Salesforce
           elsif converted_matches.size == 1
             sync = ConfiguredUserSync.new(@configuration, user, api: @api, source_data: source_data)
             sync.reconcile_converted_lead(converted_matches.first)
+            processed(user)
             next
           end
         end
         if @object == "Lead" && record && record["IsConverted"] == true
           sync = ConfiguredUserSync.new(@configuration, user, api: @api, source_data: source_data)
           sync.reconcile_converted_lead(record)
+          processed(user)
           next
         end
         if record && !used_ids.add?(record["Id"])
@@ -108,11 +115,13 @@ module Salesforce
         begin
           values = sync.mapped_values(fields, record)
         rescue Discourse::InvalidParameters => error
-          SyncConfiguration.record_result(@configuration.id, user.id, error: error)
+          DiscourseCrm::SyncConfiguration.record_result(@configuration.id, user.id, error: error)
+          processed(user)
           next
         end
         if record && values.empty?
           sync.complete(record.fetch("Id"), created: false)
+          processed(user)
         elsif record
           sync.save_link(record.fetch("Id"))
           updates << [user, sync, values.merge("Id" => record.fetch("Id"))]
@@ -165,10 +174,12 @@ module Salesforce
       creates.reject do |user, _, _|
         next false if contact_emails.exclude?(user.email.downcase)
 
-        SyncState.where(configuration_id: @configuration.id, user_id: user.id).update_all(
-          fingerprint: nil,
-        )
-        SyncConfiguration.record_result(@configuration.id, user.id)
+        DiscourseCrm::SyncState.where(
+          configuration_id: @configuration.id,
+          user_id: user.id,
+        ).update_all(fingerprint: nil)
+        DiscourseCrm::SyncConfiguration.record_result(@configuration.id, user.id)
+        processed(user)
         true
       end
     end
@@ -216,20 +227,28 @@ module Salesforce
         .each do |(user, sync, _), result|
           if result["success"] == true && result["id"].present?
             sync.complete(result.fetch("id"), created: method == :post)
+            processed(user)
           else
             retry_user(user, InvalidApiResponse.new(result.fetch("errors", []).to_json))
           end
         end
     end
 
+    def processed(user)
+      @on_processed&.call(user.id)
+    end
+
     def retry_user(user, error = nil)
-      SyncConfiguration.record_result(@configuration.id, user.id, error: error) if error
+      if error
+        DiscourseCrm::SyncConfiguration.record_result(@configuration.id, user.id, error: error)
+      end
       Jobs.enqueue(
         :sync_salesforce_user,
         configuration_id: @configuration.id,
         user_id: user.id,
         reason: @reason,
       )
+      processed(user)
     end
   end
 end

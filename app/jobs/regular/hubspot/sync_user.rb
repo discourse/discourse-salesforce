@@ -6,23 +6,32 @@ module Jobs
       sidekiq_options retry: 5
 
       def execute(args)
-        configuration = Salesforce::SyncConfiguration.active.find_by(id: args[:configuration_id])
+        configuration =
+          ::DiscourseCrm::SyncConfiguration.active.inbound.find_by(
+            id: args[:configuration_id],
+            provider: "hubspot",
+          )
         return unless configuration&.reason_enabled?(args[:reason])
-        user = Salesforce::Person.eligible_users.find_by(id: args[:user_id])
+        user = ::DiscourseCrm::UserEligibility.eligible_users.find_by(id: args[:user_id])
         return unless user
 
         ::Hubspot::ContactImport.new(configuration).import_user(user)
-        Salesforce::SyncState.where(
+        ::DiscourseCrm::SyncState.where(
           configuration_id: configuration.id,
           user_id: user.id,
         ).update_all(error: nil, error_at: nil)
+      rescue ::Hubspot::RateLimited => error
+        Jobs.enqueue_in(error.retry_after, self.class, args)
       rescue => error
-        Salesforce::SyncConfiguration.record_result(
+        ::DiscourseCrm::SyncConfiguration.record_result(
           args[:configuration_id],
           args[:user_id],
           error: error,
         )
-        raise unless error.is_a?(Discourse::InvalidParameters)
+        unless error.is_a?(Discourse::InvalidParameters) ||
+                 error.is_a?(::Hubspot::DailyQuotaExceeded)
+          raise
+        end
         Rails.logger.warn(
           "HubSpot user import stopped: configuration_id=#{args[:configuration_id]} user_id=#{args[:user_id]} error=#{error.class.name}",
         )

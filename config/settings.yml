@@ -11,6 +11,7 @@ discourse_salesforce:
         - everyone
   salesforce_enabled:
     default: false
+    client: true
   salesforce_leads_enabled:
     default: true
     client: true

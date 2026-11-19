@@ -24,7 +24,7 @@ module PageObjects
       def select_property(label)
         find('[data-name="mappings"] .d-multi-select-trigger__expand-btn').click
         find(".d-multi-select__search-input").fill_in(with: label)
-        find(".d-multi-select__result", text: label).click
+        find(".hubspot-sync-configuration__property", text: label).click
         find(".hubspot-sync-configuration__heading").click
         self
       end

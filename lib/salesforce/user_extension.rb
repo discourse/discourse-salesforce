@@ -4,11 +4,6 @@ module Salesforce
   module UserExtension
     extend ActiveSupport::Concern
 
-    prepended do
-      has_many :crm_record_links, class_name: "Salesforce::RecordLink"
-      has_many :crm_records, through: :crm_record_links, source: :record
-    end
-
     def salesforce_contact_id
       custom_fields[::Salesforce::Contact::ID_FIELD]
     end
@@ -30,7 +25,7 @@ module Salesforce
     end
 
     def salesforce_contact_payload
-      first_name, last_name = UserSyncSources.name_parts(self)
+      first_name, last_name = DiscourseCrm::UserSyncSources.name_parts(self)
 
       payload = { Email: self.email, LastName: last_name, Description: full_url }
 

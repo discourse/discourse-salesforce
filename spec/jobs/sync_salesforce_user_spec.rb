@@ -19,13 +19,20 @@ RSpec.describe Jobs::SyncSalesforceUser do
     Salesforce.leads_group.add(user)
   end
 
-  it "links an existing contact by default" do
-    stub_salesforce_person_lookup("Contact", user.email, id: "contact_123")
+  [false, true].each do |hubspot_enabled|
+    it "links existing Salesforce contacts with guided sync off and HubSpot #{hubspot_enabled ? "enabled but unconfigured" : "disabled"}" do
+      SiteSetting.enable_guided_sync_configuration = false
+      SiteSetting.hubspot_enabled = hubspot_enabled
+      SiteSetting.hubspot_portal_id = ""
+      SiteSetting.hubspot_access_token = ""
+      stub_salesforce_person_lookup("Contact", user.email, id: "contact_123")
 
-    described_class.new.execute(user_id: user.id)
+      described_class.new.execute(user_id: user.id)
 
-    expect(user.reload.salesforce_contact_id).to eq("contact_123")
-    expect(a_request(:patch, %r{/sobjects/})).not_to have_been_made
+      expect(user.reload.salesforce_contact_id).to eq("contact_123")
+      expect(a_request(:patch, %r{/sobjects/})).not_to have_been_made
+      expect(a_request(:any, /api\.hubapi\.com/)).not_to have_been_made
+    end
   end
 
   it "keeps first-match linking for duplicate records in link-only mode" do
@@ -258,7 +265,7 @@ RSpec.describe Jobs::SyncSalesforceUser do
       logger = track_log_messages { described_class.new.execute(user_id: user.id) }
 
       expect(logger.warnings).to include(
-        "CRM request failed: operation=api category=invalid_response status=400",
+        "Salesforce request failed: operation=api category=invalid_response status=400",
       )
     end
 

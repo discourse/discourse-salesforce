@@ -11,8 +11,7 @@ module ::Hubspot
     end
 
     def self.enabled?
-      SiteSetting.salesforce_enabled && SiteSetting.hubspot_enabled &&
-        SiteSetting.enable_guided_sync_configuration
+      SiteSetting.hubspot_enabled && SiteSetting.enable_guided_sync_configuration
     end
 
     def self.credentials?
@@ -20,7 +19,7 @@ module ::Hubspot
     end
 
     def self.flows
-      [InboundUsersFlow]
+      [InboundUsersFlow, OutboundUsersFlow]
     end
 
     def self.flow(direction, kind)

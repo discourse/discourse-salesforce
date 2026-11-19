@@ -21,7 +21,7 @@ module ::Hubspot
         by_email[email] = contact if email.present?
       end
       matches =
-        Salesforce::Person
+        DiscourseCrm::UserEligibility
           .eligible_users
           .with_email(by_email.keys)
           .pluck("users.id", "user_emails.email")
@@ -29,14 +29,14 @@ module ::Hubspot
       records = {}
       matches.each do |user_id, email|
         contact = by_email.fetch(email.downcase)
-        links << scope.merge(user_id: user_id, external_id: contact["id"])
+        links << scope.merge(direction: "inbound", user_id: user_id, external_id: contact["id"])
         records[contact["id"]] ||= scope.merge(
           external_id: contact["id"],
           data: contact.fetch("properties").slice(*selected_properties),
         )
       end
-      Salesforce::RecordLink.link_many!(links)
-      Salesforce::Record.store_many!(records.values)
+      DiscourseCrm::RecordLink.link_many!(links)
+      DiscourseCrm::Record.store_many!(records.values)
       contact_ids = by_email.values.map { |contact| contact["id"] }
       keep = links.map { |link| [link[:user_id], link[:external_id]] }
       stale_links =
@@ -45,7 +45,7 @@ module ::Hubspot
           .where(external_id: contact_ids)
           .pluck(:id, :user_id, :external_id)
           .filter_map { |id, user_id, external_id| id if keep.exclude?([user_id, external_id]) }
-      Salesforce::RecordLink.where(id: stale_links).delete_all if stale_links.any?
+      DiscourseCrm::RecordLink.where(id: stale_links).delete_all if stale_links.any?
       remove_orphan_records(contact_ids)
       links
     end

@@ -1,12 +1,12 @@
 # frozen_string_literal: true
 
-module ::Hubspot
+module Hubspot
   class RateLimited < InvalidApiResponse
     attr_reader :retry_after
 
-    def initialize(message = nil, retry_after: nil)
-      super(message, status: 429)
-      @retry_after = retry_after
+    def initialize(retry_after: 10)
+      @retry_after = [retry_after.to_i, 1].max
+      super("HubSpot rate limit reached", status: 429)
     end
   end
 end

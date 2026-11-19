@@ -1,3 +1,14 @@
+import { i18n } from "discourse-i18n";
+import hubspot from "discourse/plugins/discourse-salesforce/discourse/lib/hubspot/sync-provider";
+import salesforce from "discourse/plugins/discourse-salesforce/discourse/lib/salesforce/sync-provider";
+
+const OUTBOUND_PROVIDERS = { salesforce, hubspot };
+
+export function outboundTarget(provider, object) {
+  const definition = OUTBOUND_PROVIDERS[provider];
+  return { ...definition, ...definition.targets[object] };
+}
+
 export const USER_SYNC_SOURCES = [
   { id: "first", type: "text" },
   { id: "last", type: "text" },
@@ -18,32 +29,28 @@ export const USER_SYNC_SOURCES = [
   { id: "static", type: "text", group: "values" },
 ];
 
-export function createCompanyMapping(id) {
-  return {
-    id,
-    source: "static",
-    value: "Unknown",
-    destination: "Company",
-    policy: "keep",
-  };
+export function targetLabel(provider, object) {
+  const definition = OUTBOUND_PROVIDERS[provider];
+  const translationKey = definition?.targets[object]?.translationKey;
+  if (!translationKey) {
+    return `${definition?.name || provider} - ${object}`;
+  }
+  return i18n(`salesforce.guided_sync.targets.${provider}.${translationKey}`);
 }
 
-export function createSyncConfiguration() {
+export function createSyncConfiguration(
+  target = { provider: "salesforce", object: "Lead" }
+) {
   return {
-    provider: "salesforce",
     direction: "outbound",
     kind: "users",
     group_ids: [],
     groups: [],
-    object: "Lead",
+    provider: target.provider,
+    object: target.object,
     schedule: "daily",
     backfill: true,
-    mappings: [
-      { id: 1, source: "first", destination: "FirstName", policy: "keep" },
-      { id: 2, source: "last", destination: "LastName", policy: "keep" },
-      { id: 3, source: "profile", destination: "Description", policy: "keep" },
-      createCompanyMapping(6),
-    ],
+    mappings: outboundTarget(target.provider, target.object).createMappings(),
   };
 }
 

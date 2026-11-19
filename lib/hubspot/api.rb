@@ -1,73 +1,45 @@
 # frozen_string_literal: true
 
 require "json"
+require "digest"
 
 module ::Hubspot
   class Api
     BASE_URL = "https://api.hubapi.com"
     PREFIX = "/crm/v3"
-    REQUEST_TIMEOUT = 30
-    OPEN_TIMEOUT = 10
     PAGE_SIZE = 100
-    PROPERTIES_CACHE_TTL = 2.hours
-    HIDDEN_PROPERTY_PREFIXES = %w[hs_v2_ hs_analytics_ hs_email_ hs_sequences_].freeze
     LAST_MODIFIED_PROPERTY = "lastmodifieddate"
-    INVALID_RESPONSE = "hubspot.error.invalid_response"
+    HIDDEN_PROPERTY_PREFIXES = %w[hs_v2_ hs_analytics_ hs_email_ hs_sequences_].freeze
 
-    attr_reader :faraday
+    attr_reader :faraday, :account
 
     def self.has_credentials?
       SiteSetting.hubspot_portal_id.present? && SiteSetting.hubspot_access_token.present?
     end
 
-    def self.cached_properties(refresh: false)
-      new.cached_properties(refresh: refresh)
-    end
-
     def initialize
       raise Hubspot::InvalidCredentials if !self.class.has_credentials?
 
+      @account = SiteSetting.hubspot_portal_id
+      @access_token = SiteSetting.hubspot_access_token
+      @token_fingerprint = Digest::SHA256.hexdigest(@access_token)
+      @rate_limit_key = "hubspot_api:#{@account}:#{@token_fingerprint}"
       @faraday =
         Faraday.new(
           url: BASE_URL,
           headers: {
-            "Authorization" => "Bearer #{SiteSetting.hubspot_access_token}",
+            "Authorization" => "Bearer #{@access_token}",
           },
         ) do |builder|
+          builder.options.timeout = 30
+          builder.options.open_timeout = 10
           builder.adapter FinalDestination::FaradayAdapter
-          builder.options.timeout = REQUEST_TIMEOUT
-          builder.options.open_timeout = OPEN_TIMEOUT
         end
-    end
-
-    def account
-      SiteSetting.hubspot_portal_id
+      verify_account!
     end
 
     def ping
       get("objects/contacts", limit: 1)
-    end
-
-    def properties
-      get("properties/contacts")
-        .fetch("results")
-        .filter_map do |property|
-          name = property["name"].to_s
-          next if HIDDEN_PROPERTY_PREFIXES.any? { |prefix| name.start_with?(prefix) }
-          {
-            name: name,
-            label: property["label"],
-            type: property["type"],
-            group: property["groupName"],
-          }
-        end
-    end
-
-    def cached_properties(refresh: false)
-      connection = [RailsMultisite::ConnectionManagement.current_db, account].join(":")
-      cache_key = "hubspot:contact_properties:v1:#{Digest::SHA256.hexdigest(connection)}"
-      Rails.cache.delete(cache_key) if refresh
-      Rails.cache.fetch(cache_key, expires_in: PROPERTIES_CACHE_TTL) { properties }
     end
 
     def list_contacts(properties:, after: nil, limit: PAGE_SIZE)
@@ -98,32 +70,179 @@ module ::Hubspot
     end
 
     def batch_read_contacts_by_email(emails, properties:)
-      emails
+      batch_read_contacts(emails, properties: properties, id_property: "email")
+    end
+
+    def batch_read_contacts(ids, properties:, id_property: nil)
+      ids
         .each_slice(PAGE_SIZE)
         .flat_map do |slice|
-          post(
-            "objects/contacts/batch/read",
-            {
-              idProperty: "email",
-              inputs: slice.map { |email| { id: email } },
-              properties: properties,
-            },
-          ).fetch("results")
+          body = { inputs: slice.map { |id| { id: id } }, properties: properties }
+          body[:idProperty] = id_property if id_property
+          response =
+            begin
+              post("objects/contacts/batch/read", body)
+            rescue InvalidApiResponse => error
+              unless error.status == 404 &&
+                       JSON.parse(error.message)["category"] == "OBJECT_NOT_FOUND"
+                raise
+              end
+              { "results" => [] }
+            end
+          unless response.is_a?(Hash) && response["results"].is_a?(Array) &&
+                   [nil, "COMPLETE", "COMPLETED"].include?(response["status"]) &&
+                   Array(response["errors"]).all? { |item|
+                     item.is_a?(Hash) && item["category"] == "OBJECT_NOT_FOUND"
+                   }
+            raise InvalidApiResponse.new("Invalid contact batch read response")
+          end
+          response.fetch("results")
         end
     end
 
-    def get(path, query = {})
-      call(path) { |uri| faraday.get(uri, query) }
+    def get(path, query = {}, allow_not_found: false, **query_params)
+      call(path, allow_not_found: allow_not_found) do |uri|
+        faraday.get(uri, query.merge(query_params))
+      end
     end
 
-    def post(path, body)
-      call(path) { |uri| faraday.post(uri, body.to_json, "Content-Type" => "application/json") }
+    def post(path, fields)
+      call(path) { |uri| faraday.post(uri, fields.to_json, "Content-Type": "application/json") }
+    end
+
+    def patch(path, fields)
+      call(path) { |uri| faraday.patch(uri, fields.to_json, "Content-Type": "application/json") }
+    end
+
+    def self.cached_properties(refresh: false)
+      new.cached_properties(refresh: refresh)
+    end
+
+    def cached_properties(refresh: false)
+      property_metadata(refresh: refresh).filter_map do |property|
+        name = property.fetch("name")
+        next if HIDDEN_PROPERTY_PREFIXES.any? { |prefix| name.start_with?(prefix) }
+        {
+          name: name,
+          label: property["label"],
+          type: property["type"],
+          group: property["groupName"],
+        }
+      end
+    end
+
+    def cached_writable_fields(object, refresh: false)
+      raise Discourse::InvalidParameters.new(:object) unless object == "contact"
+      writable_fields(property_metadata(refresh: refresh))
     end
 
     private
 
-    def call(path)
-      uri = File.join(PREFIX, path)
+    def verify_account!
+      cache_key =
+        "hubspot:token_info:v2:#{RailsMultisite::ConnectionManagement.current_db}:#{@token_fingerprint}"
+      info = Rails.cache.read(cache_key)
+      unless info
+        DistributedMutex.synchronize("hubspot_token_info_#{@token_fingerprint}") do
+          info =
+            Rails
+              .cache
+              .fetch(cache_key, expires_in: 1.hour) do
+                response =
+                  call(
+                    "/oauth/v2/private-apps/get/access-token-info",
+                    absolute: true,
+                    throttle: false,
+                  ) do |uri|
+                    faraday.post(
+                      uri,
+                      { tokenKey: @access_token }.to_json,
+                      "Content-Type": "application/json",
+                    )
+                  end
+                unless response.is_a?(Hash) && response["hubId"].to_s.match?(/\A[1-9]\d*\z/)
+                  raise InvalidCredentials
+                end
+                response
+              end
+        end
+      end
+      unless info.is_a?(Hash) && info["hubId"].present? && info["hubId"].to_s == account
+        raise InvalidCredentials
+      end
+      app = info["appId"].presence || @token_fingerprint
+      @rate_limit_key = "hubspot_api:#{account}:#{app}"
+    end
+
+    def check_cooldown!
+      cooldown = Discourse.redis.without_namespace.ttl("#{@rate_limit_key}:cooldown")
+      raise RateLimited.new(retry_after: cooldown) if cooldown > 0
+    end
+
+    def throttle!
+      RateLimiter.new(nil, @rate_limit_key, 90, 10, global: true).performed!
+    rescue RateLimiter::LimitExceeded => error
+      raise RateLimited.new(retry_after: error.available_in)
+    end
+
+    def property_metadata(refresh: false)
+      connection = [
+        RailsMultisite::ConnectionManagement.current_db,
+        account,
+        @token_fingerprint,
+      ].join(":")
+      key = "hubspot:contact_properties:v2:#{Digest::SHA256.hexdigest(connection)}"
+      Rails.cache.delete(key) if refresh
+      Rails.cache.fetch(key, expires_in: 2.hours) { get("properties/contacts").fetch("results") }
+    end
+
+    def writable_fields(properties)
+      properties.filter_map do |field|
+        if field["archived"] || field["calculated"] ||
+             field.dig("modificationMetadata", "readOnlyValue")
+          next
+        end
+        type =
+          case field["type"]
+          when "string"
+            "string"
+          when "number"
+            "double"
+          when "bool"
+            "boolean"
+          when "date", "datetime"
+            field["type"]
+          when "enumeration"
+            case field["fieldType"]
+            when "booleancheckbox"
+              "boolean"
+            when "checkbox"
+              "multipicklist"
+            else
+              "picklist"
+            end
+          end
+        next unless type
+        result = {
+          "name" => field.fetch("name"),
+          "label" => field["label"].presence || field.fetch("name"),
+          "type" => type,
+          "custom" => field["hubspotDefined"] == false,
+          "createable" => true,
+          "updateable" => true,
+        }
+        if %w[picklist multipicklist].include?(type) && field["options"].is_a?(Array) &&
+             !field["externalOptions"]
+          result["options"] = field["options"].map { |option| option.fetch("value") }
+        end
+        result
+      end
+    end
+
+    def call(path, absolute: false, throttle: true, allow_not_found: false)
+      check_cooldown!
+      throttle! if throttle
+      uri = absolute ? path : File.join(PREFIX, path)
       response = yield(uri)
 
       case response.status
@@ -133,19 +252,39 @@ module ::Hubspot
         nil
       when 401
         raise Hubspot::InvalidCredentials
+      when 404
+        return nil if allow_not_found
+        raise_response_error(response)
       when 429
-        retry_after = response.headers["Retry-After"].to_i
-        raise Hubspot::RateLimited.new(
-                response.body.presence || "",
-                retry_after: retry_after.positive? ? retry_after : nil,
-              )
-      else
-        error =
-          Hubspot::InvalidApiResponse.new(response.body.presence || "", status: response.status)
-        error.set_backtrace(caller)
-        Discourse.warn_exception(error, message: I18n.t(INVALID_RESPONSE), env: { api_uri: uri })
+        policy =
+          begin
+            JSON.parse(response.body)
+          rescue JSON::ParserError, TypeError
+            nil
+          end
+        raise DailyQuotaExceeded if policy.is_a?(Hash) && policy["policyName"] == "DAILY"
+        retry_after = Integer(response.headers["retry-after"].to_s, exception: false) || 10
+        error = RateLimited.new(retry_after: retry_after)
+        Discourse.redis.without_namespace.setex(
+          "#{@rate_limit_key}:cooldown",
+          error.retry_after,
+          "1",
+        )
         raise error
+      else
+        raise_response_error(response)
       end
+    end
+
+    def raise_response_error(response)
+      error =
+        Hubspot::InvalidApiResponse.from_response(
+          response.body.presence || "",
+          status: response.status,
+        )
+      error.set_backtrace(caller)
+      DiscourseCrm::ConnectionError.log(error, operation: "api", provider: "hubspot")
+      raise error
     end
   end
 end

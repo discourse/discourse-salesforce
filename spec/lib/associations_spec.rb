@@ -35,16 +35,19 @@ RSpec.describe ::Salesforce::Associations do
       )
       contacts_group.add(stale_user)
       leads_group.add(stale_user)
-      Salesforce::RecordLink.link!(**scope, external_id: dead_contact_id)
+      DiscourseCrm::RecordLink.link!(**scope, external_id: dead_contact_id)
       other_account =
-        Salesforce::RecordLink.link!(**scope.merge(account: "other"), external_id: dead_contact_id)
+        DiscourseCrm::RecordLink.link!(
+          **scope.merge(account: "other"),
+          external_id: dead_contact_id,
+        )
       other_user =
-        Salesforce::RecordLink.link!(
+        DiscourseCrm::RecordLink.link!(
           **scope.merge(user_id: linked_user.id),
           external_id: dead_contact_id,
         )
       converted_lead =
-        Salesforce::RecordLink.mark_converted!(
+        DiscourseCrm::RecordLink.mark_converted!(
           **scope.merge(object: "Lead"),
           external_id: dead_lead_id,
           to_object: "Contact",
@@ -57,8 +60,8 @@ RSpec.describe ::Salesforce::Associations do
         other: Fabricate(:sync_configuration, object: "Contact", account: "other"),
       }
       configurations.each_value do |configuration|
-        Salesforce::SyncState.store(configuration.id, stale_user.id, fingerprint: "old")
-        Salesforce::SyncState.store(configuration.id, linked_user.id, fingerprint: "other-user")
+        DiscourseCrm::SyncState.store(configuration.id, stale_user.id, fingerprint: "old")
+        DiscourseCrm::SyncState.store(configuration.id, linked_user.id, fingerprint: "other-user")
       end
 
       expect(described_class.unlink_contact!(user: stale_user, expected_id: dead_contact_id)).to eq(
@@ -68,9 +71,9 @@ RSpec.describe ::Salesforce::Associations do
       expect(stale_user.reload.salesforce_contact_id).to be_nil
       expect(stale_user.salesforce_lead_id).to eq(dead_lead_id)
       expect(stale_user.custom_fields["unrelated"]).to eq("retained")
-      expect(Salesforce::RecordLink.find_by(**scope)).to be_nil
+      expect(DiscourseCrm::RecordLink.find_by(**scope)).to be_nil
       expect(
-        Salesforce::RecordLink.where(
+        DiscourseCrm::RecordLink.where(
           id: [other_account.id, other_user.id, converted_lead.id],
         ).count,
       ).to eq(3)
@@ -79,38 +82,38 @@ RSpec.describe ::Salesforce::Associations do
       expect(leads_group.users.exists?(stale_user.id)).to eq(true)
       expect(
         configurations.transform_values do |configuration|
-          Salesforce::SyncState.find_by(
+          DiscourseCrm::SyncState.find_by(
             configuration: configuration,
             user_id: stale_user.id,
           ).fingerprint
         end,
       ).to eq(contact: nil, lead: "old", other: "old")
-      expect(Salesforce::SyncState.where(user_id: linked_user.id).pluck(:fingerprint).uniq).to eq(
+      expect(DiscourseCrm::SyncState.where(user_id: linked_user.id).pluck(:fingerprint).uniq).to eq(
         ["other-user"],
       )
       expect(a_request(:any, /salesforce\.com/)).not_to have_been_made
     end
 
     it "cleans a guided-only association and preserves unrelated state on retry" do
-      Salesforce::RecordLink.link!(**scope, external_id: dead_contact_id)
+      DiscourseCrm::RecordLink.link!(**scope, external_id: dead_contact_id)
       contacts_group.add(stale_user)
 
       expect(described_class.unlink_contact!(user: stale_user, expected_id: dead_contact_id)).to eq(
         true,
       )
-      expect(Salesforce::RecordLink.find_by(**scope)).to be_nil
+      expect(DiscourseCrm::RecordLink.find_by(**scope)).to be_nil
       expect(contacts_group.users.exists?(stale_user.id)).to eq(false)
 
       contacts_group.add(stale_user)
       converted =
-        Salesforce::RecordLink.mark_converted!(
+        DiscourseCrm::RecordLink.mark_converted!(
           **scope,
           external_id: dead_contact_id,
           to_object: "Contact",
           to_id: live_contact_id,
         )
       configuration = Fabricate(:sync_configuration, object: "Contact", account: instance_url)
-      Salesforce::SyncState.store(configuration.id, stale_user.id, fingerprint: "old")
+      DiscourseCrm::SyncState.store(configuration.id, stale_user.id, fingerprint: "old")
 
       expect(described_class.unlink_contact!(user: stale_user, expected_id: dead_contact_id)).to eq(
         false,
@@ -118,7 +121,7 @@ RSpec.describe ::Salesforce::Associations do
       expect(converted.reload.converted_to_id).to eq(live_contact_id)
       expect(contacts_group.users.exists?(stale_user.id)).to eq(true)
       expect(
-        Salesforce::SyncState.find_by(
+        DiscourseCrm::SyncState.find_by(
           configuration: configuration,
           user_id: stale_user.id,
         ).fingerprint,
@@ -129,7 +132,7 @@ RSpec.describe ::Salesforce::Associations do
       [dead_contact_id, live_contact_id].each do |id|
         UserCustomField.create!(user: stale_user, name: Salesforce::Contact::ID_FIELD, value: id)
       end
-      Salesforce::RecordLink.link!(**scope, external_id: dead_contact_id)
+      DiscourseCrm::RecordLink.link!(**scope, external_id: dead_contact_id)
       contacts_group.add(stale_user)
 
       expect {
@@ -138,7 +141,7 @@ RSpec.describe ::Salesforce::Associations do
       expect(
         stale_user.user_custom_fields.where(name: Salesforce::Contact::ID_FIELD).pluck(:value),
       ).to contain_exactly(dead_contact_id, live_contact_id)
-      expect(Salesforce::RecordLink.find_by(**scope).external_id).to eq(dead_contact_id)
+      expect(DiscourseCrm::RecordLink.find_by(**scope).external_id).to eq(dead_contact_id)
       expect(contacts_group.users.exists?(stale_user.id)).to eq(true)
     end
   end
@@ -237,16 +240,18 @@ RSpec.describe ::Salesforce::Associations do
       expect(lookup).to have_been_requested.twice
     end
 
-    it "prunes guided-only links and fingerprints in the connected account" do
+    it "prunes guided-only links and fingerprints only in the connected Salesforce account" do
+      SiteSetting.hubspot_enabled = true
+      SiteSetting.hubspot_portal_id = "12345"
       scope = { provider: "salesforce", account: instance_url, object: "Contact" }
       stale_scope = scope.merge(user_id: stale_user.id)
       live_scope = scope.merge(user_id: linked_user.id)
       other_account_scope = stale_scope.merge(account: "other-account")
       lead_scope = stale_scope.merge(object: "Lead")
-      Salesforce::RecordLink.link!(**stale_scope, external_id: dead_contact_id)
-      Salesforce::RecordLink.link!(**live_scope, external_id: live_contact_id)
-      Salesforce::RecordLink.link!(**other_account_scope, external_id: dead_contact_id)
-      Salesforce::RecordLink.mark_converted!(
+      DiscourseCrm::RecordLink.link!(**stale_scope, external_id: dead_contact_id)
+      DiscourseCrm::RecordLink.link!(**live_scope, external_id: live_contact_id)
+      DiscourseCrm::RecordLink.link!(**other_account_scope, external_id: dead_contact_id)
+      DiscourseCrm::RecordLink.mark_converted!(
         **lead_scope,
         external_id: dead_lead_id,
         to_object: "Contact",
@@ -256,9 +261,17 @@ RSpec.describe ::Salesforce::Associations do
         contact: Fabricate(:sync_configuration, object: "Contact", account: instance_url),
         lead: Fabricate(:sync_configuration, object: "Lead", account: instance_url),
         other: Fabricate(:sync_configuration, object: "Contact", account: "other-account"),
+        hubspot:
+          Fabricate(
+            :sync_configuration,
+            provider: "hubspot",
+            object: "contact",
+            account: "12345",
+            mappings: [],
+          ),
       }
       configurations.each_value do |configuration|
-        Salesforce::SyncState.store(configuration.id, stale_user.id, fingerprint: "old")
+        DiscourseCrm::SyncState.store(configuration.id, stale_user.id, fingerprint: "old")
       end
       stub_request(:get, "#{instance_url}services/data/v49.0/composite/sobjects/Contact").with(
         query: {
@@ -269,31 +282,31 @@ RSpec.describe ::Salesforce::Associations do
 
       expect(described_class.prune_dead![:users]).to eq(1)
 
-      expect(Salesforce::RecordLink.find_by(**stale_scope)).to be_nil
-      expect(Salesforce::RecordLink.find_by(**live_scope).external_id).to eq(live_contact_id)
-      expect(Salesforce::RecordLink.find_by(**other_account_scope).external_id).to eq(
+      expect(DiscourseCrm::RecordLink.find_by(**stale_scope)).to be_nil
+      expect(DiscourseCrm::RecordLink.find_by(**live_scope).external_id).to eq(live_contact_id)
+      expect(DiscourseCrm::RecordLink.find_by(**other_account_scope).external_id).to eq(
         dead_contact_id,
       )
-      expect(Salesforce::RecordLink.find_by(**lead_scope).converted_to_id).to eq(dead_contact_id)
+      expect(DiscourseCrm::RecordLink.find_by(**lead_scope).converted_to_id).to eq(dead_contact_id)
       fingerprints =
         configurations.transform_values do |configuration|
-          Salesforce::SyncState.find_by(
+          DiscourseCrm::SyncState.find_by(
             configuration: configuration,
             user_id: stale_user.id,
           ).fingerprint
         end
-      expect(fingerprints).to eq(contact: nil, lead: "old", other: "old")
+      expect(fingerprints).to eq(contact: nil, lead: "old", other: "old", hubspot: "old")
     end
 
     it "enumerates linked users without scanning unrelated users" do
-      Salesforce::RecordLink.link!(
+      DiscourseCrm::RecordLink.link!(
         provider: "salesforce",
         account: instance_url,
         object: "Contact",
         user_id: stale_user.id,
         external_id: dead_contact_id,
       )
-      Salesforce::RecordLink.link!(
+      DiscourseCrm::RecordLink.link!(
         provider: "salesforce",
         account: "other-account",
         object: "Contact",
@@ -338,16 +351,16 @@ RSpec.describe ::Salesforce::Associations do
         object: "Contact",
         user_id: stale_user.id,
       }
-      Salesforce::RecordLink.link!(**scope, external_id: dead_contact_id)
+      DiscourseCrm::RecordLink.link!(**scope, external_id: dead_contact_id)
       stub_request(:get, "#{instance_url}services/data/v49.0/composite/sobjects/Contact")
         .with(query: { fields: "Id", ids: dead_contact_id })
         .to_return do
-          Salesforce::RecordLink.link!(**scope, external_id: live_contact_id)
+          DiscourseCrm::RecordLink.link!(**scope, external_id: live_contact_id)
           { status: 200, body: [nil].to_json }
         end
 
       expect(described_class.prune_dead![:users]).to eq(0)
-      expect(Salesforce::RecordLink.find_by(**scope).external_id).to eq(live_contact_id)
+      expect(DiscourseCrm::RecordLink.find_by(**scope).external_id).to eq(live_contact_id)
     end
 
     it "preserves Lead links while cleaning Contacts and Cases when Leads are disabled" do

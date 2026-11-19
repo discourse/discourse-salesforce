@@ -24,7 +24,7 @@ RSpec.describe "HubSpot sync configuration" do
 
     expect(configurations_page).to have_configuration(
       "Pull contacts",
-      type: "Pull from CRM",
+      type: "Pull contacts from CRM",
       scope: "All users",
     )
     expect(configurations_page).to have_pull_disabled
@@ -33,7 +33,7 @@ RSpec.describe "HubSpot sync configuration" do
 
     expect(configurations_page).to have_configuration(
       "Pull contacts",
-      type: "Pull from CRM",
+      type: "Pull contacts from CRM",
       scope: "All users",
     )
 

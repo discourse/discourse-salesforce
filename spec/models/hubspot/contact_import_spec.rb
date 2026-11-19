@@ -191,6 +191,23 @@ RSpec.describe ::Hubspot::ContactImport do
       )
     end
 
+    it "drops the previous company before fetching the new one so a failed fetch cannot strand it" do
+      import = described_class.new(configuration)
+      stub_hubspot_company_batch_read([hubspot_company(900, name: "Acme")], ids: %w[900])
+      import.import_page([hubspot_contact(501, "ada@example.com", associatedcompanyid: "900")])
+      stub_request(:post, hubspot_url("objects/companies/batch/read")).to_return(status: 503)
+
+      expect {
+        import.import_page([hubspot_contact(501, "ada@example.com", associatedcompanyid: "901")])
+      }.to raise_error(Hubspot::InvalidApiResponse)
+
+      expect(company_data).to eq({})
+      expect(import.referenced_company_ids(after: "")).to eq(%w[901])
+      stub_hubspot_company_batch_read([hubspot_company(901, name: "Globex")], ids: %w[901])
+      import.refresh_companies(import.referenced_company_ids(after: ""))
+      expect(company_data).to eq("901" => { "name" => "Globex" })
+    end
+
     it "removes a company HubSpot reports as missing and leaves its contacts without a company" do
       import = described_class.new(configuration)
       stub_hubspot_company_batch_read([hubspot_company(900, name: "Acme")])
@@ -263,7 +280,7 @@ RSpec.describe ::Hubspot::ContactImport do
       expect(a_request(:post, hubspot_url("objects/companies/batch/read"))).to have_been_made.once
     end
 
-    it "refreshes the given stored companies and drops the ones reported gone" do
+    it "refreshes the companies contacts reference and drops the ones reported gone" do
       import = described_class.new(configuration)
       stub_hubspot_company_batch_read(
         [hubspot_company(900, plan_tier: "pro"), hubspot_company(901, plan_tier: "pro")],
@@ -280,8 +297,8 @@ RSpec.describe ::Hubspot::ContactImport do
         errors: [{ category: "OBJECT_NOT_FOUND", context: { ids: %w[901] } }],
       )
 
-      expect(import.stored_company_ids(after: "")).to eq(%w[900 901])
-      expect(import.stored_company_ids(after: "900")).to eq(%w[901])
+      expect(import.referenced_company_ids(after: "")).to eq(%w[900 901])
+      expect(import.referenced_company_ids(after: "900")).to eq(%w[901])
       import.refresh_companies(%w[900 901])
 
       expect(company_data).to eq("900" => { "plan_tier" => "enterprise" })

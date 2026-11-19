@@ -84,7 +84,7 @@ module Jobs
       end
 
       def refresh_companies(configuration, import, args, next_args, started_at)
-        ids = import.stored_company_ids(after: args[:companies_after])
+        ids = import.referenced_company_ids(after: args[:companies_after])
         if ids.empty?
           finish(configuration, started_at)
         else

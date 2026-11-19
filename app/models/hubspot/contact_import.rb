@@ -52,12 +52,12 @@ module ::Hubspot
           .pluck(:id, :user_id, :external_id)
           .filter_map { |id, user_id, external_id| id if keep.exclude?([user_id, external_id]) }
       DiscourseCrm::RecordLink.where(id: stale_links).delete_all if stale_links.any?
+      remove_orphans(contact_ids, previous_company_ids)
       if pulls_companies?
         refresh_companies(records.values.filter_map { |record| record[:company_external_id] }.uniq)
       else
         company_records.delete_all
       end
-      remove_orphans(contact_ids, previous_company_ids)
       links
     end
 
@@ -89,12 +89,15 @@ module ::Hubspot
       company_records.where(external_id: missing).delete_all if missing.any?
     end
 
-    def stored_company_ids(after:, limit: Api::PAGE_SIZE)
-      company_records
-        .where("external_id > ?", after)
-        .order(:external_id)
+    def referenced_company_ids(after:, limit: Api::PAGE_SIZE)
+      @configuration
+        .records
+        .where.not(company_external_id: nil)
+        .where("company_external_id > ?", after)
+        .distinct
+        .order(:company_external_id)
         .limit(limit)
-        .pluck(:external_id)
+        .pluck(:company_external_id)
     end
 
     private

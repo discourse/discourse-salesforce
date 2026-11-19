@@ -281,20 +281,27 @@ RSpec.describe Jobs::Hubspot::SyncConfiguration do
       )
     end
 
-    def store_companies(count)
+    def reference_companies(count)
       DiscourseCrm::Record.store_many!(
         (1..count).map do |index|
           {
             provider: "hubspot",
             account: "12345",
-            object: "company",
-            external_id: format("c%03d", index),
-            company_external_id: nil,
+            object: "contact",
+            external_id: "contact-#{index}",
+            company_external_id: format("c%03d", index),
             data: {
             },
           }
         end,
       )
+    end
+
+    def company_data
+      DiscourseCrm::Record
+        .within(provider: "hubspot", account: "12345", object: "company")
+        .pluck(:external_id, :data)
+        .to_h
     end
 
     def company_batch_of(size)
@@ -303,9 +310,23 @@ RSpec.describe Jobs::Hubspot::SyncConfiguration do
       end
     end
 
-    it "refreshes stored companies one chunk at a time after the last page of a scheduled run" do
+    it "pulls the companies of unchanged contacts once company properties are added" do
       freeze_time Time.utc(2026, 11, 2, 12)
-      store_companies(101)
+      reference_companies(1)
+      stub_hubspot_contact_search([])
+      stub_hubspot_company_batch_read([hubspot_company("c001", name: "Acme")], ids: %w[c001])
+
+      described_class.new.execute(configuration_id: configuration.id, reason: "scheduled")
+      described_class.new.execute(enqueued_args.last.symbolize_keys)
+
+      expect(company_data).to eq("c001" => { "name" => "Acme" })
+      described_class.new.execute(enqueued_args.last.symbolize_keys)
+      expect(configuration.reload.last_synced_at).to eq_time(Time.utc(2026, 11, 2, 12))
+    end
+
+    it "refreshes referenced companies one chunk at a time after the last page of a scheduled run" do
+      freeze_time Time.utc(2026, 11, 2, 12)
+      reference_companies(101)
       stub_hubspot_contact_search([])
       stub_hubspot_company_batch_read([])
 
@@ -338,7 +359,7 @@ RSpec.describe Jobs::Hubspot::SyncConfiguration do
     end
 
     it "retries only the rate limited company chunk" do
-      store_companies(1)
+      reference_companies(1)
       stub_request(:post, hubspot_url("objects/companies/batch/read")).to_return(
         status: 429,
         headers: {
@@ -361,7 +382,7 @@ RSpec.describe Jobs::Hubspot::SyncConfiguration do
     end
 
     it "records a failing company chunk on the configuration without moving the sync time" do
-      store_companies(1)
+      reference_companies(1)
       stub_request(:post, hubspot_url("objects/companies/batch/read")).to_return(
         status: 500,
         body: "boom",
@@ -399,7 +420,7 @@ RSpec.describe Jobs::Hubspot::SyncConfiguration do
 
     it "skips the company phase on a backfill" do
       freeze_time Time.utc(2026, 11, 2, 12)
-      store_companies(1)
+      reference_companies(1)
       stub_hubspot_contact_list([])
 
       described_class.new.execute(configuration_id: configuration.id, reason: "backfill")

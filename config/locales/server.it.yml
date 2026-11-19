@@ -8,9 +8,7 @@ it:
   site_settings:
     salesforce_enabled: 'Abilita il plugin discourse-salesforce'
     salesforce_login_enabled: 'Abilita l''accesso social di Salesforce'
-    salesforce_client_id: "ID client dell'app connessa a Salesforce"
     salesforce_client_secret: "segreto client dell'app connessa a Salesforce"
-    salesforce_rsa_private_key: "Chiave privata RSA dell'app connessa a Salesforce"
     salesforce_authorization_server_url: "URL del server di autorizzazione Salesforce"
     salesforce_username: "Nome utente dell'account Salesforce"
     salesforce_case_tag_name: "Nome del tag da aggiungere negli argomenti con un caso Salesforce"
@@ -22,7 +20,3 @@ it:
   salesforce:
     error:
       invalid_response: "Risposta non valida dall'API Salesforce"
-      invalid_client_credentials: "Si è verificato un problema con le credenziali di Salesforce. Conferma la validità dell'ID client Salesforce e delle impostazioni del segreto client"
-  dashboard:
-    problem:
-      salesforce_invalid_credentials: "Si è verificato un problema con le credenziali di Salesforce. Conferma la validità dell'ID client Salesforce e delle impostazioni del segreto client"

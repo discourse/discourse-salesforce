@@ -8,9 +8,7 @@ he:
   site_settings:
     salesforce_enabled: 'הפעלת התוסף discourse-salesforce'
     salesforce_login_enabled: 'הפעלת התחברות חברתית עם Salesforce'
-    salesforce_client_id: "מזהה לקוח של יישום Salesforce מחובר"
     salesforce_client_secret: "סוד לקוח של יישום Salesforce מחובר"
-    salesforce_rsa_private_key: "מפתח RSA פרטי ללקוח של יישום Salesforce מחובר"
     salesforce_authorization_server_url: "כתובת שרת האימות של Salesforce"
     salesforce_username: "שם משתמש לחשבון ב־Salesforce"
     salesforce_case_tag_name: "שם תגית להוספה לנושאים עם מקרים של Salesforce"
@@ -22,7 +20,3 @@ he:
   salesforce:
     error:
       invalid_response: "תגובה שגויה מה־API של Salesforce"
-      invalid_client_credentials: "הייתה בעיה עם האישורים של Salesforce. נא לאשר את תוקף מזהה הלקוח של Salesforce והגדרות סוד הלקוח"
-  dashboard:
-    problem:
-      salesforce_invalid_credentials: "הייתה בעיה עם האישורים של Salesforce. נא לאשר את תוקף מזהה הלקוח של Salesforce והגדרות סוד הלקוח"

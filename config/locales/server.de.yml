@@ -8,9 +8,7 @@ de:
   site_settings:
     salesforce_enabled: '„discourse-salesforce“-Plug-in aktivieren'
     salesforce_login_enabled: 'Salesforce-Social-Log-in aktivieren'
-    salesforce_client_id: "Client-ID der verbundenen Salesforce-App"
     salesforce_client_secret: "Client-Geheimnis der verbundenen Salesforce-App"
-    salesforce_rsa_private_key: "RSA-Private-Key der verbundenen Salesforce-App"
     salesforce_authorization_server_url: "URL des Salesforce-Autorisierungsservers"
     salesforce_username: "Benutzername des Salesforce-Kontos"
     salesforce_case_tag_name: "Schlagwort-Name zum Hinzufügen in Themen mit einem Salesforce-Kundenvorgang"
@@ -22,8 +20,6 @@ de:
   salesforce:
     error:
       invalid_response: "Ungültige Antwort von Salesforce-API"
-      invalid_client_credentials: "Es gab ein Problem mit den Salesforce-Anmeldedaten. Bitte bestätige die Gültigkeit der Einstellungen für die Salesforce-Client-ID und das entsprechende Client-Geheimnis"
   dashboard:
     problem:
-      salesforce_invalid_credentials: "Es gab ein Problem mit den Salesforce-Anmeldedaten. Bitte bestätige die Gültigkeit der Einstellungen für die Salesforce-Client-ID und das entsprechende Client-Geheimnis"
       salesforce_app_not_approved: "Die mit Discourse verbundene App ist noch nicht in Salesforce vom Benutzer autorisiert, der unter der Website-Einstellung `salesforce_username` erwähnt wird. Bitte folge <a href='%{base_path}/salesforce/admin/authorize'>diesem Link</a>, um ihn zu autorisieren."

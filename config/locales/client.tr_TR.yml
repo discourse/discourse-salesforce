@@ -35,7 +35,6 @@ tr_TR:
         group_name: "Grup adı"
         email: "E-posta"
         custom_field: "Özel"
-        keep: "Salesforce"
         overwrite: "Discourse"
         retry_fields: "Tekrar Dene"
         source_groups:

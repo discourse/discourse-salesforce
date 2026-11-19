@@ -8,9 +8,7 @@ ja:
   site_settings:
     salesforce_enabled: 'discourse-salesforce プラグインを有効にする'
     salesforce_login_enabled: 'Salesforc ソーシャルログインを有効化'
-    salesforce_client_id: "Salesforce 接続アプリのクライアント ID"
     salesforce_client_secret: "Salesforce 接続アプリのクライアントシークレット"
-    salesforce_rsa_private_key: "Salesforce 接続アプリの RSA 秘密鍵"
     salesforce_authorization_server_url: "Salesforce 認証サーバーの URL"
     salesforce_username: "Salesforce アカウントユーザー名"
     salesforce_case_tag_name: "Salesforce ケースのトピックに追加するタグ名"
@@ -22,8 +20,6 @@ ja:
   salesforce:
     error:
       invalid_response: "Salesforce API からの応答が無効です"
-      invalid_client_credentials: "Salesforce の資格情報に問題がありました。Salesforce クライアント ID とクライアントシークレットの設定が有効であることを確認してください。"
   dashboard:
     problem:
-      salesforce_invalid_credentials: "Salesforce の資格情報に問題がありました。Salesforce クライアント ID とクライアントシークレットの設定が有効であることを確認してください。"
       salesforce_app_not_approved: "Discourse 接続アプリはまだ、`salesforce_username` サイト設定でメンションされたユーザーによって Salesforce 内で承認されていません。<a href='%{base_path}/salesforce/admin/authorize'>こちらのリンク</a>に従って承認してください。"

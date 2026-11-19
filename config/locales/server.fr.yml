@@ -9,9 +9,7 @@ fr:
     salesforce_leads_enabled: "Activer la recherche et la création de pistes Salesforce, la synchronisation des conversions, les éléments de fil et le nettoyage des associations. Désactivez cette option pour les organisations Salesforce dont l'utilisateur d'intégration n'a pas accès aux pistes. Les opérations sur les contacts se poursuivent et les liens existants avec les pistes sont conservés."
     salesforce_enabled: 'Activer l''extension discourse-salesforce'
     salesforce_login_enabled: 'Activer la connexion avec Salesforce'
-    salesforce_client_id: "ID client de l'application connectée Salesforce"
     salesforce_client_secret: "Clé secrète client de l'application connectée Salesforce"
-    salesforce_rsa_private_key: "Clé privée RSA de l'application connectée Salesforce"
     salesforce_authorization_server_url: "URL du serveur d'autorisation Salesforce"
     salesforce_username: "Nom d'utilisateur du compte Salesforce"
     salesforce_contact_auto_create_on_signup: "Créer automatiquement un contact Salesforce pour les nouveaux utilisateurs lorsqu'aucun contact ni aucune piste ne correspond à leur adresse e-mail. Les contacts sont créés après confirmation de l'adresse e-mail de l'utilisateur."
@@ -32,8 +30,6 @@ fr:
     error:
       ambiguous_email_match: "Plusieurs enregistrements %{object_name} de Salesforce utilisent la même adresse e-mail"
       invalid_response: "Réponse invalide de l'API Salesforce"
-      invalid_client_credentials: "Un problème est survenu avec les identifiants Salesforce. Veuillez vérifier la validité des paramètres salesforce_client_id et salesforce_client_secret"
   dashboard:
     problem:
-      salesforce_invalid_credentials: "Un problème est survenu avec les identifiants Salesforce. Veuillez vérifier la validité des paramètres salesforce_client_id et salesforce_client_secret"
       salesforce_app_not_approved: "L'application connectée Discourse n'a pas encore été autorisée dans Salesforce par l'utilisateur indiqué dans le paramètre de site `salesforce_username`. Suivez <a href='%{base_path}/salesforce/admin/authorize'>ce lien</a> pour l'autoriser."

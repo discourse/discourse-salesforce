@@ -8,9 +8,7 @@ ru:
   site_settings:
     salesforce_enabled: 'Включить плагин «discourse-salesforce»'
     salesforce_login_enabled: 'Включить вход через Salesforce'
-    salesforce_client_id: "Идентификатор клиента подключенного приложения Salesforce"
     salesforce_client_secret: "Секретный код клиента для подключенного приложения Salesforce"
-    salesforce_rsa_private_key: "Закрытый ключ RSA для подключенного приложения Salesforce"
     salesforce_authorization_server_url: "URL сервера авторизации Salesforce"
     salesforce_username: "Имя пользователя для аккаунта Salesforce"
     salesforce_case_tag_name: "Название тега для добавления в темы с обращением Salesforce"
@@ -22,7 +20,3 @@ ru:
   salesforce:
     error:
       invalid_response: "Неверный ответ от API Salesforce"
-      invalid_client_credentials: "Проблема с учетными данными Salesforce. Проверьте настройки идентификатора клиента и секрета клиента Salesforce."
-  dashboard:
-    problem:
-      salesforce_invalid_credentials: "Проблема с учетными данными Salesforce. Проверьте настройки идентификатора клиента и секретного кода клиента Salesforce."

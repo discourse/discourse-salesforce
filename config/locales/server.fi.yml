@@ -8,9 +8,7 @@ fi:
   site_settings:
     salesforce_enabled: 'Ota discourse-salesforce-lisäosa käyttöön'
     salesforce_login_enabled: 'Ota Salesforcen yhteisökirjautuminen käyttöön'
-    salesforce_client_id: "Salesforcen yhdistetyn sovelluksen asiakastunnus"
     salesforce_client_secret: "Salesforcen yhdistetyn sovelluksen asiakkaan salatunnus"
-    salesforce_rsa_private_key: "Salesforcen yhdistetyn sovelluksen RSA-yksityisavain"
     salesforce_authorization_server_url: "Salesforcen valtuutuspalvelimen URL-osoite"
     salesforce_username: "Salesforce-tilin käyttäjänimi"
     salesforce_case_tag_name: "Tunnisteen nimi, joka lisätään ketjuihin, joissa on Salesforce-tapaus"
@@ -22,7 +20,3 @@ fi:
   salesforce:
     error:
       invalid_response: "Virheellinen vastaus Salesforce APIsta"
-      invalid_client_credentials: "Salesforcen tunnistetiedoissa oli ongelma. Varmista, että Salesforcen asiakastunnuksen ja asiakkaan salatunnuksen asetukset ovat oikein."
-  dashboard:
-    problem:
-      salesforce_invalid_credentials: "Salesforcen tunnistetiedoissa oli ongelma. Varmista, että Salesforcen asiakastunnuksen ja asiakkaan salatunnuksen asetukset ovat oikein."

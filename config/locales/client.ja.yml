@@ -35,7 +35,6 @@ ja:
         group_name: "グループ名"
         email: "メール"
         custom_field: "カスタム"
-        keep: "Salesforce"
         overwrite: "Discourse"
         retry_fields: "再試行"
         source_groups:

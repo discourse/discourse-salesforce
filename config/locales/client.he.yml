@@ -35,7 +35,6 @@ he:
         group_name: "שם הקבוצה"
         email: "דוא״ל"
         custom_field: "מותאם"
-        keep: "Salesforce"
         overwrite: "Discourse"
         source_groups:
           activity: "פעילות"

@@ -36,7 +36,6 @@ fr:
         group_name: "Nom du groupe"
         email: "E-mail"
         custom_field: "Personnalisé"
-        keep: "Salesforce"
         overwrite: "Discourse"
         retry_fields: "Réessayer"
         source_groups:

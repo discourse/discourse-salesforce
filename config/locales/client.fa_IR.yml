@@ -27,7 +27,6 @@ fa_IR:
         group_name: "نام گروه"
         email: "ایمیل"
         custom_field: "سفارشی"
-        keep: "سلزفورس"
         overwrite: "Discourse"
         source_groups:
           activity: "فعالیت"

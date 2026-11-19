@@ -55,7 +55,7 @@ en:
       invalid_property_value: "The value mapped to HubSpot property %{property} is not an allowed option. Correct the mapping and save again."
       connection:
         authentication: "HubSpot authentication failed. Check the access token and confirm that the portal ID matches its account, then retry."
-        permissions: "HubSpot denied access. Check the token’s contact read and write scopes, then retry."
+        permissions: "HubSpot denied access. Check the token’s contact, company and property scopes, then retry."
         rate_limit: "HubSpot’s API request limit was reached. Try again later."
         temporary: "HubSpot could not be reached or is temporarily unavailable. Try again shortly."
         invalid_response: "HubSpot returned an unexpected response. Check the server logs for details, then retry."

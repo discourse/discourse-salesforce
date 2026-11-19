@@ -16,28 +16,63 @@ import hubspotProvider from "discourse/plugins/discourse-salesforce/discourse/li
 import { createHubspotSyncConfiguration } from "discourse/plugins/discourse-salesforce/discourse/lib/sync-configuration";
 
 const PREFIX = "salesforce.guided_sync.hubspot";
+const OBJECTS = [
+  {
+    key: "contact",
+    field: "contact_properties",
+    title: `${PREFIX}.properties`,
+    help: `${PREFIX}.properties_help`,
+    label: `${PREFIX}.choose_properties`,
+    refresh: `${PREFIX}.refresh_properties`,
+  },
+  {
+    key: "company",
+    field: "company_properties",
+    toggle: "pull_companies",
+    enable: `${PREFIX}.pull_companies`,
+    enableHelp: `${PREFIX}.pull_companies_help`,
+    title: `${PREFIX}.company_properties`,
+    help: `${PREFIX}.company_properties_help`,
+    label: `${PREFIX}.choose_company_properties`,
+    refresh: `${PREFIX}.refresh_company_properties`,
+  },
+];
 const COMING_SOON_OBJECTS = [
-  { value: "company", label: "hubspot_company" },
   { value: "Contact", label: "salesforce_contact" },
   { value: "Lead", label: "salesforce_lead" },
 ];
+
+function emptyList() {
+  return { properties: [], loaded: false, loading: false, error: null };
+}
+
+function splitMappings(record) {
+  const configuration = structuredClone(record);
+  for (const object of OBJECTS) {
+    configuration[object.field] = configuration.mappings
+      .filter((mapping) => mapping.object === object.key)
+      .map((mapping) => mapping.source);
+    if (object.toggle) {
+      configuration[object.toggle] = configuration[object.field].length > 0;
+    }
+  }
+  return configuration;
+}
 
 export default class HubspotSyncConfiguration extends Component {
   @service a11y;
   @service dialog;
 
-  @tracked configuration = structuredClone(
+  @tracked configuration = splitMappings(
     this.args.record || createHubspotSyncConfiguration()
   );
-  @tracked loadingProperties = false;
-  @tracked properties = [];
-  @tracked propertiesError;
+  @tracked lists = { contact: emptyList(), company: emptyList() };
   @tracked saving = false;
   formData = this.configuration;
 
   #form;
   #initialLoad;
-  #propertiesRequest = 0;
+  #requests = { contact: 0, company: 0 };
 
   willDestroy() {
     super.willDestroy(...arguments);
@@ -61,13 +96,18 @@ export default class HubspotSyncConfiguration extends Component {
     return i18n("salesforce.guided_sync.pull_objects.hubspot_contact");
   }
 
-  get selectedProperties() {
-    return this.configuration.mappings.map(
-      (mapping) =>
-        this.properties.find(
-          (property) => property.name === mapping.source
-        ) || { name: mapping.source, label: mapping.source }
-    );
+  get objects() {
+    return OBJECTS.map((object) => ({
+      ...object,
+      enabled: !object.toggle || this.configuration[object.toggle],
+      list: this.lists[object.key],
+      selection: this.configuration[object.field].map(
+        (source) =>
+          this.lists[object.key].properties.find(
+            (property) => property.name === source
+          ) || { name: source, label: source }
+      ),
+    }));
   }
 
   get scheduleTiming() {
@@ -90,42 +130,45 @@ export default class HubspotSyncConfiguration extends Component {
   registerForm(form) {
     this.#form = form;
     this.#initialLoad = next(this, () => {
-      this.refreshProperties();
+      for (const object of this.objects) {
+        if (object.enabled) {
+          this.refreshProperties(object.key);
+        }
+      }
     });
   }
 
   @action
-  async refreshProperties(force = false) {
-    const request = ++this.#propertiesRequest;
-    this.loadingProperties = true;
-    this.propertiesError = null;
+  async refreshProperties(key, force = false) {
+    const request = ++this.#requests[key];
+    const field = OBJECTS.find((object) => object.key === key).field;
+    this.#updateList(key, { loading: true, error: null });
     try {
       const result = await ajax(hubspotProvider.metadataUrl, {
-        data: { refresh: force },
+        data: { object: key, refresh: force },
       });
-      if (this.#stale(request)) {
+      if (this.#stale(key, request)) {
         return;
       }
-      this.properties = result.properties;
-      this.#form.removeError("mappings");
+      this.#updateList(key, { properties: result.properties, loaded: true });
+      this.#form.removeError(field);
     } catch (error) {
-      if (!this.#stale(request)) {
-        this.propertiesError = extractError(
-          error,
-          i18n(`${PREFIX}.properties_failed`)
-        );
+      if (!this.#stale(key, request)) {
+        this.#updateList(key, {
+          error: extractError(error, i18n(`${PREFIX}.properties_failed`)),
+        });
       }
     } finally {
-      if (!this.#stale(request)) {
-        this.loadingProperties = false;
+      if (!this.#stale(key, request)) {
+        this.#updateList(key, { loading: false });
       }
     }
   }
 
   @action
-  async findProperties(query) {
+  async findProperties(key, query) {
     const term = (query || "").toLowerCase();
-    return this.properties.filter(
+    return this.lists[key].properties.filter(
       (property) =>
         property.name.toLowerCase().includes(term) ||
         property.label?.toLowerCase().includes(term)
@@ -138,13 +181,11 @@ export default class HubspotSyncConfiguration extends Component {
   }
 
   @action
-  selectProperties(properties) {
-    const mappings = properties.map((property, index) => ({
-      id: index + 1,
-      source: property.name,
-    }));
-    this.#form.set("mappings", mappings);
-    this.configuration = { ...this.configuration, mappings };
+  selectProperties(key, properties) {
+    const field = OBJECTS.find((object) => object.key === key).field;
+    const sources = properties.map((property) => property.name);
+    this.#form.set(field, sources);
+    this.configuration = { ...this.configuration, [field]: sources };
   }
 
   @action
@@ -154,28 +195,43 @@ export default class HubspotSyncConfiguration extends Component {
   }
 
   @action
-  validateConfiguration(data, { addError, removeError }) {
-    removeError("mappings");
-    if (this.propertiesError || this.loadingProperties) {
-      addError("mappings", {
-        title: i18n(`${PREFIX}.properties`),
-        message: this.propertiesError || i18n(`${PREFIX}.loading_properties`),
-      });
-      return;
+  toggleObject(key, value, options) {
+    this.setConfiguration(value, options);
+    if (value && !this.lists[key].loaded) {
+      this.refreshProperties(key);
     }
-    const unavailable = data.mappings
-      .map((mapping) => mapping.source)
-      .filter(
+  }
+
+  @action
+  validateConfiguration(data, { addError, removeError }) {
+    for (const object of OBJECTS) {
+      removeError(object.field);
+      const list = this.lists[object.key];
+      if (
+        (object.toggle && !data[object.toggle]) ||
+        data[object.field].length === 0
+      ) {
+        continue;
+      }
+      if (list.error || list.loading) {
+        addError(object.field, {
+          title: i18n(object.title),
+          message: list.error || i18n(`${PREFIX}.loading_properties`),
+        });
+        continue;
+      }
+      const unavailable = data[object.field].filter(
         (source) =>
-          !this.properties.some((property) => property.name === source)
+          !list.properties.some((property) => property.name === source)
       );
-    if (unavailable.length) {
-      addError("mappings", {
-        title: i18n(`${PREFIX}.properties`),
-        message: i18n(`${PREFIX}.properties_unavailable`, {
-          properties: unavailable.join(", "),
-        }),
-      });
+      if (unavailable.length) {
+        addError(object.field, {
+          title: i18n(object.title),
+          message: i18n(`${PREFIX}.properties_unavailable`, {
+            properties: unavailable.join(", "),
+          }),
+        });
+      }
     }
   }
 
@@ -186,7 +242,7 @@ export default class HubspotSyncConfiguration extends Component {
     }
     this.saving = true;
     try {
-      if (await this.args.onSave(this.configuration)) {
+      if (await this.args.onSave(this.#payload())) {
         this.a11y.announce(i18n("salesforce.guided_sync.save_success"));
       }
     } finally {
@@ -211,12 +267,33 @@ export default class HubspotSyncConfiguration extends Component {
     return false;
   }
 
-  #stale(request) {
+  #payload() {
+    const configuration = { ...this.configuration };
+    const mappings = this.objects
+      .flatMap((object) =>
+        object.enabled
+          ? configuration[object.field].map((source) => ({
+              object: object.key,
+              source,
+            }))
+          : []
+      )
+      .map((mapping, index) => ({ id: index + 1, ...mapping }));
+    for (const object of OBJECTS) {
+      delete configuration[object.field];
+      delete configuration[object.toggle];
+    }
+    return { ...configuration, mappings };
+  }
+
+  #stale(key, request) {
     return (
-      this.isDestroying ||
-      this.isDestroyed ||
-      request !== this.#propertiesRequest
+      this.isDestroying || this.isDestroyed || request !== this.#requests[key]
     );
+  }
+
+  #updateList(key, patch) {
+    this.lists = { ...this.lists, [key]: { ...this.lists[key], ...patch } };
   }
 
   <template>
@@ -252,83 +329,101 @@ export default class HubspotSyncConfiguration extends Component {
           <p class="hubspot-sync-configuration__description">{{i18n
               "salesforce.guided_sync.hubspot.pull_description"
             }}</p>
-          <form.Field
-            @disabled={{@record.id}}
-            @name="object"
-            @title={{i18n "salesforce.guided_sync.pull_target"}}
-            @type="menu"
-            @validation="required"
-            as |field|
-          >
-            <field.Control @selection={{this.objectLabel}} as |menu|>
-              <menu.Item @value="contact">{{this.objectLabel}}</menu.Item>
-              {{#each this.comingSoonObjects as |object|}}
-                <menu.Item
-                  data-test-coming-soon-object={{object.value}}
-                  disabled={{true}}
-                  @value={{object.value}}
-                >{{object.label}}</menu.Item>
-              {{/each}}
-            </field.Control>
-          </form.Field>
-          <DConditionalLoadingSpinner
-            data-test-properties-loading
-            aria-busy={{this.loadingProperties}}
-            @condition={{this.loadingProperties}}
-          >
-            {{#if this.propertiesError}}
-              <form.Alert @type="error">{{this.propertiesError}}</form.Alert>
-              <DButton
-                class="btn-default hubspot-sync-configuration__retry-properties"
-                data-test-refresh-properties
-                @action={{fn this.refreshProperties true}}
-                @icon="arrows-rotate"
-                @label="salesforce.guided_sync.retry_fields"
-              />
-            {{else}}
-              <form.Field
-                @format="full"
-                @helpText={{i18n
-                  "salesforce.guided_sync.hubspot.properties_help"
-                }}
-                @name="mappings"
-                @title={{i18n "salesforce.guided_sync.hubspot.properties"}}
-                @type="custom"
-                as |field|
-              >
-                <field.Control>
-                  <div class="hubspot-sync-configuration__properties">
-                    <DMultiSelect
-                      @compareFn={{this.compareProperties}}
-                      @label={{i18n
-                        "salesforce.guided_sync.hubspot.choose_properties"
-                      }}
-                      @loadFn={{this.findProperties}}
-                      @matchTriggerWidth={{true}}
-                      @onChange={{this.selectProperties}}
-                      @selection={{this.selectedProperties}}
+          <div class="hubspot-sync-configuration__pull-fields">
+            <form.Field
+              @disabled={{@record.id}}
+              @name="object"
+              @title={{i18n "salesforce.guided_sync.pull_target"}}
+              @type="menu"
+              @validation="required"
+              as |field|
+            >
+              <field.Control @selection={{this.objectLabel}} as |menu|>
+                <menu.Item @value="contact">{{this.objectLabel}}</menu.Item>
+                {{#each this.comingSoonObjects as |object|}}
+                  <menu.Item
+                    data-test-coming-soon-object={{object.value}}
+                    disabled={{true}}
+                    @value={{object.value}}
+                  >{{object.label}}</menu.Item>
+                {{/each}}
+              </field.Control>
+            </form.Field>
+            {{#each this.objects as |object|}}
+              {{#if object.toggle}}
+                <form.Field
+                  @format="full"
+                  @helpText={{i18n object.enableHelp}}
+                  @name={{object.toggle}}
+                  @onSet={{fn this.toggleObject object.key}}
+                  @title={{i18n object.enable}}
+                  @type="checkbox"
+                  as |field|
+                >
+                  <field.Control />
+                </form.Field>
+              {{/if}}
+              {{#if object.enabled}}
+                <DConditionalLoadingSpinner
+                  class="hubspot-sync-configuration__object-properties"
+                  data-test-properties-loading={{object.key}}
+                  aria-busy={{object.list.loading}}
+                  @condition={{object.list.loading}}
+                >
+                  {{#if object.list.error}}
+                    <form.Alert @type="error">{{object.list.error}}</form.Alert>
+                    <DButton
+                      class="btn-default"
+                      data-test-refresh-properties={{object.key}}
+                      @action={{fn this.refreshProperties object.key true}}
+                      @icon="arrows-rotate"
+                      @label="salesforce.guided_sync.retry_fields"
+                    />
+                  {{else}}
+                    <form.Field
+                      @format="full"
+                      @helpText={{i18n object.help}}
+                      @name={{object.field}}
+                      @title={{i18n object.title}}
+                      @type="custom"
+                      as |field|
                     >
-                      <:selection as |property|>{{property.label}}</:selection>
-                      <:result as |property|>
-                        <span
-                          class="hubspot-sync-configuration__property"
-                        >{{property.label}}
-                          <code>{{property.name}}</code></span>
-                      </:result>
-                    </DMultiSelect>
-                  </div>
-                </field.Control>
-              </form.Field>
-              <DButton
-                class="btn-flat"
-                data-test-refresh-properties
-                @action={{fn this.refreshProperties true}}
-                @disabled={{this.loadingProperties}}
-                @icon="arrows-rotate"
-                @label="salesforce.guided_sync.hubspot.refresh_properties"
-              />
-            {{/if}}
-          </DConditionalLoadingSpinner>
+                      <field.Control>
+                        <div class="hubspot-sync-configuration__properties">
+                          <DMultiSelect
+                            @compareFn={{this.compareProperties}}
+                            @label={{i18n object.label}}
+                            @loadFn={{fn this.findProperties object.key}}
+                            @matchTriggerWidth={{true}}
+                            @onChange={{fn this.selectProperties object.key}}
+                            @selection={{object.selection}}
+                          >
+                            <:selection
+                              as |property|
+                            >{{property.label}}</:selection>
+                            <:result as |property|>
+                              <span
+                                class="hubspot-sync-configuration__property"
+                              >{{property.label}}
+                                <code>{{property.name}}</code></span>
+                            </:result>
+                          </DMultiSelect>
+                        </div>
+                      </field.Control>
+                    </form.Field>
+                    <DButton
+                      class="btn-flat"
+                      data-test-refresh-properties={{object.key}}
+                      @action={{fn this.refreshProperties object.key true}}
+                      @disabled={{object.list.loading}}
+                      @icon="arrows-rotate"
+                      @label={{object.refresh}}
+                    />
+                  {{/if}}
+                </DConditionalLoadingSpinner>
+              {{/if}}
+            {{/each}}
+          </div>
         </section>
         <section
           class="hubspot-sync-configuration__section"

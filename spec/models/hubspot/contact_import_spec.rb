@@ -105,6 +105,204 @@ RSpec.describe ::Hubspot::ContactImport do
         /hubspot_portal_id/,
       )
     end
+
+    it "keeps the company id on contacts without requesting companies when none of their properties are selected" do
+      described_class.new(configuration).import_page(
+        [hubspot_contact(501, "ada@example.com", associatedcompanyid: "900")],
+      )
+
+      expect(configuration.records.find_by(external_id: "501").company_external_id).to eq("900")
+      expect(a_request(:post, hubspot_url("objects/companies/batch/read"))).not_to have_been_made
+    end
+  end
+
+  context "with company properties" do
+    let!(:configuration) do
+      Fabricate(
+        :hubspot_sync_configuration,
+        mappings: [
+          { "id" => 1, "object" => "contact", "source" => "lifecyclestage" },
+          { "id" => 2, "object" => "company", "source" => "name" },
+          { "id" => 3, "object" => "company", "source" => "plan_tier" },
+        ],
+      )
+    end
+    let(:company_scope) { scope.merge(object: "company") }
+
+    def company_data
+      DiscourseCrm::Record.within(**company_scope).pluck(:external_id, :data).to_h
+    end
+
+    it "pulls the companies of matched contacts with the selected properties" do
+      stub_hubspot_company_batch_read(
+        [hubspot_company(900, name: "Acme", plan_tier: "enterprise", domain: "acme.com")],
+        ids: %w[900],
+      )
+
+      described_class.new(configuration).import_page(
+        [
+          hubspot_contact(
+            501,
+            "ada@example.com",
+            lifecyclestage: "customer",
+            associatedcompanyid: "900",
+          ),
+          hubspot_contact(502, "grace@example.com", associatedcompanyid: "900"),
+          hubspot_contact(503, "nobody@example.com", associatedcompanyid: "901"),
+        ],
+      )
+
+      expect(
+        a_request(:post, hubspot_url("objects/companies/batch/read")).with(
+          body: hash_including("properties" => %w[name plan_tier]),
+        ),
+      ).to have_been_made.once
+      expect(company_data).to eq("900" => { "name" => "Acme", "plan_tier" => "enterprise" })
+      expect(configuration.records.pluck(:external_id, :company_external_id)).to contain_exactly(
+        %w[501 900],
+        %w[502 900],
+      )
+      expect(configuration.records.find_by(external_id: "501").company.data).to eq(
+        "name" => "Acme",
+        "plan_tier" => "enterprise",
+      )
+    end
+
+    it "drops a company once no contact points at it and keeps one that is still referenced" do
+      import = described_class.new(configuration)
+      stub_hubspot_company_batch_read(
+        [hubspot_company(900, name: "Acme"), hubspot_company(901, name: "Globex")],
+        ids: %w[900 901],
+      )
+      import.import_page(
+        [
+          hubspot_contact(501, "ada@example.com", associatedcompanyid: "900"),
+          hubspot_contact(502, "grace@example.com", associatedcompanyid: "901"),
+        ],
+      )
+      stub_hubspot_company_batch_read([hubspot_company(901, name: "Globex")], ids: %w[901])
+
+      import.import_page([hubspot_contact(501, "ada@example.com", associatedcompanyid: "901")])
+
+      expect(company_data.keys).to eq(%w[901])
+      expect(configuration.records.pluck(:external_id, :company_external_id)).to contain_exactly(
+        %w[501 901],
+        %w[502 901],
+      )
+    end
+
+    it "drops the previous company before fetching the new one so a failed fetch cannot strand it" do
+      import = described_class.new(configuration)
+      stub_hubspot_company_batch_read([hubspot_company(900, name: "Acme")], ids: %w[900])
+      import.import_page([hubspot_contact(501, "ada@example.com", associatedcompanyid: "900")])
+      stub_request(:post, hubspot_url("objects/companies/batch/read")).to_return(status: 503)
+
+      expect {
+        import.import_page([hubspot_contact(501, "ada@example.com", associatedcompanyid: "901")])
+      }.to raise_error(Hubspot::InvalidApiResponse)
+
+      expect(company_data).to eq({})
+      expect(import.referenced_company_ids(after: "")).to eq(%w[901])
+      stub_hubspot_company_batch_read([hubspot_company(901, name: "Globex")], ids: %w[901])
+      import.refresh_companies(import.referenced_company_ids(after: ""))
+      expect(company_data).to eq("901" => { "name" => "Globex" })
+    end
+
+    it "removes a company HubSpot reports as missing and leaves its contacts without a company" do
+      import = described_class.new(configuration)
+      stub_hubspot_company_batch_read([hubspot_company(900, name: "Acme")])
+      import.import_page([hubspot_contact(501, "ada@example.com", associatedcompanyid: "900")])
+      stub_hubspot_company_batch_read(
+        [],
+        errors: [{ category: "OBJECT_NOT_FOUND", context: { ids: %w[900] } }],
+      )
+
+      import.import_page([hubspot_contact(501, "ada@example.com", associatedcompanyid: "900")])
+
+      expect(company_data).to eq({})
+      expect(configuration.records.find_by(external_id: "501").company).to be_nil
+    end
+
+    it "keeps stored companies when the company batch fails for another reason" do
+      import = described_class.new(configuration)
+      stub_hubspot_company_batch_read([hubspot_company(900, name: "Acme")])
+      import.import_page([hubspot_contact(501, "ada@example.com", associatedcompanyid: "900")])
+      stub_hubspot_company_batch_read(
+        [],
+        errors: [{ category: "VALIDATION_ERROR", context: { ids: %w[900] } }],
+      )
+
+      expect {
+        import.import_page([hubspot_contact(501, "ada@example.com", associatedcompanyid: "900")])
+      }.to raise_error(Hubspot::InvalidApiResponse)
+
+      expect(company_data).to eq("900" => { "name" => "Acme" })
+    end
+
+    it "removes the orphaned company of a contact the user no longer has" do
+      import = described_class.new(configuration)
+      old_email = UserEmail.create!(user: user, email: "old@example.com")
+      stub_hubspot_company_batch_read(
+        [hubspot_company(900, name: "Acme"), hubspot_company(901, name: "Globex")],
+        ids: %w[900 901],
+      )
+      import.import_page(
+        [
+          hubspot_contact(501, "ada@example.com", associatedcompanyid: "900"),
+          hubspot_contact(502, "old@example.com", associatedcompanyid: "901"),
+        ],
+      )
+      old_email.destroy!
+      stub_hubspot_batch_read([hubspot_contact(501, "ada@example.com", associatedcompanyid: "900")])
+      stub_hubspot_company_batch_read([hubspot_company(900, name: "Acme")], ids: %w[900])
+
+      import.import_user(user.reload)
+
+      expect(configuration.records.pluck(:external_id)).to eq(%w[501])
+      expect(company_data.keys).to eq(%w[900])
+    end
+
+    it "drops stored companies once no company property is selected any more" do
+      stub_hubspot_company_batch_read([hubspot_company(900, name: "Acme")])
+      described_class.new(configuration).import_page(
+        [hubspot_contact(501, "ada@example.com", associatedcompanyid: "900")],
+      )
+      configuration.update!(
+        mappings: [{ "id" => 1, "object" => "contact", "source" => "lifecyclestage" }],
+      )
+
+      described_class.new(configuration).import_page(
+        [hubspot_contact(502, "grace@example.com", associatedcompanyid: "900")],
+      )
+
+      expect(company_data).to eq({})
+      expect(configuration.records.pluck(:company_external_id).uniq).to eq(%w[900])
+      expect(a_request(:post, hubspot_url("objects/companies/batch/read"))).to have_been_made.once
+    end
+
+    it "refreshes the companies contacts reference and drops the ones reported gone" do
+      import = described_class.new(configuration)
+      stub_hubspot_company_batch_read(
+        [hubspot_company(900, plan_tier: "pro"), hubspot_company(901, plan_tier: "pro")],
+      )
+      import.import_page(
+        [
+          hubspot_contact(501, "ada@example.com", associatedcompanyid: "900"),
+          hubspot_contact(502, "grace@example.com", associatedcompanyid: "901"),
+        ],
+      )
+      stub_hubspot_company_batch_read(
+        [hubspot_company(900, plan_tier: "enterprise")],
+        ids: %w[900 901],
+        errors: [{ category: "OBJECT_NOT_FOUND", context: { ids: %w[901] } }],
+      )
+
+      expect(import.referenced_company_ids(after: "")).to eq(%w[900 901])
+      expect(import.referenced_company_ids(after: "900")).to eq(%w[901])
+      import.refresh_companies(%w[900 901])
+
+      expect(company_data).to eq("900" => { "plan_tier" => "enterprise" })
+    end
   end
 
   describe "#import_user" do
@@ -148,7 +346,13 @@ RSpec.describe ::Hubspot::ContactImport do
             hash_including(
               "idProperty" => "email",
               "inputs" => [{ "id" => "ada@example.com" }, { "id" => "ada.work@example.com" }],
-              "properties" => %w[email lastmodifieddate lifecyclestage jobtitle],
+              "properties" => %w[
+                email
+                lastmodifieddate
+                associatedcompanyid
+                lifecyclestage
+                jobtitle
+              ],
             ),
         ),
       ).to have_been_made.once

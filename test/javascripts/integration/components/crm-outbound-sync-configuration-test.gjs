@@ -64,23 +64,20 @@ module(
     test("offers configured CRM targets and resets mappings when switching providers", async function (assert) {
       this.targets.push({ provider: "hubspot", object: "contact" });
       const requests = [];
-      pretender.get(
-        "/salesforce/admin/hubspot/contact-properties.json",
-        (request) => {
-          requests.push({ ...request.queryParams });
-          return [
-            200,
-            { "Content-Type": "application/json" },
-            JSON.stringify({
-              fields: ["email", "firstname", "lastname"].map((name) => ({
-                name,
-                label: name === "firstname" ? "First name" : name,
-                type: "string",
-              })),
-            }),
-          ];
-        }
-      );
+      pretender.get("/salesforce/admin/hubspot/properties.json", (request) => {
+        requests.push({ ...request.queryParams });
+        return [
+          200,
+          { "Content-Type": "application/json" },
+          JSON.stringify({
+            fields: ["email", "firstname", "lastname"].map((name) => ({
+              name,
+              label: name === "firstname" ? "First name" : name,
+              type: "string",
+            })),
+          }),
+        ];
+      });
       const saved = [];
       this.save = (configuration) => saved.push(structuredClone(configuration));
       await render(
@@ -140,7 +137,7 @@ module(
 
     test("starts with HubSpot when it is the only configured provider", async function (assert) {
       this.targets = [{ provider: "hubspot", object: "contact" }];
-      pretender.get("/salesforce/admin/hubspot/contact-properties.json", () => [
+      pretender.get("/salesforce/admin/hubspot/properties.json", () => [
         200,
         { "Content-Type": "application/json" },
         JSON.stringify({

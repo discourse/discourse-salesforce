@@ -1,7 +1,7 @@
 export default {
   name: "HubSpot",
   emailField: "email",
-  metadataUrl: "/salesforce/admin/hubspot/contact-properties.json",
+  metadataUrl: "/salesforce/admin/hubspot/properties.json",
   targets: {
     contact: {
       translationKey: "Contact",

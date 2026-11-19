@@ -79,21 +79,68 @@ RSpec.describe ::Hubspot::Api do
           %w[lifecyclestage hs_analytics_source hs_email_open hs_v2_date jobtitle hs_sequences_x],
         )
 
-        expect(api.cached_properties.map { |property| property[:name] }).to eq(
+        expect(api.cached_properties("contact").map { |property| property[:name] }).to eq(
           %w[lifecyclestage jobtitle],
         )
-        expect(api.cached_properties.first).to eq(
+        expect(api.cached_properties("contact").first).to eq(
           name: "lifecyclestage",
           label: "Lifecyclestage",
           type: "string",
           group: "contactinformation",
         )
 
-        described_class.cached_properties
-        described_class.cached_properties
+        described_class.cached_properties("contact")
+        described_class.cached_properties("contact")
         expect(a_request(:get, hubspot_url("properties/contacts"))).to have_been_made.once
-        described_class.cached_properties(refresh: true)
+        described_class.cached_properties("contact", refresh: true)
         expect(a_request(:get, hubspot_url("properties/contacts"))).to have_been_made.twice
+      end
+
+      it "caches company properties separately from contact properties" do
+        stub_hubspot_properties(%w[lifecyclestage])
+        stub_hubspot_properties(%w[name hs_analytics_x plan_tier], object: "company")
+
+        described_class.cached_properties("contact")
+        companies = described_class.cached_properties("company")
+        described_class.cached_properties("company")
+
+        expect(companies.map { |property| property[:name] }).to eq(%w[name plan_tier])
+        expect(a_request(:get, hubspot_url("properties/companies"))).to have_been_made.once
+        expect(a_request(:get, hubspot_url("properties/contacts"))).to have_been_made.once
+      end
+    end
+
+    describe "#batch_read_companies" do
+      it "reads ids in chunks of 100 and reports the ids HubSpot no longer has" do
+        ids = (1..150).map(&:to_s)
+        stub_hubspot_company_batch_read(
+          [hubspot_company(1, name: "Acme")],
+          ids: ids.first(100),
+          errors: [{ category: "OBJECT_NOT_FOUND", context: { ids: %w[2 3] } }],
+        )
+        stub_hubspot_company_batch_read([hubspot_company(150, name: "Globex")], ids: ids.last(50))
+
+        results, missing = api.batch_read_companies(ids, properties: %w[name])
+
+        expect(results.map { |company| company["id"] }).to eq(%w[1 150])
+        expect(missing).to eq(%w[2 3])
+        expect(
+          a_request(:post, hubspot_url("objects/companies/batch/read")).with(
+            body: hash_including("properties" => %w[name]),
+          ),
+        ).to have_been_made.twice
+      end
+
+      it "raises when a batch reports an error other than a missing record" do
+        stub_hubspot_company_batch_read(
+          [],
+          errors: [{ category: "VALIDATION_ERROR", context: { ids: %w[1] } }],
+        )
+
+        expect { api.batch_read_companies(%w[1], properties: %w[name]) }.to raise_error(
+          Hubspot::InvalidApiResponse,
+          /VALIDATION_ERROR/,
+        )
       end
     end
 
@@ -143,6 +190,7 @@ RSpec.describe ::Hubspot::Api do
       end
     end
   end
+
   describe "#cached_writable_fields" do
     it "distinguishes boolean checkboxes from other enumeration fields" do
       properties = [
@@ -199,6 +247,7 @@ RSpec.describe ::Hubspot::Api do
       expect(request).to have_been_requested.twice
     end
   end
+
   after do
     Discourse.redis.without_namespace.del("hubspot_api:12345:6789:cooldown")
     RateLimiter.new(nil, "hubspot_api:12345:6789", 90, 10, global: true).clear!

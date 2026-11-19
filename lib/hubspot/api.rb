@@ -10,6 +10,9 @@ module ::Hubspot
     PAGE_SIZE = 100
     LAST_MODIFIED_PROPERTY = "lastmodifieddate"
     HIDDEN_PROPERTY_PREFIXES = %w[hs_v2_ hs_analytics_ hs_email_ hs_sequences_].freeze
+    OBJECT_PATHS = { "contact" => "contacts", "company" => "companies" }.freeze
+    COMPANY_PROPERTY = "associatedcompanyid"
+    MISSING_RECORD_CATEGORY = "OBJECT_NOT_FOUND"
 
     attr_reader :faraday, :account
 
@@ -100,6 +103,26 @@ module ::Hubspot
         end
     end
 
+    def batch_read_companies(ids, properties:)
+      results = []
+      missing = []
+      ids.each_slice(PAGE_SIZE) do |slice|
+        response =
+          post(
+            "objects/companies/batch/read",
+            { inputs: slice.map { |id| { id: id } }, properties: properties },
+          )
+        results.concat(response.fetch("results"))
+        Array(response["errors"]).each do |error|
+          if error["category"] != MISSING_RECORD_CATEGORY
+            raise Hubspot::InvalidApiResponse.new(error.to_json, status: 207)
+          end
+          missing.concat(Array(error.dig("context", "ids")).map(&:to_s))
+        end
+      end
+      [results, missing]
+    end
+
     def get(path, query = {}, allow_not_found: false, **query_params)
       call(path, allow_not_found: allow_not_found) do |uri|
         faraday.get(uri, query.merge(query_params))
@@ -114,12 +137,12 @@ module ::Hubspot
       call(path) { |uri| faraday.patch(uri, fields.to_json, "Content-Type": "application/json") }
     end
 
-    def self.cached_properties(refresh: false)
-      new.cached_properties(refresh: refresh)
+    def self.cached_properties(object, refresh: false)
+      new.cached_properties(object, refresh: refresh)
     end
 
-    def cached_properties(refresh: false)
-      property_metadata(refresh: refresh).filter_map do |property|
+    def cached_properties(object, refresh: false)
+      property_metadata(object, refresh: refresh).filter_map do |property|
         name = property.fetch("name")
         next if HIDDEN_PROPERTY_PREFIXES.any? { |prefix| name.start_with?(prefix) }
         {
@@ -133,7 +156,7 @@ module ::Hubspot
 
     def cached_writable_fields(object, refresh: false)
       raise Discourse::InvalidParameters.new(:object) unless object == "contact"
-      writable_fields(property_metadata(refresh: refresh))
+      writable_fields(property_metadata(object, refresh: refresh))
     end
 
     private
@@ -185,15 +208,19 @@ module ::Hubspot
       raise RateLimited.new(retry_after: error.available_in)
     end
 
-    def property_metadata(refresh: false)
+    def property_metadata(object, refresh: false)
       connection = [
         RailsMultisite::ConnectionManagement.current_db,
         account,
         @token_fingerprint,
       ].join(":")
-      key = "hubspot:contact_properties:v2:#{Digest::SHA256.hexdigest(connection)}"
+      key = "hubspot:#{object}_properties:v2:#{Digest::SHA256.hexdigest(connection)}"
       Rails.cache.delete(key) if refresh
-      Rails.cache.fetch(key, expires_in: 2.hours) { get("properties/contacts").fetch("results") }
+      Rails
+        .cache
+        .fetch(key, expires_in: 2.hours) do
+          get("properties/#{OBJECT_PATHS.fetch(object)}").fetch("results")
+        end
     end
 
     def writable_fields(properties)

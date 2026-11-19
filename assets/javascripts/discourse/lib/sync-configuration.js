@@ -62,7 +62,7 @@ export function createHubspotSyncConfiguration() {
     object: "contact",
     schedule: "daily",
     backfill: true,
-    mappings: [{ id: 1, source: "lifecyclestage" }],
+    mappings: [{ id: 1, object: "contact", source: "lifecyclestage" }],
   };
 }
 

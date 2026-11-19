@@ -21,17 +21,33 @@ module PageObjects
         has_css?('[data-name="object"] .form-kit__control-menu-trigger', text: label)
       end
 
-      def select_property(label)
-        find('[data-name="mappings"] .d-multi-select-trigger__expand-btn').click
+      def enable_company_pull
+        PageObjects::Components::FormKitField.new('[data-name="pull_companies"]').check
+        self
+      end
+
+      def has_company_pull?
+        PageObjects::Components::FormKitField.new('[data-name="pull_companies"]').checked?
+      end
+
+      def has_no_company_properties?
+        has_no_css?('[data-name="company_properties"]')
+      end
+
+      def select_property(label, object: "contact")
+        find("[data-name=\"#{object}_properties\"] .d-multi-select-trigger__expand-btn").click
         find(".d-multi-select__search-input").fill_in(with: label)
         find(".hubspot-sync-configuration__property", text: label).click
         find(".hubspot-sync-configuration__heading").click
         self
       end
 
-      def has_selected_properties?(*labels)
+      def has_selected_properties?(*labels, object: "contact")
         labels.all? do |label|
-          has_css?('[data-name="mappings"] .d-multi-select-trigger__selected-item', text: label)
+          has_css?(
+            "[data-name=\"#{object}_properties\"] .d-multi-select-trigger__selected-item",
+            text: label,
+          )
         end
       end
 

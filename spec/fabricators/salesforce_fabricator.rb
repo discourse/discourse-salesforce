@@ -54,7 +54,12 @@ Fabricator(:hubspot_sync_configuration, class_name: DiscourseCrm::SyncConfigurat
   schedule "daily"
   backfill true
   active true
-  mappings { [{ "source" => "lifecyclestage" }, { "source" => "jobtitle" }] }
+  mappings do
+    [
+      { "id" => 1, "object" => "contact", "source" => "lifecyclestage" },
+      { "id" => 2, "object" => "contact", "source" => "jobtitle" },
+    ]
+  end
 end
 
 Fabricator(:crm_record, class_name: DiscourseCrm::Record) do

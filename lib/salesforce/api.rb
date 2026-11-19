@@ -14,8 +14,8 @@ module ::Salesforce
     ACCESS_TOKEN_KEY = "salesforce_access_token"
     CREDENTIAL_SETTINGS = %i[
       salesforce_authorization_server_url
-      salesforce_client_id
-      salesforce_rsa_private_key
+      salesforce_consumer_key
+      salesforce_server_key_contents
       salesforce_username
     ].freeze
 
@@ -95,7 +95,7 @@ module ::Salesforce
       connection = [
         RailsMultisite::ConnectionManagement.current_db,
         SiteSetting.salesforce_authorization_server_url,
-        SiteSetting.salesforce_client_id,
+        SiteSetting.salesforce_consumer_key,
         SiteSetting.salesforce_username,
         SiteSetting.salesforce_instance_url,
       ].join(":")
@@ -166,7 +166,7 @@ module ::Salesforce
 
     def claims
       {
-        iss: SiteSetting.salesforce_client_id,
+        iss: SiteSetting.salesforce_consumer_key,
         sub: SiteSetting.salesforce_username,
         aud: SiteSetting.salesforce_authorization_server_url,
         iat: Time.now.utc.to_i,
@@ -175,7 +175,7 @@ module ::Salesforce
     end
 
     def private_key
-      OpenSSL::PKey::RSA.new(SiteSetting.salesforce_rsa_private_key)
+      OpenSSL::PKey::RSA.new(SiteSetting.salesforce_server_key_contents)
     end
 
     def jwt_assertion
@@ -183,8 +183,8 @@ module ::Salesforce
     end
 
     def self.has_credentials?
-      SiteSetting.salesforce_client_id.present? && SiteSetting.salesforce_username.present? &&
-        SiteSetting.salesforce_rsa_private_key.present? &&
+      SiteSetting.salesforce_consumer_key.present? && SiteSetting.salesforce_username.present? &&
+        SiteSetting.salesforce_server_key_contents.present? &&
         SiteSetting.salesforce_authorization_server_url.present?
     end
 

@@ -69,14 +69,14 @@ RSpec.describe DiscourseCrm::SyncConfigurationController do
   describe "credential status" do
     it "reports existing plugin credential presence without exposing secrets or verifying access" do
       sign_in(admin)
-      SiteSetting.salesforce_client_id = ""
+      SiteSetting.salesforce_consumer_key = ""
       get "/salesforce/admin/guided-sync/configurations.json"
       expect(response.parsed_body.fetch("providers")).to eq(
         [{ "name" => "salesforce", "credentials_configured" => false }],
       )
-      SiteSetting.salesforce_client_id = "test-client"
+      SiteSetting.salesforce_consumer_key = "test-client"
       SiteSetting.salesforce_username = "test@example.com"
-      SiteSetting.salesforce_rsa_private_key = "test-private-key"
+      SiteSetting.salesforce_server_key_contents = "test-private-key"
       SiteSetting.salesforce_authorization_server_url = "https://login.salesforce.com"
       SiteSetting.hubspot_enabled = true
       get "/salesforce/admin/guided-sync/configurations.json"

@@ -4,9 +4,9 @@ en:
     enable_guided_sync_configuration: "Send Discourse user data to Salesforce or HubSpot using configurable field mappings, group membership, and a refresh schedule."
     salesforce_enabled: 'Enable the discourse-salesforce plugin'
     salesforce_login_enabled: 'Enable Salesforce Social Login'
-    salesforce_client_id: "Salesforce connected app's client id"
+    salesforce_consumer_key: "Salesforce connected app's consumer key"
     salesforce_client_secret: "Salesforce connected app's client secret"
-    salesforce_rsa_private_key: "Salesforce connected app's RSA private key"
+    salesforce_server_key_contents: "Contents of the server.key file containing the Salesforce connected app's RSA private key"
     salesforce_authorization_server_url: "Salesforce authorization server's URL"
     salesforce_username: "Salesforce account username"
     salesforce_contact_auto_create_on_signup: "Automatically create a Salesforce Contact for new users when no Contact or Lead matches their email. Contacts are created once the user's email is confirmed."
@@ -49,7 +49,7 @@ en:
       fields_unavailable: "Could not load Salesforce fields. Check the connection and permissions, then try again."
       ambiguous_email_match: "Multiple Salesforce %{object_name} records have the same email"
       invalid_response: "Invalid response from Salesforce API"
-      invalid_client_credentials: "There was an issue with the Salesforce credentials. Please confirm the validity of the Salesforce client id and client secret settings"
+      invalid_client_credentials: "There was an issue with the Salesforce credentials. Please confirm the validity of the Salesforce consumer key and client secret settings"
   hubspot:
     error:
       invalid_property_value: "The value mapped to HubSpot property %{property} is not an allowed option. Correct the mapping and save again."
@@ -62,5 +62,5 @@ en:
       invalid_response: "Invalid response from HubSpot API"
   dashboard:
     problem:
-      salesforce_invalid_credentials: "There was an issue with the Salesforce credentials. Please confirm the validity of the Salesforce client id and client secret settings"
+      salesforce_invalid_credentials: "There was an issue with the Salesforce credentials. Please confirm the validity of the Salesforce consumer key and client secret settings"
       salesforce_app_not_approved: "The Discourse connected app is not yet authorized in Salesforce by the user mentioned in site setting `salesforce_username`. Please follow <a href='%{base_path}/salesforce/admin/authorize'>this link</a> to authorize it."

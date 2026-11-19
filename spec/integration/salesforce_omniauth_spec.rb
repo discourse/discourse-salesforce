@@ -4,7 +4,7 @@ require_relative "../spec_helper"
 
 RSpec.describe "Salesforce OAuth2" do
   before do
-    SiteSetting.salesforce_client_id = "SALESFORCE_CLIENT_ID"
+    SiteSetting.salesforce_consumer_key = "SALESFORCE_CONSUMER_KEY"
     SiteSetting.salesforce_client_secret = "SALESFORCE_CLIENT_SECRET"
     SiteSetting.salesforce_login_enabled = true
   end

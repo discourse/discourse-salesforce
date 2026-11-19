@@ -267,7 +267,7 @@ class Auth::SalesforceAuthenticator < Auth::ManagedAuthenticator
                       setup:
                         lambda { |env|
                           opts = env["omniauth.strategy"].options
-                          opts[:client_id] = SiteSetting.salesforce_client_id
+                          opts[:client_id] = SiteSetting.salesforce_consumer_key
                           opts[:client_secret] = SiteSetting.salesforce_client_secret
                           opts[:pkce] = true
                           opts[:redirect_uri] = "#{Discourse.base_url}/auth/salesforce/callback"
@@ -294,7 +294,7 @@ class Auth::SalesforceAuthenticator < Auth::ManagedAuthenticator
   end
 
   def required_settings
-    %i[salesforce_client_id salesforce_client_secret salesforce_authorization_server_url]
+    %i[salesforce_consumer_key salesforce_client_secret salesforce_authorization_server_url]
   end
 
   # salesforce doesn't return unverified emails in their API so we can assume

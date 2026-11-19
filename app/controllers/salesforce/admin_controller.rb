@@ -15,7 +15,7 @@ module Salesforce
     def authorize
       query =
         URI.encode_www_form(
-          client_id: SiteSetting.salesforce_client_id,
+          client_id: SiteSetting.salesforce_consumer_key,
           redirect_uri: Discourse.base_url,
           response_type: "code",
           code_challenge: pkce_code_challenge,

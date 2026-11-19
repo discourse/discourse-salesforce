@@ -4,7 +4,7 @@ RSpec.describe Auth::SalesforceAuthenticator do
   subject(:authenticator) { described_class.new }
 
   before do
-    SiteSetting.salesforce_client_id = "client_id"
+    SiteSetting.salesforce_consumer_key = "client_id"
     SiteSetting.salesforce_client_secret = "client_secret"
   end
 
@@ -40,7 +40,7 @@ RSpec.describe Auth::SalesforceAuthenticator do
   end
 
   %i[
-    salesforce_client_id
+    salesforce_consumer_key
     salesforce_client_secret
     salesforce_authorization_server_url
   ].each do |setting|

@@ -175,7 +175,7 @@ RSpec.describe DiscourseWorkflows::Nodes::SalesforceRecord::V1, discourse_workfl
         /Could not reach Salesforce/,
       )
 
-      SiteSetting.salesforce_client_id = ""
+      SiteSetting.salesforce_consumer_key = ""
 
       expect { execute_node(configuration: configuration) }.to raise_error(
         DiscourseWorkflows::NodeError,

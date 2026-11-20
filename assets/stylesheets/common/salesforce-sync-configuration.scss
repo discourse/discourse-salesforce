@@ -1,7 +1,8 @@
 @use "lib/viewport";
 
 .salesforce-sync-configuration,
-.hubspot-sync-configuration {
+.hubspot-sync-configuration,
+.crm-segment-editor {
   width: 100%;
   min-width: 0;
 
@@ -455,7 +456,8 @@
 }
 
 .salesforce-sync-configuration__section,
-.hubspot-sync-configuration__section {
+.hubspot-sync-configuration__section,
+.crm-segment-editor__section {
   min-width: 0;
   padding-block: 1.5em;
   border-block-end: 1px solid var(--primary-low);
@@ -465,9 +467,170 @@
   }
 
   > .salesforce-sync-configuration__description,
-  > .hubspot-sync-configuration__description {
+  > .hubspot-sync-configuration__description,
+  > .crm-segment-editor__description {
     margin-block: 0 1em;
     color: var(--primary-high);
+  }
+}
+
+.crm-segment-editor {
+  &__conditions {
+    display: flex;
+    flex-direction: column;
+    gap: 0.75em;
+    margin-block: 1em 0.5em;
+  }
+
+  &__condition {
+    display: grid;
+    grid-template-columns: minmax(0, 2fr) minmax(0, 1.2fr) minmax(0, 1.5fr) auto;
+    gap: 0.75em;
+    align-items: start;
+
+    > .form-kit__field {
+      margin: 0;
+    }
+
+    @include viewport.until(md) {
+      grid-template-columns: minmax(0, 1fr) auto;
+    }
+  }
+
+  &__property-label {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 1em;
+    width: 100%;
+
+    code {
+      padding: 0;
+      background: none;
+      color: var(--primary-high);
+      font-size: var(--font-down-1);
+    }
+  }
+
+  &__preview {
+    display: flex;
+    flex-direction: column;
+    gap: 0.25em;
+    margin-block-start: 1em;
+    padding: 0.75em 1em;
+    border: 1px solid var(--primary-low);
+    border-radius: var(--d-border-radius);
+  }
+
+  &__preview-users {
+    color: var(--primary-high);
+    overflow-wrap: anywhere;
+  }
+
+  &__group-fields {
+    display: flex;
+    flex-direction: column;
+    gap: 1em;
+
+    > .form-kit__field {
+      margin: 0;
+    }
+  }
+
+  &__badge-preview {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 0.75em;
+  }
+
+  &__badge-properties .d-multi-select-trigger {
+    width: 100%;
+    max-width: 40em;
+    min-width: 0;
+
+    .d-multi-select-trigger__selection-label {
+      max-width: 12em;
+    }
+  }
+}
+
+.crm-segment-badge {
+  display: inline-flex;
+
+  &__chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.35em;
+    padding: 0.15em 0.6em;
+    border-radius: var(--d-border-radius);
+    background: var(--primary-low);
+    color: var(--primary-high);
+    font-size: var(--font-down-1);
+    white-space: nowrap;
+    cursor: default;
+
+    .d-icon {
+      color: var(--primary-medium);
+    }
+  }
+
+  &__tooltip {
+    display: flex;
+    flex-direction: column;
+    gap: 0.35em;
+    min-width: 14em;
+    max-width: 22em;
+  }
+
+  &__row {
+    display: flex;
+    justify-content: space-between;
+    gap: 1em;
+  }
+
+  &__row-label,
+  &__muted {
+    color: var(--primary-medium);
+  }
+
+  &__link {
+    margin-block-start: 0.35em;
+    color: var(--tertiary);
+  }
+}
+
+.crm-segments {
+  margin-block-start: 2em;
+
+  &__table {
+    @include viewport.until(md) {
+      .d-table__cell.--controls {
+        position: static;
+        display: block;
+        width: auto;
+        padding-block-start: var(--space-2);
+        text-align: start;
+      }
+
+      .d-table__cell-actions {
+        flex-wrap: wrap;
+        justify-content: flex-start;
+      }
+    }
+  }
+
+  &__status {
+    color: var(--primary-high);
+    font-size: var(--font-down-1);
+
+    &.--error {
+      color: var(--danger);
+    }
+  }
+
+  &__muted {
+    color: var(--primary-medium);
   }
 }
 

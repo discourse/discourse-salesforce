@@ -12,7 +12,15 @@ import DPageSubheader from "discourse/ui-kit/d-page-subheader";
 import { i18n } from "discourse-i18n";
 import CrmDeleteSyncConfirmation from "discourse/plugins/discourse-salesforce/discourse/components/crm-delete-sync-confirmation";
 import CrmOutboundSyncConfiguration from "discourse/plugins/discourse-salesforce/discourse/components/crm-outbound-sync-configuration";
+import CrmSegmentEditor from "discourse/plugins/discourse-salesforce/discourse/components/crm-segment-editor";
+import CrmSegments from "discourse/plugins/discourse-salesforce/discourse/components/crm-segments";
 import HubspotSyncConfiguration from "discourse/plugins/discourse-salesforce/discourse/components/hubspot-sync-configuration";
+import {
+  createSegment,
+  deleteSegment,
+  findSegment,
+  saveSegment,
+} from "discourse/plugins/discourse-salesforce/discourse/lib/crm-segments";
 import {
   createHubspotSyncConfiguration,
   createSyncConfiguration,
@@ -32,6 +40,8 @@ const FLOWS = {
     }),
   },
 };
+const NEW_SEGMENT_KEY = "new-segment";
+const SEGMENT_KEY_PREFIX = "segment-";
 
 export default class CrmSyncConfigurations extends Component {
   @service a11y;
@@ -51,10 +61,21 @@ export default class CrmSyncConfigurations extends Component {
     const direction = Object.keys(FLOWS).find(
       (name) => FLOWS[name].newKey === this.args.selectedId
     );
+    const selectedId = String(this.args.selectedId ?? "");
     if (record && record.kind !== "posts") {
       this.selected = this.#editorFor(record);
     } else if (direction) {
       this.add(direction);
+    } else if (selectedId === NEW_SEGMENT_KEY) {
+      this.selected = this.#segmentEditorFor(createSegment(), NEW_SEGMENT_KEY);
+    } else if (selectedId.startsWith(SEGMENT_KEY_PREFIX)) {
+      const segment = findSegment(
+        selectedId.slice(SEGMENT_KEY_PREFIX.length),
+        this.args.groups
+      );
+      if (segment) {
+        this.selected = this.#segmentEditorFor(segment, selectedId);
+      }
     }
   }
 
@@ -108,6 +129,15 @@ export default class CrmSyncConfigurations extends Component {
   }
 
   @action
+  addSegment() {
+    if (this.args.onSelect && this.args.selectedId !== NEW_SEGMENT_KEY) {
+      this.args.onSelect(NEW_SEGMENT_KEY);
+      return;
+    }
+    this.selected = this.#segmentEditorFor(createSegment(), NEW_SEGMENT_KEY);
+  }
+
+  @action
   edit(record) {
     if (record.kind === "posts") {
       return;
@@ -117,6 +147,22 @@ export default class CrmSyncConfigurations extends Component {
       return;
     }
     this.selected = this.#editorFor(record);
+  }
+
+  @action
+  editSegment(segment) {
+    const key = `${SEGMENT_KEY_PREFIX}${segment.id}`;
+    if (this.args.onSelect) {
+      this.args.onSelect(key);
+      return;
+    }
+    this.selected = this.#segmentEditorFor(segment, key);
+  }
+
+  @action
+  async deleteSegment(segment) {
+    await deleteSegment(segment.id);
+    this.a11y.announce(i18n("salesforce.guided_sync.segments.deleted"));
   }
 
   @action
@@ -182,6 +228,17 @@ export default class CrmSyncConfigurations extends Component {
     }
   }
 
+  @action
+  async saveSegment(segment) {
+    await saveSegment(segment);
+    this.toasts.success({
+      duration: "short",
+      data: { message: i18n("salesforce.guided_sync.segments.saved") },
+    });
+    this.close();
+    return true;
+  }
+
   #editorFor(configuration, key = configuration.id) {
     return {
       key,
@@ -190,6 +247,16 @@ export default class CrmSyncConfigurations extends Component {
         configuration.direction === "inbound"
           ? HubspotSyncConfiguration
           : CrmOutboundSyncConfiguration,
+      onSave: this.save,
+    };
+  }
+
+  #segmentEditorFor(segment, key) {
+    return {
+      key,
+      configuration: segment,
+      component: CrmSegmentEditor,
+      onSave: this.saveSegment,
     };
   }
 
@@ -214,7 +281,7 @@ export default class CrmSyncConfigurations extends Component {
           @targets={{@targets}}
           @record={{editor.configuration}}
           @onCancel={{this.close}}
-          @onSave={{this.save}}
+          @onSave={{editor.onSave}}
         />
       {{/each}}
     {{else}}
@@ -265,6 +332,18 @@ export default class CrmSyncConfigurations extends Component {
                 /></:content>
             </AdminConfigAreaCard>
           {{/if}}
+          <AdminConfigAreaCard
+            @heading="salesforce.guided_sync.segments.card_title"
+            @description="salesforce.guided_sync.segments.card_description"
+          >
+            <:content><DButton
+                class="btn-primary"
+                data-test-define-segment
+                @action={{this.addSegment}}
+                @icon="filter"
+                @label="salesforce.guided_sync.segments.add"
+              /></:content>
+          </AdminConfigAreaCard>
           <AdminConfigAreaCard
             class="salesforce-sync-configurations__coming-soon"
             @heading="salesforce.guided_sync.send_posts"
@@ -373,6 +452,12 @@ export default class CrmSyncConfigurations extends Component {
             </tbody>
           </table>
         {{/if}}
+        <CrmSegments
+          @groups={{@groups}}
+          @onAdd={{this.addSegment}}
+          @onDelete={{this.deleteSegment}}
+          @onEdit={{this.editSegment}}
+        />
       </div>
     {{/if}}
   </template>

@@ -8,19 +8,29 @@ en:
     discourse_workflows:
       node_unavailable:
         requires_salesforce: "Requires the Salesforce plugin to be enabled"
+        requires_crm_pull: "Requires an active configuration that pulls records from a CRM"
       nodes:
         "trigger:salesforce_case_created": "Salesforce case created"
         "trigger:salesforce_person_linked": "Salesforce contact or lead linked"
         "action:salesforce_record": "Salesforce record"
+        "action:crm_records": "CRM records"
       node_descriptions:
         "trigger:salesforce_case_created": "Fires when a Salesforce case is created for a topic"
         "trigger:salesforce_person_linked": "Fires when a user is linked to a new or existing Salesforce contact or lead"
         "action:salesforce_record": "Read or update a record in Salesforce"
+        "action:crm_records": "List users with records pulled from a CRM. Each item carries the user and every record linked to them, with the stored contact and company properties"
       salesforce_person_linked:
         objects: "Objects"
         objects_contact: "Contact"
         objects_lead: "Lead"
         objects_placeholder: "Contacts and leads"
+      crm_records:
+        provider: "Provider"
+        providers:
+          hubspot: "HubSpot"
+        object: "Object"
+        objects:
+          contact: "Contacts"
       salesforce_record:
         operation: "Operation"
         operations:

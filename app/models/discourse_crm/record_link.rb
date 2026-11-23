@@ -23,9 +23,12 @@ module DiscourseCrm
         .index_by(&:user_id)
     end
 
-    def self.link_many!(rows)
-      return if rows.empty?
-      insert_all(rows, unique_by: :index_crm_record_links_on_scope_user_and_external_id)
+    def self.link_many!(rows, returning: nil)
+      insert_all(
+        rows,
+        unique_by: :index_crm_record_links_on_scope_user_and_external_id,
+        returning: returning,
+      )
     end
 
     def self.link!(provider:, account:, object:, user_id:, external_id:, converted_from_id: nil)

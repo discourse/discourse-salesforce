@@ -19,11 +19,9 @@ module ::Jobs
             reason: args[:reason],
           )
         rescue => error
-          ::DiscourseCrm::SyncConfiguration.record_result(
-            args[:configuration_id],
-            args[:user_id],
-            error: error,
-          )
+          if configuration
+            ::Salesforce::SyncActivity.record_failure(configuration, args[:user_id], error)
+          end
           unless error.is_a?(Discourse::InvalidParameters) ||
                    error.is_a?(Salesforce::AmbiguousEmailMatch)
             raise

@@ -23,6 +23,7 @@ module Jobs
           reason: args[:reason],
           started_at: started_at.iso8601,
         }
+        next_args[:history_result] = args[:history_result] if args[:history_result]
         if args[:companies_after]
           return refresh_companies(configuration, import, args, next_args, started_at)
         end
@@ -38,18 +39,25 @@ module Jobs
             import_api.list_contacts(after: args[:after], properties: import.requested_properties)
           end
         results = page.fetch("results")
-        links = import.import_page(results)
-        configuration
-          .sync_states
-          .where(user_id: links.map { |link| link[:user_id] })
-          .update_all(error: nil, error_at: nil)
+        company_phase = args[:reason] == "scheduled" && import.pulls_companies?
+        reasons =
+          import.import_page(results, defer_companies: company_phase) do |imported_page|
+            imported = imported_page.reasons(summarize_unchanged: args[:reason] == "scheduled")
+            configuration.record_import_results(imported, scheduled_at: next_args[:started_at])
+            imported
+          end
+        if reasons.any?
+          next_args[:history_result] = "recorded"
+        elsif results.any?
+          next_args[:history_result] ||= "no_matching_users"
+        end
 
         next_after = page.dig("paging", "next", "after")
         if next_after.blank?
-          if since && import.pulls_companies?
+          if company_phase
             Jobs.enqueue(::Jobs::Hubspot::SyncConfiguration, **next_args, companies_after: "")
           else
-            finish(configuration, started_at)
+            finish(configuration, started_at, next_args[:history_result])
           end
         elsif since && next_after.to_i >= SEARCH_CURSOR_LIMIT
           restart = restart_window(results, since)
@@ -61,13 +69,14 @@ module Jobs
           )
         end
       rescue ::Hubspot::RateLimited => error
+        ::Hubspot::SyncActivity.record_failure(configuration, nil, error)
         Jobs.enqueue_in(
           error.retry_after,
           ::Jobs::Hubspot::SyncConfiguration,
           args.to_h.symbolize_keys,
         )
       rescue => error
-        ::DiscourseCrm::SyncConfiguration.record_result(args[:configuration_id], error: error)
+        configuration&.record_result(error: error)
         unless error.is_a?(Discourse::InvalidParameters) ||
                  error.is_a?(::Hubspot::DailyQuotaExceeded)
           raise
@@ -85,19 +94,36 @@ module Jobs
 
       def refresh_companies(configuration, import, args, next_args, started_at)
         ids = import.referenced_company_ids(after: args[:companies_after])
-        if ids.empty?
-          finish(configuration, started_at)
-        else
-          import.refresh_companies(ids)
-          Jobs.enqueue(::Jobs::Hubspot::SyncConfiguration, **next_args, companies_after: ids.last)
+        return finish(configuration, started_at, next_args[:history_result]) if ids.empty?
+
+        import.refresh_companies(ids, allow_partial_import: true) do |result|
+          if result.nil? ||
+               ::Hubspot::SyncActivity.record_company_results(
+                 configuration,
+                 ids,
+                 result,
+                 started_at,
+               )
+            next_args[:history_result] = "recorded"
+          end
         end
+        Jobs.enqueue(::Jobs::Hubspot::SyncConfiguration, **next_args, companies_after: ids.last)
       end
 
-      def finish(configuration, started_at)
-        ::DiscourseCrm::SyncConfiguration
-          .where(id: configuration.id)
-          .where("last_synced_at IS NULL OR last_synced_at < ?", started_at)
-          .update_all(last_synced_at: started_at, last_error: nil, last_error_at: nil)
+      def finish(configuration, started_at, history_result)
+        ::DiscourseCrm::SyncAttempt.transaction do
+          unless history_result == "recorded"
+            ::DiscourseCrm::SyncAttempt.record(
+              configuration,
+              nil,
+              reason: history_result || "no_contacts",
+            )
+          end
+          ::DiscourseCrm::SyncConfiguration
+            .where(id: configuration.id)
+            .where("last_synced_at IS NULL OR last_synced_at < ?", started_at)
+            .update_all(last_synced_at: started_at, last_error: nil, last_error_at: nil)
+        end
       end
 
       def search_window(configuration, args)
@@ -112,7 +138,7 @@ module Jobs
         restart = value.present? ? Time.zone.parse(value) : nil
         if restart.nil? || restart <= since
           raise ::Hubspot::InvalidApiResponse.new(
-                  "Search reached #{SEARCH_CURSOR_LIMIT} results without a later modified date",
+                  "Contact search limit reached without a later modified date",
                 )
         end
         restart

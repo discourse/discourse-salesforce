@@ -6,6 +6,10 @@ module ::Hubspot
       "hubspot"
     end
 
+    def self.failure_reason_class
+      FailureReason
+    end
+
     def self.account
       SiteSetting.hubspot_portal_id
     end

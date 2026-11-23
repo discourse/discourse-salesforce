@@ -9,9 +9,13 @@ discourse_salesforce:
       impact: "feature,admins"
       allow_enabled_for:
         - everyone
+  crm_sync_activity_retention_days:
+    default: 90
+    min: 0
   salesforce_enabled:
     default: false
     client: true
+    refresh: true
   salesforce_leads_enabled:
     default: true
     client: true
@@ -120,6 +124,8 @@ discourse_salesforce:
   hubspot_enabled:
     default: false
     hidden: true
+    client: true
+    refresh: true
   hubspot_portal_id:
     default: ""
     hidden: true

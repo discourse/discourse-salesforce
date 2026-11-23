@@ -26,6 +26,7 @@ end
 require_relative "lib/salesforce/engine"
 
 register_asset "stylesheets/salesforce.scss"
+register_asset "stylesheets/common/crm-sync-activity.scss", :admin
 register_asset "stylesheets/common/salesforce-sync-configuration.scss", :admin
 
 add_admin_route "salesforce.title", "discourse-salesforce", use_new_show_route: true
@@ -120,6 +121,17 @@ after_initialize do
     )
   end
 
+  # Historical values must be scrubbed even when CRM syncing is disabled.
+  # rubocop:disable Discourse/Plugins/UsePluginInstanceOn
+  DiscourseEvent.on(:user_anonymized) do |user:, **|
+    DiscourseCrm::SyncAttempt.scrub_rejected_values(user.id)
+  end
+
+  DiscourseEvent.on(:user_destroyed) do |user|
+    DiscourseCrm::SyncAttempt.scrub_rejected_values(user.id)
+  end
+  # rubocop:enable Discourse/Plugins/UsePluginInstanceOn
+
   on(:user_updated) do |user, changed_fields = []|
     DiscourseCrm::ConfigurationScheduler.enqueue_user(
       user,
@@ -161,6 +173,7 @@ after_initialize do
   on(:post_edited) { |post| automatic_case_sync.call(post.topic) }
 
   reloadable_patch do |plugin|
+    UserEmail.include(DiscourseCrm::UserEmailExtension)
     User.prepend(DiscourseCrm::UserExtension)
     User.prepend(Salesforce::UserExtension)
     Topic.prepend(Salesforce::TopicExtension)

@@ -136,7 +136,10 @@ RSpec.shared_context "with hubspot spec helper" do
 
   def stub_hubspot_company_batch_read(results, ids: nil, errors: [])
     stub = stub_request(:post, hubspot_url("objects/companies/batch/read"))
-    stub = stub.with(body: hash_including("inputs" => ids.map { |id| { "id" => id } })) if ids
+    if ids
+      inputs = ids.map { |id| { "id" => id } }
+      stub = stub.with(body: hash_including("inputs" => match_array(inputs)))
+    end
     stub.to_return(
       status: errors.any? ? 207 : 200,
       body: { results: results, errors: errors }.to_json,

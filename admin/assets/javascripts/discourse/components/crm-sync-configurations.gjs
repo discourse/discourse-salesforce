@@ -297,40 +297,6 @@ export default class CrmSyncConfigurations extends Component {
                       <div class="salesforce-sync-configurations__status">
                         {{i18n "salesforce.guided_sync.connection_changed"}}
                       </div>
-                    {{else if record.sync_status.error}}
-                      <div class="salesforce-sync-configurations__status">
-                        {{#if
-                          (eq
-                            record.sync_status.error "Hubspot::MissingContact"
-                          )
-                        }}
-                          {{i18n
-                            "salesforce.guided_sync.hubspot.missing_contact"
-                          }}
-                        {{else if
-                          (eq
-                            record.sync_status.error
-                            "Hubspot::InvalidPropertyValue"
-                          )
-                        }}
-                          {{i18n
-                            "salesforce.guided_sync.hubspot.invalid_property_value"
-                          }}
-                        {{else if
-                          (eq
-                            record.sync_status.error
-                            "Hubspot::DailyQuotaExceeded"
-                          )
-                        }}
-                          {{i18n
-                            "salesforce.guided_sync.hubspot.daily_quota_exceeded"
-                          }}
-                        {{else if (eq record.direction "outbound")}}
-                          {{i18n "salesforce.guided_sync.outbound_sync_error"}}
-                        {{else}}
-                          {{i18n "salesforce.guided_sync.sync_error"}}
-                        {{/if}}
-                      </div>
                     {{/if}}
                   </td>
                   <td class="d-table__cell --detail"><div

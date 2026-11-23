@@ -15,20 +15,17 @@ module Jobs
         user = ::DiscourseCrm::UserEligibility.eligible_users.find_by(id: args[:user_id])
         return unless user
 
-        ::Hubspot::ContactImport.new(configuration).import_user(user)
-        ::DiscourseCrm::SyncState.where(
-          configuration_id: configuration.id,
-          user_id: user.id,
-        ).update_all(error: nil, error_at: nil)
+        import = ::Hubspot::ContactImport.new(configuration)
+        import.import_user(user) do |reasons|
+          configuration.record_import_results(reasons, clear_errors_for: user.id)
+        end
       rescue ::Hubspot::RateLimited => error
+        ::Hubspot::SyncActivity.record_failure(configuration, args[:user_id], error)
         Jobs.enqueue_in(error.retry_after, self.class, args)
       rescue => error
-        ::DiscourseCrm::SyncConfiguration.record_result(
-          args[:configuration_id],
-          args[:user_id],
-          error: error,
-        )
+        configuration&.record_result(args[:user_id], error: error)
         unless error.is_a?(Discourse::InvalidParameters) ||
+                 error.is_a?(::Hubspot::ApiValidationError) ||
                  error.is_a?(::Hubspot::DailyQuotaExceeded)
           raise
         end

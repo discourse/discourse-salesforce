@@ -32,12 +32,11 @@ module Hubspot
 
     def self.sync(configuration_id, user_id, reason: nil)
       return unless DiscourseCrm::SyncConfiguration.enabled?
+      configurations = DiscourseCrm::SyncConfiguration.active.outbound.where(provider: "hubspot")
+      entered_lock = false
       DistributedMutex.synchronize("hubspot_person_create_#{user_id}", validity: 5.minutes) do
-        configuration =
-          DiscourseCrm::SyncConfiguration.active.outbound.find_by(
-            id: configuration_id,
-            provider: "hubspot",
-          )
+        entered_lock = true
+        configuration = configurations.find_by(id: configuration_id)
         return unless configuration&.reason_enabled?(reason) && Hubspot::SyncProvider.credentials?
         user =
           DiscourseCrm::UserEligibility.eligible_group_members(
@@ -45,7 +44,16 @@ module Hubspot
           ).find_by(id: user_id)
         return unless user && DiscourseCrm::UserEligibility.email_verified?(user)
         new(configuration, user).sync(skip_unchanged: reason == "change")
+      rescue => error
+        SyncActivity.record_failure(configuration, user_id, error) if configuration
+        raise
       end
+    rescue => error
+      if configurations && !entered_lock
+        configuration = configurations.find_by(id: configuration_id)
+        SyncActivity.record_failure(configuration, user_id, error) if configuration
+      end
+      raise
     end
 
     def initialize(configuration, user, api: Api.new, sources: nil)
@@ -77,7 +85,7 @@ module Hubspot
             "id",
           )
       end
-      complete(id)
+      complete(id, created: record.nil?, changed: values.present?)
     end
 
     def fingerprint
@@ -98,10 +106,10 @@ module Hubspot
       )&.synced?(fingerprint)
     end
 
-    def complete(id)
+    def complete(id, created:, changed: true)
       save_link(id)
       DiscourseCrm::SyncState.store(@configuration.id, @user.id, fingerprint: fingerprint)
-      DiscourseCrm::SyncConfiguration.record_result(@configuration.id, @user.id)
+      SyncActivity.record_write(@configuration, @user.id, created: created, changed: changed)
     end
 
     def mapped_values(record, fields, refresh: true)

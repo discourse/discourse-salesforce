@@ -111,6 +111,15 @@ RSpec.describe ::Hubspot::Api do
     end
 
     describe "#batch_read_companies" do
+      it "rejects a pending company lookup even when all requested IDs are present" do
+        stub_request(:post, hubspot_url("objects/companies/batch/read")).to_return(
+          body: { status: "PENDING", results: [hubspot_company(1, name: "Acme")] }.to_json,
+        )
+        expect { api.batch_read_companies(%w[1], properties: %w[name]) }.to raise_error(
+          Hubspot::InvalidApiResponse,
+        ) { |error| expect(error.diagnostics).to eq(codes: ["INCOMPLETE_COMPANY_BATCH_READ"]) }
+      end
+
       it "reads ids in chunks of 100 and reports the ids HubSpot no longer has" do
         ids = (1..150).map(&:to_s)
         stub_hubspot_company_batch_read(
@@ -145,6 +154,16 @@ RSpec.describe ::Hubspot::Api do
     end
 
     describe "#batch_read_contacts_by_email" do
+      it "preserves a 404 when the response does not confirm a missing contact" do
+        stub_request(:post, hubspot_url("objects/contacts/batch/read")).to_return(
+          status: 404,
+          body: "Not found",
+        )
+        expect {
+          api.batch_read_contacts_by_email(["ada@example.com"], properties: %w[email])
+        }.to raise_error(Hubspot::InvalidApiResponse) { |error| expect(error.status).to eq(404) }
+      end
+
       it "reads emails in chunks of 100 and concatenates the results" do
         emails = (1..150).map { |index| "user#{index}@example.com" }
         stub_hubspot_batch_read([hubspot_contact(1, "user1@example.com")])

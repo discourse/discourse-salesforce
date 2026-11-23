@@ -52,7 +52,7 @@ module("Integration | Component | CrmSyncConfigurations", function (hooks) {
     ];
   });
 
-  test("renders unknown targets and explains daily quota exhaustion", async function (assert) {
+  test("renders unknown targets without inline sync errors", async function (assert) {
     this.records = [
       {
         id: "custom",
@@ -99,8 +99,10 @@ module("Integration | Component | CrmSyncConfigurations", function (hooks) {
       .dom('[data-test-configuration="unknown"]')
       .includesText("other-crm - Person");
     assert
-      .dom('[data-test-configuration="quota"]')
-      .includesText("HubSpot’s daily API quota is exhausted");
+      .dom(
+        '[data-test-configuration="quota"] .salesforce-sync-configurations__status'
+      )
+      .doesNotExist();
   });
 
   test("post sync deep links cannot open the disabled post configuration", async function (assert) {
@@ -401,10 +403,7 @@ module("Integration | Component | CrmSyncConfigurations", function (hooks) {
       .dom(
         '[data-test-configuration="contact"] .salesforce-sync-configurations__status'
       )
-      .hasText(
-        "Sync failed — check the server logs, correct the problem, and save this configuration to retry sync.",
-        "keeps errors visible"
-      );
+      .doesNotExist();
     assert
       .dom(
         '[data-test-configuration="stale-connection"] .salesforce-sync-configurations__status'
@@ -578,7 +577,7 @@ module("Integration | Component | CrmSyncConfigurations", function (hooks) {
     assert.dom("[data-test-pull-crm]").isDisabled();
     assert
       .dom('[data-test-configuration="push"]')
-      .includesText("Restore it or create a replacement");
+      .doesNotIncludeText("Restore it or create a replacement");
     assert
       .dom('[data-test-configuration="push"]')
       .includesText("Send users to CRM");

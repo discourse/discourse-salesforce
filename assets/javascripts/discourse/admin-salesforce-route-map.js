@@ -3,6 +3,7 @@ export default {
   path: "/plugins",
 
   map() {
+    this.route("salesforce-activity", { path: "activity" });
     this.route("salesforce-configurations", { path: "configurations" });
   },
 };

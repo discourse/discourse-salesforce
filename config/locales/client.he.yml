@@ -27,6 +27,7 @@ he:
     salesforce:
       title: Salesforce
       guided_sync:
+        crm_object: "עצם CRM"
         all_users: "כל המשתמשים"
         discard_changes: "התעלמות מהשינויים"
         keep_editing: "להמשיך לערוך"

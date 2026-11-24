@@ -16,6 +16,8 @@ ja:
         objects: "物"
         objects_contact: "連絡先"
         objects_lead: "リード"
+      crm_records:
+        provider: "プロバイダー"
       salesforce_record:
         operations:
           update: "更新"

@@ -16,6 +16,8 @@ es:
         objects: "Objetos"
         objects_contact: "Contacto"
         objects_lead: "Cliente potencial"
+      crm_records:
+        provider: "Proveedor"
       salesforce_record:
         operations:
           update: "Actualizar"

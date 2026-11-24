@@ -10,6 +10,8 @@ zh_TW:
       salesforce_person_linked:
         objects: "物件"
         objects_contact: "聯繫"
+      crm_records:
+        provider: "服務提供者"
       salesforce_record:
         operation: "操作"
         operations:

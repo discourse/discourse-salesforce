@@ -16,6 +16,8 @@ tr_TR:
         objects: "Nesneler"
         objects_contact: "İletişim"
         objects_lead: "Potansiyel Müşteri"
+      crm_records:
+        provider: "Sağlayıcı"
       salesforce_record:
         operations:
           update: "Güncelle"

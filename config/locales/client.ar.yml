@@ -16,6 +16,8 @@ ar:
         objects: "الأشياء"
         objects_contact: "تواصل معنا"
         objects_lead: "عميل محتمل"
+      crm_records:
+        provider: "مقدِّم الخدمة"
       salesforce_record:
         operation: "العملية"
         operations:

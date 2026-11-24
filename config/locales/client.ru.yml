@@ -16,6 +16,8 @@ ru:
         objects: "Объекты"
         objects_contact: "Контакты"
         objects_lead: "Интерес"
+      crm_records:
+        provider: "Поставщик"
       salesforce_record:
         operations:
           update: "Обновить"

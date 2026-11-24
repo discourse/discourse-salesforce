@@ -10,6 +10,8 @@ lt:
       salesforce_person_linked:
         objects: "Objektai"
         objects_contact: "Susisiekite"
+      crm_records:
+        provider: "Teikėjas"
       salesforce_record:
         operations:
           update: "Atnaujinti"

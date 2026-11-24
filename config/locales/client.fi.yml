@@ -16,6 +16,8 @@ fi:
         objects: "Esineet"
         objects_contact: "Yhteystiedot"
         objects_lead: "Liidi"
+      crm_records:
+        provider: "Palveluntarjoaja"
       salesforce_record:
         operations:
           update: "Päivitä"

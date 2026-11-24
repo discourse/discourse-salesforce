@@ -16,6 +16,8 @@ zh_CN:
         objects: "物体"
         objects_contact: "联系人"
         objects_lead: "潜在客户"
+      crm_records:
+        provider: "提供商"
       salesforce_record:
         operation: "操作"
         operations:

@@ -10,6 +10,8 @@ da:
       salesforce_person_linked:
         objects: "Objekter"
         objects_contact: "Kontakt"
+      crm_records:
+        provider: "Udbyder"
       salesforce_record:
         operations:
           update: "Opdater"

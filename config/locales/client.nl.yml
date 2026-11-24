@@ -16,6 +16,8 @@ nl:
         objects: "Objecten"
         objects_contact: "Contact"
         objects_lead: "Lead"
+      crm_records:
+        provider: "Provider"
       salesforce_record:
         operations:
           update: "Bijwerken"

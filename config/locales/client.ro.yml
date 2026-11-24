@@ -10,6 +10,8 @@ ro:
       salesforce_person_linked:
         objects: "Obiecte"
         objects_contact: "Contact"
+      crm_records:
+        provider: "Furnizor"
       salesforce_record:
         operations:
           update: "Actualizează"

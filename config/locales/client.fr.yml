@@ -16,6 +16,8 @@ fr:
         objects: "Objets"
         objects_contact: "Contact"
         objects_lead: "Prospect"
+      crm_records:
+        provider: "Fournisseur"
       salesforce_record:
         operation: "Opération"
         operations:

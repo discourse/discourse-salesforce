@@ -16,6 +16,8 @@ pt_BR:
         objects: "Objetos"
         objects_contact: "Contato"
         objects_lead: "Lead"
+      crm_records:
+        provider: "Provedor"
       salesforce_record:
         operations:
           update: "Atualizar"

@@ -16,6 +16,8 @@ it:
         objects: "Oggetti"
         objects_contact: "Contatto"
         objects_lead: "Lead"
+      crm_records:
+        provider: "Fornitore"
       salesforce_record:
         operations:
           update: "Aggiorna"

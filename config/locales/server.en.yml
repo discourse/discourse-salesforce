@@ -38,6 +38,9 @@ en:
         no_fields: "Add at least one field to update"
         missing_value: "\"%{field}\" has no value"
         request_failed: "Could not reach Salesforce: %{message}"
+      records:
+        unknown_provider: "\"%{value}\" does not pull records from a CRM"
+        unknown_object: "\"%{value}\" is not an object the pull keeps"
     error:
       connection:
         authentication: "Salesforce authentication failed. Check the API credentials and the integration user’s app authorization, then retry."

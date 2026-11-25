@@ -13,6 +13,21 @@ sw:
       salesforce_record:
         value_placeholder: "Thamani"
     salesforce:
+      activity:
+        user: "Mtumiaji"
+        from: "Kutoka"
+        to: "Kwenda"
+        details: "Taarifa"
+        all: "Vyote"
+        filter: "Chuja"
+        reason: "Sababu"
+        error: "Hitilafu"
+        outcomes:
+          success: "Fanikiwa"
+          failed: "Kushindwa"
+          skipped: "Imerukwa"
+        objects:
+          contact: "Wasiliana"
       guided_sync:
         cancel_setup: "Ghairi"
         group_name: "Jina la kikundi"

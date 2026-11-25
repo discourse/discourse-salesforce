@@ -14,6 +14,21 @@ sk:
           update: "Aktualizovať"
         value_placeholder: "Hodnota"
     salesforce:
+      activity:
+        outcome: "Výsledok"
+        user: "Používateľ"
+        from: "Od"
+        to: "Komu"
+        details: "Detaily"
+        all: "Všetky"
+        filter: "Filter"
+        deleted_user: "Používateľ bol odstránený"
+        reason: "Dôvod"
+        error: "Chyba"
+        outcomes:
+          success: "Úspešné"
+          failed: "Nepodarilo sa"
+          skipped: "Preskočené"
       guided_sync:
         all_users: "Všetci používatelia"
         discard_changes: "Zahodenie zmien"

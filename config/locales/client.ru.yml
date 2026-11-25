@@ -27,6 +27,24 @@ ru:
         name: "Salesforce"
         title: "Вход через Salesforce"
     salesforce:
+      activity:
+        outcome: "Результат"
+        user: "Пользователь"
+        from: "Отправитель"
+        to: "Получатель"
+        details: "Детали"
+        all: "Все настройки"
+        filter: "Фильтр"
+        deleted_user: "Удалённый пользователь"
+        reason: "Причина"
+        error: "Ошибка"
+        outcomes:
+          success: "Выполнена"
+          failed: "Не удалась"
+          skipped: "Пропущено"
+        objects:
+          contact: "Контакты"
+          lead: "Интерес"
       title: Salesforce
       guided_sync:
         all_users: "Все пользователи"

@@ -14,6 +14,20 @@ hr:
           update: "Ažuriraj"
         value_placeholder: "Vrijednost"
     salesforce:
+      activity:
+        user: "Korisnik"
+        from: "Od"
+        to: "Za"
+        details: "Detalji"
+        all: "Sve"
+        filter: "Filter"
+        deleted_user: "Izbrisani korisnik"
+        reason: "Razlog"
+        error: "Greška"
+        outcomes:
+          success: "Uspješno"
+          failed: "Neuspješno"
+          skipped: "Preskočeno"
       guided_sync:
         all_users: "Svi korisnici"
         keep_editing: "Nastavite uređivati"

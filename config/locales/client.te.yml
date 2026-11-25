@@ -14,6 +14,19 @@ te:
           update: "నవీకరించండి"
         value_placeholder: "విలువ"
     salesforce:
+      activity:
+        user: "సభ్యుడు"
+        from: "నుండి"
+        to: "కు"
+        details: "వివరాలు"
+        all: "అన్ని"
+        filter: "ఫిల్టర్ చేయండి"
+        reason: "కారణం"
+        error: "లోపం"
+        outcomes:
+          success: "విజయవంతమైంది"
+          failed: "విఫలం"
+          skipped: "వదిలిన"
       guided_sync:
         keep_editing: "సవరించడం కొనసాగించండి"
         cancel_setup: "రద్దుచేయండి"

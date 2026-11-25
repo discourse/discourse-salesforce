@@ -18,6 +18,23 @@ el:
           update: "Ενημέρωση"
         value_placeholder: "Τιμή"
     salesforce:
+      activity:
+        outcome: "Αποτέλεσμα"
+        user: "Χρήστης"
+        from: "Από"
+        to: "Προς"
+        details: "Λεπτομέρειες"
+        all: "Όλα"
+        filter: "Φίλτρο"
+        deleted_user: "Διαγραμμένος χρήστης"
+        reason: "Αιτία"
+        error: "Σφάλμα"
+        outcomes:
+          success: "Επιτυχής"
+          failed: "Απέτυχε"
+          skipped: "Παραβλέφθηκε"
+        objects:
+          contact: "Επικοινωνία"
       guided_sync:
         all_users: "Όλοι οι χρήστες"
         discard_changes: "Απόρριψη αλλαγών"

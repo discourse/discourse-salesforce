@@ -17,6 +17,22 @@ da:
           update: "Opdater"
         value_placeholder: "værdi"
     salesforce:
+      activity:
+        user: "Bruger"
+        from: "Fra"
+        to: "Til"
+        details: "Detaljer"
+        all: "Alle"
+        filter: "Filter"
+        deleted_user: "Slettet bruger"
+        reason: "Begrundelse"
+        error: "Fejl"
+        outcomes:
+          success: "Gennemført"
+          failed: "Fejlet"
+          skipped: "Droppet"
+        objects:
+          contact: "Kontakt"
       guided_sync:
         all_users: "Alle brugere"
         keep_editing: "Fortsæt redigering"

@@ -16,6 +16,26 @@ uk:
           update: "Оновити"
         value_placeholder: "Значення"
     salesforce:
+      activity:
+        outcome: "Результат"
+        user: "Користувач"
+        from: "Від"
+        to: "До"
+        details: "Подробиці"
+        all: "Все"
+        filter: "Filter"
+        deleted_user: "Видалений користувач"
+        reason: "Причина"
+        error: "Помилка"
+        outcomes:
+          success: "Успішно"
+          failed: "Помилка"
+          skipped: "Пропущено"
+        objects:
+          contact: "Контакти"
+        reasons:
+          updated: "%{object} оновлено"
+          imported: "%{object} імпортовано"
       guided_sync:
         all_users: "Всі користувачі"
         discard_changes: "Скасувати зміни"

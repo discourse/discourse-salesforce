@@ -19,6 +19,21 @@ fa_IR:
         name: "سلزفورس"
         title: "ورود با سلزفورس"
     salesforce:
+      activity:
+        user: "کاربر"
+        from: "از طرف"
+        to: "به"
+        details: "جزئیات"
+        all: "همه"
+        filter: "فیلتر"
+        reason: "دلیل"
+        error: "خطا"
+        outcomes:
+          success: "موفق"
+          failed: "ناموفق"
+          skipped: "رد شده"
+        objects:
+          contact: "تماس"
       title: سلزفورس
       guided_sync:
         all_users: "همه کاربران"

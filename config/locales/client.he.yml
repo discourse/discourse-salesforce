@@ -25,6 +25,24 @@ he:
         name: "Salesforce"
         title: "כניסה עם Salesforce"
     salesforce:
+      activity:
+        outcome: "תוצאה"
+        user: "משתמש"
+        from: "מאת"
+        to: "אל"
+        details: "פרטים"
+        all: "הכול"
+        filter: "סינון"
+        deleted_user: "משתמש שנמחק"
+        reason: "סיבה"
+        error: "תקלה"
+        outcomes:
+          success: "הצליח"
+          failed: "נכשל"
+          skipped: "דולג"
+        objects:
+          contact: "איש/אשת קשר"
+          lead: "ליד"
       title: Salesforce
       guided_sync:
         crm_object: "עצם CRM"

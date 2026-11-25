@@ -14,6 +14,24 @@ vi:
           update: "Cập nhật"
         value_placeholder: "Giá trị"
     salesforce:
+      activity:
+        outcome: "Kết quả"
+        user: "Người dùng"
+        from: "Từ"
+        to: "Tới"
+        details: "Chi tiết"
+        all: "All"
+        filter: "Lọc"
+        deleted_user: "Người dùng đã bị xóa"
+        reason: "Lý do"
+        error: "Lỗi"
+        outcomes:
+          success: "Thành công"
+          failed: "Thất bại"
+          skipped: "Đã bỏ qua"
+        reasons:
+          updated: "Đã cập nhật %{object}"
+          imported: "Đã nhập %{object}"
       guided_sync:
         all_users: "Tất cả Thành viên"
         discard_changes: "Hủy bỏ các thay đổi"

@@ -15,6 +15,22 @@ ko:
           update: "업데이트"
         value_placeholder: "값"
     salesforce:
+      activity:
+        user: "사용자"
+        from: "보내는사람"
+        to: "받는사람"
+        details: "세부 정보"
+        all: "전체"
+        filter: "필터"
+        deleted_user: "삭제된 사용자"
+        reason: "이유"
+        error: "에러"
+        outcomes:
+          success: "성공"
+          failed: "실패"
+          skipped: "생략됨"
+        objects:
+          contact: "연락처"
       guided_sync:
         all_users: "모든 사용자"
         keep_editing: "편집 유지"

@@ -17,6 +17,23 @@ hu:
           update: "Frissítés"
         value_placeholder: "Érték"
     salesforce:
+      activity:
+        outcome: "Eredmény"
+        user: "Felhasználó"
+        from: "From"
+        to: "Címzett"
+        details: "Részletek"
+        all: "Összes"
+        filter: "Szűrő"
+        deleted_user: "Törölt felhasználó"
+        reason: "Ok"
+        error: "Hiba"
+        outcomes:
+          success: "Sikeres"
+          failed: "Sikertelen"
+          skipped: "Átlépve"
+        objects:
+          contact: "Kapcsolat"
       guided_sync:
         all_users: "Minden felhasználó"
         discard_changes: "Változások elvetése"

@@ -16,6 +16,21 @@ id:
         name: "Salesforce"
         title: "Masuk dengan Salesforce"
     salesforce:
+      activity:
+        user: "Pengguna"
+        from: "Dari"
+        to: "Kepada"
+        details: "Detil"
+        all: "Semua"
+        filter: "Filter"
+        deleted_user: "Pengguna yang dihapus"
+        reason: "Alasan"
+        error: "Gangguan"
+        outcomes:
+          failed: "Gagal"
+        objects:
+          contact: "Kontak"
+          lead: "Prospek"
       title: Salesforce
       guided_sync:
         cancel_setup: "Batal"

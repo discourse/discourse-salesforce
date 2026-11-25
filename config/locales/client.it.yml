@@ -27,6 +27,24 @@ it:
         name: "Salesforce"
         title: "Accedi con Salesforce"
     salesforce:
+      activity:
+        outcome: "Esito"
+        user: "Utente"
+        from: "Da"
+        to: "A"
+        details: "Dettagli"
+        all: "Tutte"
+        filter: "Filtro"
+        deleted_user: "Utente eliminato"
+        reason: "Motivo"
+        error: "Errore"
+        outcomes:
+          success: "Completato"
+          failed: "Non riuscito"
+          skipped: "Saltata"
+        objects:
+          contact: "Contatto"
+          lead: "Lead"
       title: Salesforce
       guided_sync:
         all_users: "Tutti gli utenti"

@@ -15,6 +15,23 @@ ur:
           update: "اپ ڈیٹ"
         value_placeholder: "وَیلِیو"
     salesforce:
+      activity:
+        outcome: "نتیجہ"
+        user: "رکن"
+        from: "سے"
+        to: "کے لئے"
+        details: "تفصیلات"
+        all: "تمام"
+        filter: "فِلٹر"
+        deleted_user: "حذف شدہ رکن"
+        reason: "وجہ"
+        error: "خرابی"
+        outcomes:
+          success: "کامیابی"
+          failed: "ناکامی"
+          skipped: "چھوڑا گیا"
+        objects:
+          contact: "رابطہ"
       guided_sync:
         all_users: "تمام اراکین"
         discard_changes: "تبدیلیوں کو مسترد کریں"

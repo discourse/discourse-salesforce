@@ -12,6 +12,19 @@ bs_BA:
       salesforce_record:
         value_placeholder: "Value"
     salesforce:
+      activity:
+        user: "User"
+        from: "Od"
+        to: "Za"
+        details: "Details"
+        all: "All"
+        filter: "Filter"
+        reason: "Reason"
+        error: "Greška"
+        outcomes:
+          success: "Uspješan"
+          failed: "Neuspješno"
+          skipped: "Skipped"
       guided_sync:
         cancel_setup: "Odustani"
         group_name: "Ime grupe"

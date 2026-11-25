@@ -14,6 +14,19 @@ sq:
           update: "Përditëso"
         value_placeholder: "Vlera"
     salesforce:
+      activity:
+        user: "User"
+        from: "Nga"
+        to: "Për"
+        details: "Detaje"
+        all: "Të Gjithë"
+        filter: "Filtro"
+        deleted_user: "Përdoruesi është fshirë"
+        reason: "Arsye"
+        error: "Gabim"
+        outcomes:
+          failed: "Dështoi"
+          skipped: "Skipped"
       guided_sync:
         cancel_setup: "Anulo"
         group_name: "Emri i grupit"

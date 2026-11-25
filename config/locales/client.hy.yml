@@ -15,6 +15,21 @@ hy:
           update: "Թարմացնել"
         value_placeholder: "Արժեք"
     salesforce:
+      activity:
+        user: "Օգտատեր"
+        from: "Ում կողմից"
+        to: "Մինչև"
+        details: "Մանրամասներ"
+        all: "Բոլորը"
+        filter: "Ֆիլտր"
+        reason: "Պատճառ"
+        error: "Սխալ"
+        outcomes:
+          success: "Հաջողված"
+          failed: "Ձախողված"
+          skipped: "Բաց է թողնված"
+        objects:
+          contact: "Կապ"
       guided_sync:
         keep_editing: "Շարունակել խմբագրումը"
         cancel_setup: "Չեղարկել"

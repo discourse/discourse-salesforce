@@ -17,6 +17,23 @@ lt:
           update: "Atnaujinti"
         value_placeholder: "Reikšmė"
     salesforce:
+      activity:
+        outcome: "Rezultatas"
+        user: "Narys"
+        from: "Nuo"
+        to: "Kam"
+        details: "Detalės"
+        all: "Visos"
+        filter: "Filtruoti"
+        deleted_user: "Ištrintas naudotojas"
+        reason: "Priežastis"
+        error: "Klaida"
+        outcomes:
+          success: "Sėkmingas"
+          failed: "Nepavyko"
+          skipped: "Praleisti"
+        objects:
+          contact: "Susisiekite"
       guided_sync:
         discard_changes: "Atmesti pakeitimus"
         keep_editing: "Tęskite redagavimą"

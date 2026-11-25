@@ -28,6 +28,27 @@ ar:
         name: "Salesforce"
         title: "تسجيل الدخول من خلال Salesforce"
     salesforce:
+      activity:
+        outcome: "النتيجة"
+        user: "المستخدم"
+        from: "من"
+        to: "إلى"
+        details: "التفاصيل"
+        all: "الكل"
+        filter: "عامل التصفية"
+        deleted_user: "مستخدم محذوف"
+        reason: "السبب"
+        error: "خطأ"
+        outcomes:
+          success: "نجح"
+          failed: "فشل"
+          skipped: "المتخطاة"
+        objects:
+          contact: "تواصل معنا"
+          lead: "عميل محتمل"
+        reasons:
+          updated: "تم تحديث %{object}"
+          imported: "تم استيراد %{object}"
       title: Salesforce
       guided_sync:
         all_users: "جميع المستخدمين"

@@ -14,6 +14,21 @@ cs:
           update: "Aktualizovat"
         value_placeholder: "Hodnota"
     salesforce:
+      activity:
+        outcome: "Výsledky"
+        user: "Uživatel"
+        from: "Od koho"
+        to: "Do"
+        details: "Podrobnosti"
+        all: "Vše"
+        filter: "Filtr"
+        deleted_user: "Smazaný uživatel"
+        reason: "Důvod"
+        error: "Chyba"
+        outcomes:
+          success: "Úspěšný"
+          failed: "Neúspěšný"
+          skipped: "Přeskočené"
       guided_sync:
         all_users: "Všichni uživatelé"
         discard_changes: "Zahodit změny"

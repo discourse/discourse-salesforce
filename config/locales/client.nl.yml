@@ -27,6 +27,24 @@ nl:
         name: "Salesforce"
         title: "Aanmelden met Salesforce"
     salesforce:
+      activity:
+        outcome: "Resultaat"
+        user: "Gebruiker"
+        from: "Van"
+        to: "Aan"
+        details: "Details"
+        all: "Alles"
+        filter: "Filter"
+        deleted_user: "Verwijderde gebruiker"
+        reason: "Reden"
+        error: "Fout"
+        outcomes:
+          success: "Gelukt"
+          failed: "Mislukt"
+          skipped: "Overgeslagen"
+        objects:
+          contact: "Contact"
+          lead: "Lead"
       title: Salesforce
       guided_sync:
         all_users: "Alle gebruikers"

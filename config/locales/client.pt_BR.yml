@@ -27,6 +27,24 @@ pt_BR:
         name: "Salesforce"
         title: "Entrar com Salesforce"
     salesforce:
+      activity:
+        outcome: "Resultado"
+        user: "Usuário(a)"
+        from: "De"
+        to: "Para"
+        details: "Detalhes"
+        all: "Todas"
+        filter: "Filtro"
+        deleted_user: "Usuário(a) excluído(a)"
+        reason: "Motivo"
+        error: "Erro"
+        outcomes:
+          success: "Realizado(a)"
+          failed: "Falha"
+          skipped: "Ignorados(as)"
+        objects:
+          contact: "Contato"
+          lead: "Lead"
       title: Salesforce
       guided_sync:
         all_users: "Todos(as) os(as) usuários(as)"

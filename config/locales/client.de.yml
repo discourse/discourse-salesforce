@@ -28,6 +28,27 @@ de:
         name: "Salesforce"
         title: "Mit Salesforce anmelden"
     salesforce:
+      activity:
+        outcome: "Ergebnis"
+        user: "Nutzer"
+        from: "Von"
+        to: "An"
+        details: "Details"
+        all: "Gesamt"
+        filter: "Filter"
+        deleted_user: "Gelöschter Benutzer"
+        reason: "Grund"
+        error: "Fehler"
+        outcomes:
+          success: "Erfolgreich"
+          failed: "Fehlgeschlagen"
+          skipped: "Übersprungen"
+        objects:
+          contact: "Kontakt"
+          lead: "Lead"
+        reasons:
+          updated: "%{object} aktualisiert"
+          imported: "%{object} importiert"
       title: Salesforce
       guided_sync:
         all_users: "Alle Benutzer"

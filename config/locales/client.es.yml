@@ -27,6 +27,24 @@ es:
         name: "Salesforce"
         title: "Iniciar sesión con Salesforce"
     salesforce:
+      activity:
+        outcome: "Resultado"
+        user: "Usuario"
+        from: "De"
+        to: "Para"
+        details: "Detalles"
+        all: "Todos"
+        filter: "Filtro"
+        deleted_user: "Usuario eliminado"
+        reason: "Motivo"
+        error: "Error"
+        outcomes:
+          success: "Exitoso"
+          failed: "Falló"
+          skipped: "Omitido"
+        objects:
+          contact: "Contacto"
+          lead: "Cliente potencial"
       title: Salesforce
       guided_sync:
         all_users: "Todos los usuarios"

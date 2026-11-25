@@ -27,6 +27,24 @@ fi:
         name: "Salesforce"
         title: "Kirjaudu sisään Salesforce-tilillä"
     salesforce:
+      activity:
+        outcome: "Tulos"
+        user: "Käyttäjä"
+        from: "Ajalta"
+        to: "Päättyen"
+        details: "Tiedot"
+        all: "Kaikki"
+        filter: "Suodatin"
+        deleted_user: "Poistettu käyttäjä"
+        reason: "Syy"
+        error: "Virhe"
+        outcomes:
+          success: "Onnistui"
+          failed: "Epäonnistui"
+          skipped: "Ohitettu"
+        objects:
+          contact: "Yhteystiedot"
+          lead: "Liidi"
       title: Salesforce
       guided_sync:
         all_users: "Kaikki käyttäjät"

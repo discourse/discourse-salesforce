@@ -13,6 +13,21 @@ et:
       salesforce_record:
         value_placeholder: "Väärtus"
     salesforce:
+      activity:
+        user: "Kasutaja"
+        from: "Kellelt"
+        to: "Kellele"
+        details: "Üksikasjad"
+        all: "Kõik"
+        filter: "Filter"
+        reason: "Põhjus"
+        error: "Viga"
+        outcomes:
+          success: "Edukas"
+          failed: "Ebaõnnestunud"
+          skipped: "Üle hüpatud"
+        objects:
+          contact: "Kontakt"
       guided_sync:
         cancel_setup: "Tühista"
         group_name: "Rühma nimi"

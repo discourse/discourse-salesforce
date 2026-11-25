@@ -14,6 +14,18 @@ bg:
           update: "Актуализация"
         value_placeholder: "Стойност"
     salesforce:
+      activity:
+        user: "Потребител"
+        from: "От"
+        to: "До"
+        details: "Детайли"
+        all: "Всички"
+        filter: "Филтър"
+        reason: "Причина"
+        error: "Грешка"
+        outcomes:
+          failed: "Провалени"
+          skipped: "Пропусни"
       guided_sync:
         cancel_setup: "Прекрати"
         group_name: "Име на групата"

@@ -14,6 +14,18 @@ th:
           update: "อัปเดต"
         value_placeholder: "ค่า"
     salesforce:
+      activity:
+        user: "ผู้ใช้"
+        from: "จาก"
+        to: "ถึง"
+        details: "รายละเอียด"
+        all: "ทั้งหมด"
+        reason: "เหตุผล"
+        error: "ผิดพลาด"
+        outcomes:
+          success: "สำเร็จ"
+          failed: "ล้มเหลว"
+          skipped: "ข้าม"
       guided_sync:
         cancel_setup: "ยกเลิก"
         group_name: "ชื่อกลุ่ม"

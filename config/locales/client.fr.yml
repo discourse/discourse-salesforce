@@ -28,6 +28,27 @@ fr:
         name: "Salesforce"
         title: "Se connecter avec Salesforce"
     salesforce:
+      activity:
+        outcome: "Résultat"
+        user: "Utilisateur"
+        from: "De"
+        to: "À"
+        details: "Détails"
+        all: "Tout"
+        filter: "Filtre"
+        deleted_user: "Utilisateur supprimé"
+        reason: "Raison"
+        error: "Erreur"
+        outcomes:
+          success: "Succès"
+          failed: "Échec"
+          skipped: "Ignorés"
+        objects:
+          contact: "Contact"
+          lead: "Prospect"
+        reasons:
+          updated: "%{object} mis à jour"
+          imported: "%{object} importé(s)"
       title: Salesforce
       guided_sync:
         all_users: "Tous les utilisateurs"

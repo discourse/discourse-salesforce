@@ -14,6 +14,20 @@ nb_NO:
           update: "Oppdater"
         value_placeholder: "Verdi"
     salesforce:
+      activity:
+        user: "Bruker"
+        from: "Fra"
+        to: "Til"
+        details: "Detaljer"
+        all: "Alle"
+        filter: "Filtrer"
+        deleted_user: "Slettet bruker"
+        reason: "Begrunnelse"
+        error: "Feil"
+        outcomes:
+          success: "Vellykket"
+          failed: "Feilet"
+          skipped: "Hoppet over"
       guided_sync:
         keep_editing: "Fortsett å redigere"
         cancel_setup: "Avbryt"

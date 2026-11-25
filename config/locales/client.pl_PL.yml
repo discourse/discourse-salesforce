@@ -16,6 +16,26 @@ pl_PL:
           update: "Aktualizuj"
         value_placeholder: "Wartość"
     salesforce:
+      activity:
+        outcome: "Rezultat"
+        user: "Użytkownik"
+        from: "Od"
+        to: "Do"
+        details: "Detale"
+        all: "Wszystkie"
+        filter: "Filtr"
+        deleted_user: "Usunięty użytkownik"
+        reason: "Powód"
+        error: "Błąd"
+        outcomes:
+          success: "Powodzenie "
+          failed: "Niepowodzenie"
+          skipped: "Pominięte"
+        objects:
+          contact: "Dane kontaktowe"
+        reasons:
+          updated: "%{object} zaktualizowano"
+          imported: "%{object} zaimportowano"
       guided_sync:
         all_users: "Wszyscy użytkownicy"
         discard_changes: "Odrzuć zmiany"

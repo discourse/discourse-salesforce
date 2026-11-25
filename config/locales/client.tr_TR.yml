@@ -27,6 +27,24 @@ tr_TR:
         name: "Salesforce"
         title: "Salesforce ile Giriş Yapın"
     salesforce:
+      activity:
+        outcome: "Sonuç"
+        user: "Kullanıcı"
+        from: "Başlangıç:"
+        to: "Kime"
+        details: "Detaylar"
+        all: "Hepsi"
+        filter: "Filtre"
+        deleted_user: "Silinmiş kullanıcı"
+        reason: "Neden"
+        error: "Hata"
+        outcomes:
+          success: "Başarılı"
+          failed: "Başarısız"
+          skipped: "Atlanan"
+        objects:
+          contact: "İletişim"
+          lead: "Potansiyel Müşteri"
       title: Salesforce
       guided_sync:
         all_users: "Tüm kullanıcılar"

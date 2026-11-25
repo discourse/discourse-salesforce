@@ -12,6 +12,21 @@ be:
       salesforce_record:
         value_placeholder: "Значэнне"
     salesforce:
+      activity:
+        user: "карыстальнік"
+        from: "Ад"
+        to: "Каму"
+        details: "Падрабязнасці"
+        all: "Усе"
+        filter: "Фільтр"
+        reason: "Прычына"
+        error: "Памылка"
+        outcomes:
+          success: "Паспяховая"
+          failed: "Няўдалыя"
+          skipped: "Прапушчана"
+        objects:
+          contact: "кантакт"
       guided_sync:
         cancel_setup: "Скасаваць"
         email: "Электронная пошта"

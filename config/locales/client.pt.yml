@@ -25,6 +25,22 @@ pt:
         name: "Salesforce"
         title: "Iniciar sessão com Salesforce"
     salesforce:
+      activity:
+        user: "Utilizador"
+        from: "De"
+        to: "Para"
+        details: "Detalhes"
+        all: "Tudo"
+        filter: "Filtrar"
+        reason: "Motivo"
+        error: "Erro"
+        outcomes:
+          success: "Sucesso"
+          failed: "Falhado"
+          skipped: "Ignorado"
+        objects:
+          contact: "Contacte-nos"
+          lead: "Lead"
       title: Salesforce
       guided_sync:
         keep_editing: "Prosseguir a edição"

@@ -12,6 +12,19 @@ lv:
       salesforce_record:
         value_placeholder: "Vērtība"
     salesforce:
+      activity:
+        user: "Lietotājs"
+        from: "No"
+        to: "Kam"
+        details: "Detaļas"
+        all: "Viss"
+        filter: "Filtrs"
+        reason: "Iemesls"
+        error: "Kļūda..."
+        outcomes:
+          success: "Veiksmīgs"
+          failed: "Neizdevies"
+          skipped: "Izlaists"
       guided_sync:
         cancel_setup: "Atcelt"
         group_name: "Grupas nosaukums"

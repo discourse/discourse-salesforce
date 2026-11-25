@@ -17,6 +17,21 @@ ro:
           update: "Actualizează"
         value_placeholder: "Valoare"
     salesforce:
+      activity:
+        user: "Utilizatori"
+        from: "De la"
+        to: "Către"
+        details: "Detalii"
+        all: "Toate"
+        filter: "Filtru"
+        reason: "Motiv"
+        error: "Eroare"
+        outcomes:
+          success: "Cu succes"
+          failed: "Eșuată"
+          skipped: "Omise"
+        objects:
+          contact: "Contact"
       guided_sync:
         all_users: "Toți utilizatorii"
         discard_changes: "Renunță la modificări"

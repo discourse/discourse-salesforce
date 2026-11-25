@@ -13,6 +13,21 @@ ca:
       salesforce_record:
         value_placeholder: "Valor"
     salesforce:
+      activity:
+        user: "Usuari"
+        from: "De"
+        to: "A"
+        details: "Detalls"
+        all: "Tot"
+        filter: "Filtre"
+        reason: "Motiu"
+        error: "Error"
+        outcomes:
+          success: "Amb èxit"
+          failed: "Fallits"
+          skipped: "Saltat"
+        objects:
+          contact: "Contacte"
       guided_sync:
         cancel_setup: "Cancel·la"
         group_name: "Nom del grup"

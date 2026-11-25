@@ -10,6 +10,16 @@ sr:
       salesforce_record:
         value_placeholder: "Vriednost"
     salesforce:
+      activity:
+        user: "Korisnik"
+        details: "Detalji"
+        all: "sve"
+        filter: "Filter"
+        reason: "Razlog"
+        error: "Greška"
+        outcomes:
+          failed: "Neuspešno"
+          skipped: "Preskočeno"
       guided_sync:
         cancel_setup: "Odustani"
         configure: "Konfiguriši"

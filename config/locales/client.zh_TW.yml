@@ -18,6 +18,26 @@ zh_TW:
           update: "更新"
         value_placeholder: "值"
     salesforce:
+      activity:
+        outcome: "結果"
+        user: "使用者"
+        from: "來自"
+        to: "發至"
+        details: "詳細資訊"
+        all: "所有"
+        filter: "篩選"
+        deleted_user: "已被刪除的使用者"
+        reason: "原因"
+        error: "錯誤"
+        outcomes:
+          success: "成功"
+          failed: "失敗"
+          skipped: "跳過"
+        objects:
+          contact: "聯繫"
+        reasons:
+          updated: "已更新 %{object} 個"
+          imported: "已匯入 %{object} 個"
       guided_sync:
         all_users: "所有使用者"
         discard_changes: "捨棄變更"

@@ -12,6 +12,18 @@ sl:
       salesforce_record:
         value_placeholder: "Stanje"
     salesforce:
+      activity:
+        user: "Uporabnik"
+        from: "Od"
+        to: "Do"
+        details: "Podrobnosti"
+        all: "Vse"
+        filter: "Filter"
+        reason: "Razlog"
+        error: "napaka"
+        outcomes:
+          success: "Uspešno"
+          failed: "Spodletelo"
       guided_sync:
         keep_editing: "Nadaljuj z urejanjem"
         cancel_setup: "Prekliči"

@@ -27,6 +27,24 @@ ja:
         name: "Salesforce"
         title: "Salesforce でログイン"
     salesforce:
+      activity:
+        outcome: "結果"
+        user: "ユーザー"
+        from: "開始"
+        to: "終了"
+        details: "詳細"
+        all: "すべて"
+        filter: "フィルター"
+        deleted_user: "削除されたユーザー"
+        reason: "理由"
+        error: "エラー"
+        outcomes:
+          success: "成功"
+          failed: "失敗しました"
+          skipped: "スキップ"
+        objects:
+          contact: "連絡先"
+          lead: "リード"
       title: Salesforce
       guided_sync:
         all_users: "すべてのユーザー"

@@ -20,6 +20,23 @@ sv:
         name: "Salesforce"
         title: "Logga in med Salesforce"
     salesforce:
+      activity:
+        user: "Användare"
+        from: "Från"
+        to: "Till"
+        details: "Detaljer"
+        all: "Alla"
+        filter: "Filter"
+        deleted_user: "Raderad användare"
+        reason: "Anledning"
+        error: "Fel"
+        outcomes:
+          success: "Lyckad"
+          failed: "Misslyckad"
+          skipped: "Överhoppade"
+        objects:
+          contact: "Kontakt"
+          lead: "Lead"
       title: Salesforce
       guided_sync:
         all_users: "Alla användare"

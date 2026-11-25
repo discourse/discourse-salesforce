@@ -15,6 +15,21 @@ gl:
           update: "Actualizar"
         value_placeholder: "Valor"
     salesforce:
+      activity:
+        user: "Usuario"
+        from: "De"
+        to: "A"
+        details: "Detalles"
+        all: "Todas"
+        filter: "Filtro"
+        reason: "Motivo"
+        error: "Erro"
+        outcomes:
+          success: "Feito"
+          failed: "Fallou"
+          skipped: "Saltada"
+        objects:
+          contact: "Contacto"
       guided_sync:
         keep_editing: "Seguir editando"
         cancel_setup: "Cancelar"

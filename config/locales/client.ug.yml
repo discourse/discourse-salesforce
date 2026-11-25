@@ -14,6 +14,21 @@ ug:
           update: "يېڭىلا"
         value_placeholder: "قىممەت"
     salesforce:
+      activity:
+        outcome: "نەتىجە"
+        user: "ئىشلەتكۈچى"
+        from: "كىمدىن"
+        to: "كىمگە"
+        details: "تەپسىلاتى"
+        all: "ھەممىسى"
+        filter: "سۈزگۈچ"
+        deleted_user: "ئىشلەتكۈچى ئۆچۈر"
+        reason: "سەۋەبى"
+        error: "خاتالىق"
+        outcomes:
+          success: "مۇۋەپپەقىيەتلىك"
+          failed: "مەغلۇب بولدى"
+          skipped: "ئاتلىدى"
       guided_sync:
         all_users: "بارلىق ئىشلەتكۈچى"
         discard_changes: "ئۆزگەرتىشنى تاشلىۋەت"

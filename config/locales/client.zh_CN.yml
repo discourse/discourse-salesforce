@@ -28,6 +28,27 @@ zh_CN:
         name: "Salesforce"
         title: "使用 Salesforce 登录"
     salesforce:
+      activity:
+        outcome: "成果"
+        user: "用户"
+        from: "发件人"
+        to: "收件人"
+        details: "详细信息"
+        all: "所有"
+        filter: "筛选"
+        deleted_user: "已被删除的用户"
+        reason: "原因"
+        error: "错误"
+        outcomes:
+          success: "成功"
+          failed: "失败"
+          skipped: "已跳过"
+        objects:
+          contact: "联系人"
+          lead: "潜在客户"
+        reasons:
+          updated: "%{object} 个已更新"
+          imported: "%{object} 个已导入"
       title: Salesforce
       guided_sync:
         all_users: "所有用户"

@@ -60,11 +60,7 @@ module Salesforce
       return if record == :converted_lead
       return if record == :conversion_error
       if record.nil? && existing_contact_for_lead?
-        DiscourseCrm::SyncState.where(
-          configuration_id: @configuration.id,
-          user_id: @user.id,
-        ).update_all(fingerprint: nil)
-        DiscourseCrm::SyncConfiguration.record_result(@configuration.id, @user.id)
+        SyncActivity.record_existing_contact(@configuration, @user.id)
         return
       end
       values = mapped_values(fields, record)
@@ -79,18 +75,21 @@ module Salesforce
             values.merge("Email" => @user.email),
           ).fetch("id")
       end
-      complete(id, created: record.nil?)
-      DiscourseCrm::SyncState.store(@configuration.id, @user.id, fingerprint: fingerprint)
+      complete(id, created: record.nil?, changed: values.present?, fingerprint: fingerprint)
     end
 
-    def complete(id, created:)
+    def complete(id, created:, changed: true, fingerprint: nil)
       save_link(id)
       @person.link!(@user, id, created: created)
-      DiscourseCrm::SyncState.where(
-        configuration_id: @configuration.id,
-        user_id: @user.id,
-      ).update_all(fingerprint: nil)
-      DiscourseCrm::SyncConfiguration.record_result(@configuration.id, @user.id)
+      if fingerprint
+        DiscourseCrm::SyncState.store(@configuration.id, @user.id, fingerprint: fingerprint)
+      else
+        DiscourseCrm::SyncState.where(
+          configuration_id: @configuration.id,
+          user_id: @user.id,
+        ).update_all(fingerprint: nil)
+      end
+      SyncActivity.record_write(@configuration, @user.id, created: created, changed: changed)
     end
 
     def reconcile_converted_lead(record)
@@ -125,8 +124,8 @@ module Salesforce
         )
         @user.salesforce_lead_id = nil if @user.salesforce_lead_id == record["Id"]
         Contact.link!(@user, contact_id, created: false)
+        @configuration.record_result(@user.id, reason: "reconciled")
       end
-      DiscourseCrm::SyncConfiguration.record_result(@configuration.id, @user.id)
       true
     end
 
@@ -191,7 +190,7 @@ module Salesforce
       return false unless @person == Lead
       return false unless @configuration.record_link_for(@user.id)&.converted?
 
-      DiscourseCrm::SyncConfiguration.record_result(@configuration.id, @user.id)
+      SyncActivity.record_converted_lead(@configuration, @user.id)
       true
     end
 
@@ -234,11 +233,7 @@ module Salesforce
       Rails.logger.warn(
         "Skipping converted Salesforce Lead reconciliation for Discourse user #{@user.id}: #{message}",
       )
-      DiscourseCrm::SyncConfiguration.record_result(
-        @configuration.id,
-        @user.id,
-        error: @conversion_error,
-      )
+      SyncActivity.record_failure(@configuration, @user.id, @conversion_error)
       false
     end
 

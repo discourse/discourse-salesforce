@@ -82,6 +82,7 @@ module DiscourseCrm
             configuration.flow.configuration_job,
             configuration_id: configuration.id,
             reason: "scheduled",
+            **(configuration.outbound? ? { scheduled_at: now.iso8601(6) } : {}),
           )
         end
     end

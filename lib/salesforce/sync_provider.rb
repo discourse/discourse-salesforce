@@ -6,6 +6,10 @@ module ::Salesforce
       "salesforce"
     end
 
+    def self.failure_reason_class
+      FailureReason
+    end
+
     def self.account
       SiteSetting.salesforce_instance_url
     end

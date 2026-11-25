@@ -30,6 +30,9 @@ module DiscourseCrm
              primary_key: %i[provider account object],
              foreign_key: %i[provider account object]
 
+    # Serialize dependent deletion with workers inserting sync states.
+    before_destroy(prepend: true) { self.class.where(id: id).lock.pick(:id) }
+
     enum :direction, { outbound: "outbound", inbound: "inbound" }, validate: true
 
     validates :provider, inclusion: { in: PROVIDERS.keys }
@@ -188,33 +191,96 @@ module DiscourseCrm
       record.destroy!
     end
 
-    def self.record_result(id, user_id = nil, error: nil)
-      if user_id
-        if error
-          SyncState.store(id, user_id, error: error.class.name, error_at: Time.zone.now)
-        else
-          SyncState.where(configuration_id: id, user_id: user_id).update_all(
-            error: nil,
-            error_at: nil,
-          )
-          where(id: id).update_all(last_synced_at: Time.zone.now)
-          outbound
+    def self.record_result(id, ...)
+      find_by(id: id)&.record_result(...)
+    end
+
+    def record_result(
+      user_id = nil,
+      error: nil,
+      reason: nil,
+      record_attempt: true,
+      summarize_repeat: false
+    )
+      self.class.transaction do
+        if user_id
+          if error
+            SyncState.store(id, user_id, error: error.class.name, error_at: Time.zone.now)
+          else
+            self.class.where(id: id).update_all(last_synced_at: Time.zone.now)
+            self
+              .class
+              .outbound
+              .where(id: id)
+              .where.not(last_error: nil)
+              .update_all(last_error: nil, last_error_at: nil)
+            cleared_errors =
+              SyncState
+                .where(configuration_id: id, user_id: user_id)
+                .where.not(error: nil)
+                .update_all(error: nil, error_at: nil)
+            if cleared_errors.zero? && (reason == "unchanged" || summarize_repeat)
+              last_outcome, last_reason =
+                SyncAttempt
+                  .where(configuration_id: id, user_id: user_id)
+                  .order(created_at: :desc, id: :desc)
+                  .pick(:outcome, :reason)
+              if last_outcome != "failed" && (reason == "unchanged" || reason == last_reason)
+                next reason.to_sym
+              end
+            end
+          end
+        elsif error
+          self
+            .class
             .where(id: id)
-            .where.not(last_error: nil)
-            .update_all(last_error: nil, last_error_at: nil)
+            .update_all(last_error: error.class.name, last_error_at: Time.zone.now)
+        else
+          self.class.where(id: id).update_all(last_synced_at: Time.zone.now)
         end
-      elsif error
-        where(id: id).update_all(last_error: error.class.name, last_error_at: Time.zone.now)
-      else
-        where(id: id).update_all(last_synced_at: Time.zone.now)
+        SyncAttempt.record(self, user_id, error: error, reason: reason) if record_attempt
       end
     end
 
-    def self.record_batch_failure(id, user_ids, error:)
+    def record_import_results(reasons, clear_errors_for: reasons.keys, scheduled_at: nil)
+      self.class.transaction do
+        unchanged = reasons.select { |_, reason| reason == "unchanged" }.keys
+        if unchanged.any?
+          recovering = sync_states.where(user_id: unchanged).where.not(error: nil).pluck(:user_id)
+          unchanged -= recovering
+          unchanged -= SyncAttempt.users_with_latest_failure(id, unchanged)
+          if unchanged.any?
+            SyncAttempt.record_check_summary(
+              self,
+              scheduled_at,
+              unchanged.size,
+              reason: "unchanged_summary",
+            )
+          end
+        end
+        reasons
+          .except(*unchanged)
+          .each { |user_id, reason| SyncAttempt.record(self, user_id, reason: reason) }
+        sync_states.where(user_id: clear_errors_for).update_all(error: nil, error_at: nil)
+      end
+    end
+
+    def self.record_batch_failure(id, ...)
+      find_by(id: id)&.record_batch_failure(...)
+    end
+
+    def record_batch_failure(user_ids, error:)
       ids = Array(user_ids).map(&:to_i).uniq
       return if ids.empty? || ids.size > ConfigurationScheduler::BATCH_SIZE
-      ids.each { |user_id| record_result(id, user_id, error: error) }
-      record_result(id, error: error)
+      failures = block_given? ? ids.group_by { |user_id| yield(user_id) } : { error => ids }
+      self.class.transaction do
+        record_result(error: error, record_attempt: false)
+        failures.each do |failure, affected_ids|
+          SyncState.store(id, affected_ids, error: failure.class.name, error_at: Time.zone.now)
+          user_id = affected_ids.first if affected_ids.one?
+          SyncAttempt.record(self, user_id, error: failure)
+        end
+      end
     end
 
     def self.record_batch_success(id)

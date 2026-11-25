@@ -72,8 +72,13 @@ module ::Hubspot
       post("objects/contacts/search", body)
     end
 
-    def batch_read_contacts_by_email(emails, properties:)
-      batch_read_contacts(emails, properties: properties, id_property: "email")
+    def batch_read_contacts_by_email(emails, properties:, &on_validation_error)
+      batch_read_contacts(
+        emails,
+        properties: properties,
+        id_property: "email",
+        &on_validation_error
+      )
     end
 
     def batch_read_contacts(ids, properties:, id_property: nil)
@@ -86,18 +91,23 @@ module ::Hubspot
             begin
               post("objects/contacts/batch/read", body)
             rescue InvalidApiResponse => error
-              unless error.status == 404 &&
-                       JSON.parse(error.message)["category"] == "OBJECT_NOT_FOUND"
-                raise
-              end
+              raise unless missing_record_response?(error)
               { "results" => [] }
             end
-          unless response.is_a?(Hash) && response["results"].is_a?(Array) &&
-                   [nil, "COMPLETE", "COMPLETED"].include?(response["status"]) &&
-                   Array(response["errors"]).all? { |item|
-                     item.is_a?(Hash) && item["category"] == "OBJECT_NOT_FOUND"
-                   }
+          unless completed_batch_read?(response)
             raise InvalidApiResponse.new("Invalid contact batch read response")
+          end
+          errors =
+            Array(response["errors"]).reject do |item|
+              item.is_a?(Hash) && item["category"] == MISSING_RECORD_CATEGORY
+            end
+          unless errors.all? { |item| item.is_a?(Hash) && item["category"] == "VALIDATION_ERROR" }
+            raise InvalidApiResponse.new("Invalid contact batch read response")
+          end
+          errors.each do |item|
+            error = ApiValidationError.new(item.to_json)
+            raise error unless block_given?
+            yield error
           end
           response.fetch("results")
         end
@@ -112,13 +122,17 @@ module ::Hubspot
             "objects/companies/batch/read",
             { inputs: slice.map { |id| { id: id } }, properties: properties },
           )
-        results.concat(response.fetch("results"))
-        Array(response["errors"]).each do |error|
-          if error["category"] != MISSING_RECORD_CATEGORY
-            raise Hubspot::InvalidApiResponse.new(error.to_json, status: 207)
-          end
-          missing.concat(Array(error.dig("context", "ids")).map(&:to_s))
+        unless completed_batch_read?(response)
+          raise InvalidApiResponse.new("Incomplete company batch read response")
         end
+        results.concat(response.fetch("results"))
+        errors, missing_errors =
+          Array(response["errors"]).partition { |item| item["category"] != MISSING_RECORD_CATEGORY }
+        if errors.any?
+          error = errors.find { |item| item["category"] != "VALIDATION_ERROR" } || errors.first
+          raise Hubspot::InvalidApiResponse.new(error.to_json, status: 207)
+        end
+        missing_errors.each { |item| missing.concat(Array(item.dig("context", "ids")).map(&:to_s)) }
       end
       [results, missing]
     end
@@ -160,6 +174,24 @@ module ::Hubspot
     end
 
     private
+
+    def completed_batch_read?(response)
+      unless response.is_a?(Hash) && response["results"].is_a?(Array) &&
+               [nil, "COMPLETE", "COMPLETED"].include?(response["status"])
+        return false
+      end
+      errors = response.fetch("errors", [])
+      errors.is_a?(Array) && errors.all?(Hash) &&
+        response.fetch("numErrors", errors.size) == errors.size
+    end
+
+    def missing_record_response?(error)
+      return false unless error.status == 404
+      body = JSON.parse(error.message)
+      body.is_a?(Hash) && body["category"] == MISSING_RECORD_CATEGORY
+    rescue JSON::ParserError
+      false
+    end
 
     def verify_account!
       cache_key =

@@ -71,6 +71,17 @@ RSpec.describe ::Hubspot::ContactImport do
       expect(configuration.records).to be_empty
     end
 
+    it "unlinks a previously imported contact whose email was cleared" do
+      import = described_class.new(configuration)
+      import.import_page([hubspot_contact(501, user.email)])
+
+      result = import.import_page([hubspot_contact(501, nil)])
+
+      expect(result.reasons).to eq(user.id => "contact_unlinked")
+      expect(configuration.record_links).to be_empty
+      expect(configuration.records).to be_empty
+    end
+
     it "keeps the link of a contact that shares its email with another contact on the page" do
       import = described_class.new(configuration)
       import.import_page([hubspot_contact(501, "ada@example.com")])
@@ -154,7 +165,7 @@ RSpec.describe ::Hubspot::ContactImport do
 
       expect(
         a_request(:post, hubspot_url("objects/companies/batch/read")).with(
-          body: hash_including("properties" => %w[name plan_tier]),
+          body: hash_including("properties" => %w[name plan_tier hs_merged_object_ids]),
         ),
       ).to have_been_made.once
       expect(company_data).to eq("900" => { "name" => "Acme", "plan_tier" => "enterprise" })
@@ -166,6 +177,55 @@ RSpec.describe ::Hubspot::ContactImport do
         "name" => "Acme",
         "plan_tier" => "enterprise",
       )
+    end
+
+    it "links a merged company to contacts referencing either ID" do
+      stub_hubspot_company_batch_read(
+        [hubspot_company(902, name: "Acme", hs_merged_object_ids: "899;900")],
+        ids: %w[900 902],
+      )
+      described_class.new(configuration).import_page(
+        [
+          hubspot_contact(501, "ada@example.com", associatedcompanyid: "900"),
+          hubspot_contact(502, "grace@example.com", associatedcompanyid: "902"),
+        ],
+      )
+      expect(configuration.records.map { |contact| contact.company.data }).to eq(
+        [{ "name" => "Acme" }, { "name" => "Acme" }],
+      )
+    end
+
+    it "identifies an unexpected company without recording company data" do
+      stub_hubspot_company_batch_read([hubspot_company(901, name: "Private")], ids: %w[900])
+      expect { described_class.new(configuration).refresh_companies(%w[900]) }.to raise_error(
+        Hubspot::InvalidApiResponse,
+      ) { |error| expect(error.diagnostics).to eq(codes: ["UNEXPECTED_COMPANY"]) }
+    end
+
+    it "identifies two companies claiming the same merged ID" do
+      stub_hubspot_company_batch_read(
+        [
+          hubspot_company(901, hs_merged_object_ids: "900"),
+          hubspot_company(902, hs_merged_object_ids: "900"),
+        ],
+        ids: %w[900],
+      )
+      expect { described_class.new(configuration).refresh_companies(%w[900]) }.to raise_error(
+        Hubspot::InvalidApiResponse,
+      ) { |error| expect(error.diagnostics).to eq(codes: ["CONFLICTING_COMPANY_IDS"]) }
+    end
+
+    it "keeps returned companies and reports unresolved missing IDs once" do
+      stub_hubspot_company_batch_read(
+        [hubspot_company(902, name: "Acme", hs_merged_object_ids: "900")],
+        ids: %w[900 901 902],
+        errors: [{ category: "OBJECT_NOT_FOUND", context: { ids: %w[900 901 901 902] } }],
+      )
+
+      expect(described_class.new(configuration).refresh_companies(%w[900 901 902]).missing).to eq(
+        %w[901],
+      )
+      expect(company_data).to eq("900" => { "name" => "Acme" }, "902" => { "name" => "Acme" })
     end
 
     it "drops a company once no contact points at it and keeps one that is still referenced" do
@@ -191,20 +251,48 @@ RSpec.describe ::Hubspot::ContactImport do
       )
     end
 
-    it "drops the previous company before fetching the new one so a failed fetch cannot strand it" do
+    it "imports contact changes and records a separate failure when HubSpot omits a requested company" do
       import = described_class.new(configuration)
       stub_hubspot_company_batch_read([hubspot_company(900, name: "Acme")], ids: %w[900])
-      import.import_page([hubspot_contact(501, "ada@example.com", associatedcompanyid: "900")])
-      stub_request(:post, hubspot_url("objects/companies/batch/read")).to_return(status: 503)
-
-      expect {
-        import.import_page([hubspot_contact(501, "ada@example.com", associatedcompanyid: "901")])
-      }.to raise_error(Hubspot::InvalidApiResponse)
-
-      expect(company_data).to eq({})
-      expect(import.referenced_company_ids(after: "")).to eq(%w[901])
+      import.import_page(
+        [
+          hubspot_contact(
+            501,
+            "ada@example.com",
+            associatedcompanyid: "900",
+            lifecyclestage: "lead",
+          ),
+        ],
+      )
+      contacts = [
+        hubspot_contact(
+          501,
+          "ada@example.com",
+          associatedcompanyid: "901",
+          lifecyclestage: "customer",
+        ),
+      ]
+      stub_hubspot_company_batch_read([], ids: %w[901])
+      import.import_page(contacts)
+      expect(DiscourseCrm::SyncAttempt.sole.diagnostics).to include(
+        "codes" => ["INCOMPLETE_COMPANY_BATCH_READ"],
+      )
+      expect(company_data).to be_empty
+      expect(configuration.records.find_by!(external_id: "501").data).to eq(
+        "lifecyclestage" => "customer",
+      )
       stub_hubspot_company_batch_read([hubspot_company(901, name: "Globex")], ids: %w[901])
-      import.refresh_companies(import.referenced_company_ids(after: ""))
+      stub_hubspot_contact_list(contacts)
+      Jobs::Hubspot::SyncConfiguration.new.execute(
+        configuration_id: configuration.id,
+        reason: "backfill",
+      )
+      history =
+        DiscourseCrm::SyncAttempt.find_by!(configuration_id: configuration.id, user_id: user.id)
+      expect(history).to have_attributes(reason: "imported", diagnostics: {})
+      expect(configuration.records.find_by!(external_id: "501").data).to include(
+        "lifecyclestage" => "customer",
+      )
       expect(company_data).to eq("901" => { "name" => "Globex" })
     end
 
@@ -232,9 +320,8 @@ RSpec.describe ::Hubspot::ContactImport do
         errors: [{ category: "VALIDATION_ERROR", context: { ids: %w[900] } }],
       )
 
-      expect {
-        import.import_page([hubspot_contact(501, "ada@example.com", associatedcompanyid: "900")])
-      }.to raise_error(Hubspot::InvalidApiResponse)
+      import.import_page([hubspot_contact(501, "ada@example.com", associatedcompanyid: "900")])
+      expect(DiscourseCrm::SyncAttempt.sole.outcome).to eq("failed")
 
       expect(company_data).to eq("900" => { "name" => "Acme" })
     end
@@ -290,6 +377,22 @@ RSpec.describe ::Hubspot::ContactImport do
           hubspot_contact(501, "ada@example.com", associatedcompanyid: "900"),
           hubspot_contact(502, "grace@example.com", associatedcompanyid: "901"),
         ],
+      )
+      stub_hubspot_company_batch_read(
+        [hubspot_company(900, plan_tier: "enterprise")],
+        ids: %w[900 901],
+      )
+      expect { import.refresh_companies(%w[900 901]) }.to raise_error(
+        Hubspot::InvalidApiResponse,
+        "Incomplete company batch read response",
+      )
+      expect(company_data).to eq(
+        "900" => {
+          "plan_tier" => "pro",
+        },
+        "901" => {
+          "plan_tier" => "pro",
+        },
       )
       stub_hubspot_company_batch_read(
         [hubspot_company(900, plan_tier: "enterprise")],

@@ -15,20 +15,42 @@ module Jobs::Hubspot
       if pending_ids.size > ::DiscourseCrm::ConfigurationScheduler::BATCH_SIZE
         raise Discourse::InvalidParameters.new(:user_ids)
       end
-      ::Hubspot::ConfiguredUserBatchSync.sync(
+      ::DiscourseCrm::SyncAttempt.track_batch(
         configuration,
-        pending_ids.dup,
-        reason: args[:reason],
-      ) { |user_id| pending_ids.delete(user_id) }
-      ::DiscourseCrm::SyncConfiguration.record_batch_success(configuration.id)
+        pending_ids,
+        args[:scheduled_at],
+      ) do |processed|
+        ::Hubspot::ConfiguredUserBatchSync.sync(
+          configuration,
+          pending_ids.dup,
+          reason: args[:reason],
+          &processed
+        )
+      end
+    rescue ::Hubspot::ConfiguredUserBatchSync::BatchReadFailure => failure
+      error = failure.provider_error
+      batch_error =
+        ::Hubspot::InvalidApiResponse.new(
+          "Invalid contact batch read response",
+          status: error.status,
+        )
+      configuration&.record_batch_failure(pending_ids, error: error) do |user_id|
+        user_id == failure.matched_user_id ? error : batch_error
+      end
+      raise if ::Hubspot::SyncFailure.retryable?(error)
+      (pending_ids - [failure.matched_user_id]).each do |user_id|
+        Jobs.enqueue(
+          Jobs::Hubspot::PushUser,
+          configuration_id: configuration.id,
+          user_id: user_id,
+          reason: args[:reason],
+        )
+      end
     rescue ::Hubspot::RateLimited => error
+      ::Hubspot::SyncActivity.record_failure(configuration, nil, error)
       Jobs.enqueue_in(error.retry_after, self.class, args.merge(user_ids: pending_ids))
     rescue => error
-      ::DiscourseCrm::SyncConfiguration.record_batch_failure(
-        args[:configuration_id],
-        pending_ids || args[:user_ids],
-        error: error,
-      )
+      configuration&.record_batch_failure(pending_ids || args[:user_ids], error: error)
       raise if ::Hubspot::SyncFailure.retryable?(error)
       if error.is_a?(Discourse::InvalidParameters)
         Rails.logger.warn(

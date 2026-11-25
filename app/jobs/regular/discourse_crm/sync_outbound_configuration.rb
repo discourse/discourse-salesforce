@@ -15,8 +15,10 @@ module Jobs::DiscourseCrm
           .order(:id)
           .limit(::DiscourseCrm::ConfigurationScheduler::BATCH_SIZE)
           .pluck(:id)
+      run = {}
       sync_ids = ids
       if args[:reason] == "scheduled"
+        run[:scheduled_at] = args[:scheduled_at] || Time.current.iso8601(6)
         linked_ids = configuration.record_links.where(user_id: ids).pluck(:user_id)
         failures =
           configuration
@@ -36,6 +38,7 @@ module Jobs::DiscourseCrm
           configuration_id: configuration.id,
           user_ids: sync_ids,
           reason: args[:reason],
+          **run,
         )
       end
       if ids.size == ::DiscourseCrm::ConfigurationScheduler::BATCH_SIZE
@@ -44,6 +47,7 @@ module Jobs::DiscourseCrm
           configuration_id: configuration.id,
           after_user_id: ids.last,
           reason: args[:reason],
+          **run,
         )
       end
     end

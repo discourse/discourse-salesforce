@@ -102,6 +102,31 @@ RSpec.describe Jobs::SyncSalesforceUser do
     expect(user.reload.salesforce_lead_id).to eq("confirmed-lead")
   end
 
+  it "records one failure and retains the CRM link if saving the fingerprint fails" do
+    stub_salesforce_person_lookup("Lead", user.email, fields: %w[LastName Company Trust__c])
+    stub_request(:post, "#{api_path}/Lead").to_return(body: { id: "lead123" }.to_json)
+    DiscourseCrm::SyncState
+      .stubs(:store)
+      .with(configuration.id, user.id, has_key(:fingerprint))
+      .raises(ActiveRecord::Deadlocked)
+    DiscourseCrm::SyncState.stubs(:store).with(configuration.id, user.id, has_key(:error))
+
+    expect { run_sync }.to raise_error(ActiveRecord::Deadlocked)
+    expect(configuration.record_link_for(user.id).external_id).to eq("lead123")
+    expect(DiscourseCrm::SyncAttempt.where(user_id: user.id).pluck(:outcome)).to eq(["failed"])
+  end
+
+  it "sends encrypted fields to Salesforce while redacting them from sync history" do
+    fields.find { |field| field[:name] == "Company" }[:type] = "encryptedstring"
+    stub_request(:get, "#{api_path}/Lead/describe").to_return(body: { fields: fields }.to_json)
+    stub_salesforce_person_lookup("Lead", user.email, fields: %w[LastName Company Trust__c])
+    stub_request(:post, "#{api_path}/Lead").with(
+      body: hash_including("Company" => "Unknown"),
+    ).to_return(body: { id: "lead123" }.to_json)
+    run_sync
+    expect(DiscourseCrm::SyncAttempt.sole.diagnostics).to eq({})
+  end
+
   [false, true].each do |hubspot_enabled|
     it "creates and retains a Salesforce Lead with HubSpot #{hubspot_enabled ? "enabled but unconfigured" : "disabled"}" do
       SiteSetting.hubspot_enabled = hubspot_enabled
@@ -158,6 +183,11 @@ RSpec.describe Jobs::SyncSalesforceUser do
     expect(user.salesforce_contact_id).to be_nil
     expect(configuration.reload.sync_status["error"]).to be_nil
     expect(configuration.last_synced_at).to be_present
+    expect(DiscourseCrm::SyncAttempt.last).to have_attributes(
+      user_id: user.id,
+      outcome: "skipped",
+      reason: "skipped_existing_contact",
+    )
   end
 
   [503, 400].each do |status|

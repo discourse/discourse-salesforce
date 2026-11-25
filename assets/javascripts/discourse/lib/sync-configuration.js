@@ -2,10 +2,31 @@ import { i18n } from "discourse-i18n";
 import hubspot from "discourse/plugins/discourse-salesforce/discourse/lib/hubspot/sync-provider";
 import salesforce from "discourse/plugins/discourse-salesforce/discourse/lib/salesforce/sync-provider";
 
-const OUTBOUND_PROVIDERS = { salesforce, hubspot };
+const providers = new Map([
+  ["salesforce", salesforce],
+  ["hubspot", hubspot],
+]);
+
+export const providerOptions = Array.from(providers, ([id, { name }]) => ({
+  id,
+  name,
+}));
+
+export function providerLabel(id) {
+  return providers.get(id)?.name ?? id;
+}
+
+export function guidedSyncEnabled(siteSettings) {
+  return (
+    siteSettings.enable_guided_sync_configuration &&
+    Array.from(providers.values()).some(
+      ({ enabledSetting }) => siteSettings[enabledSetting]
+    )
+  );
+}
 
 export function outboundTarget(provider, object) {
-  const definition = OUTBOUND_PROVIDERS[provider];
+  const definition = providers.get(provider);
   return { ...definition, ...definition.targets[object] };
 }
 
@@ -30,8 +51,8 @@ export const USER_SYNC_SOURCES = [
 ];
 
 export function targetLabel(provider, object) {
-  const definition = OUTBOUND_PROVIDERS[provider];
-  const translationKey = definition?.targets[object]?.translationKey;
+  const definition = providers.get(provider);
+  const translationKey = definition?.targets?.[object]?.translationKey;
   if (!translationKey) {
     return `${definition?.name || provider} - ${object}`;
   }

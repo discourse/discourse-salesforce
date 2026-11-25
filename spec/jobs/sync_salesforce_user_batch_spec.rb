@@ -50,6 +50,18 @@ RSpec.describe Jobs::SyncSalesforceUserBatch do
     )
   end
 
+  it "preserves a configuration failure when no batch members are still eligible" do
+    group.remove(user)
+    group.remove(other_user)
+    failed_at = 1.hour.ago.change(usec: 0)
+    configuration.update!(last_error: "Previous failure", last_error_at: failed_at)
+
+    expect { run_batch }.not_to change(DiscourseCrm::SyncAttempt, :count)
+
+    expect(configuration.reload.last_error).to eq("Previous failure")
+    expect(configuration.last_error_at).to eq_time(failed_at)
+  end
+
   it "retries only the failed batch members when backfill is disabled" do
     configuration.update!(schedule: "manual", backfill: false)
     Salesforce::ConfiguredUserBatchSync.stubs(:sync).raises(Salesforce::InvalidCredentials)
@@ -75,6 +87,35 @@ RSpec.describe Jobs::SyncSalesforceUserBatch do
     )
   end
 
+  it "records completed attempts when the configuration was removed during the CRM call" do
+    stub_request(:get, query_path).with(query: hash_including("q" => /SELECT/)).to_return(
+      body: { records: [] }.to_json,
+    )
+    stub_request(:post, collection_url).to_return do
+      configuration.destroy!
+      {
+        status: 200,
+        body: [
+          { id: "003000000000001", success: true, errors: [] },
+          { success: false, errors: [{ statusCode: "INVALID_EMAIL_ADDRESS" }] },
+        ].to_json,
+      }
+    end
+    run_batch
+    expect(user.reload.salesforce_contact_id).to eq("003000000000001")
+    expect(
+      DiscourseCrm::SyncAttempt.where(configuration_id: configuration.id).pluck(:user_id, :outcome),
+    ).to contain_exactly([user.id, "success"], [other_user.id, "failed"])
+    expect(DiscourseCrm::SyncState.where(configuration_id: configuration.id)).to be_empty
+  end
+
+  it "only records failures for eligible members of a failed batch" do
+    group.remove(other_user)
+    stub_request(:get, "#{api_path}/Contact/describe").to_return(status: 503)
+    expect { run_batch }.to raise_error(Salesforce::InvalidApiResponse)
+    expect(DiscourseCrm::SyncAttempt.pluck(:user_id, :outcome)).to eq([[user.id, "failed"]])
+  end
+
   it "excludes an unconfirmed email while syncing verified users" do
     user.email_tokens.delete_all
     user.email_tokens.create!(email: user.email, scope: EmailToken.scopes[:signup])
@@ -92,14 +133,14 @@ RSpec.describe Jobs::SyncSalesforceUserBatch do
         .with do |request|
           JSON.parse(request.body)["records"].map { |record| record["Email"] } == [other_user.email]
         end
-        .to_return(body: [{ id: "contact2", success: true }].to_json)
+        .to_return(body: [{ id: "003000000000002", success: true }].to_json)
 
     run_batch
 
     expect(lookup).to have_been_requested.once
     expect(create).to have_been_requested.once
     expect(user.reload.salesforce_contact_id).to be_nil
-    expect(other_user.reload.salesforce_contact_id).to eq("contact2")
+    expect(other_user.reload.salesforce_contact_id).to eq("003000000000002")
   end
 
   it "pins email matches before a failed batch update and reconciles them after an email change" do
@@ -171,7 +212,12 @@ RSpec.describe Jobs::SyncSalesforceUserBatch do
         sent = JSON.parse(request.body)
         true
       end
-      .to_return(body: [{ id: "one", success: true }, { id: "two", success: true }].to_json)
+      .to_return(
+        body: [
+          { id: "003000000000001", success: true },
+          { id: "003000000000002", success: true },
+        ].to_json,
+      )
     run_batch
     expect(
       sent["records"].map { |record| record.slice("Email", "Posts_Read__c", "Role__c") },
@@ -184,6 +230,8 @@ RSpec.describe Jobs::SyncSalesforceUserBatch do
   end
 
   it "batches reads and creates, saves links, and skips unchanged records on retry" do
+    fields.find { |field| field[:name] == "LastName" }[:encrypted] = true
+    stub_request(:get, "#{api_path}/Contact/describe").to_return(body: { fields: fields }.to_json)
     query =
       "SELECT Id,Email,LastName,LeadSource FROM Contact WHERE Email IN ('#{user.email}','#{other_user.email}')"
     lookup =
@@ -214,35 +262,145 @@ RSpec.describe Jobs::SyncSalesforceUserBatch do
           ],
         },
       ).to_return(
-        body: [{ id: "contact1", success: true }, { id: "contact2", success: true }].to_json,
+        body: [
+          { id: "003000000000001", success: true },
+          { id: "003000000000002", success: true },
+        ].to_json,
       )
     run_batch
+    expect(DiscourseCrm::SyncAttempt.where(outcome: "success").pluck(:diagnostics)).to eq([{}, {}])
     expect(create).to have_been_requested.once
     expect(lookup).to have_been_requested.once
     expect(a_request(:get, "#{api_path}/Contact/describe")).to have_been_requested.once
     expect([user.reload.salesforce_contact_id, other_user.reload.salesforce_contact_id]).to eq(
-      %w[contact1 contact2],
+      %w[003000000000001 003000000000002],
     )
     stub_request(:get, query_path).with(query: hash_including("q" => /SELECT/)).to_return(
       body: {
         records: [
-          { Id: "contact1", Email: user.email, LastName: "CRM name", LeadSource: "Discourse" },
-          { Id: "contact2", Email: other_user.email, LastName: "Chen", LeadSource: "Discourse" },
+          {
+            Id: "003000000000001",
+            Email: user.email,
+            LastName: "CRM name",
+            LeadSource: "Discourse",
+          },
+          {
+            Id: "003000000000002",
+            Email: other_user.email,
+            LastName: "Chen",
+            LeadSource: "Discourse",
+          },
         ],
       }.to_json,
     )
-    run_batch
+    configuration.update!(schedule: "hourly")
+    started_at = Time.current.iso8601(6)
+    [user, other_user].each do |member|
+      described_class.new.execute(
+        configuration_id: configuration.id,
+        user_ids: [member.id],
+        reason: "scheduled",
+        scheduled_at: started_at,
+      )
+    end
+    summary = DiscourseCrm::SyncAttempt.where(reason: "unchanged_summary").sole
+    expect(summary).to have_attributes(user_id: nil, diagnostics: { "count" => 2 })
+    expect(DiscourseCrm::SyncAttempt.where(reason: "unchanged")).to be_empty
     expect(create).to have_been_requested.once
     expect(a_request(:patch, collection_url)).not_to have_been_made
     expect(Jobs::SyncSalesforceUser.jobs).to be_empty
+  end
+
+  it "only confirms updates whose returned ID matches the submitted record" do
+    first_id = "003000000000001"
+    second_id = "003000000000002"
+    stub_request(:get, query_path).with(query: hash_including("q" => /SELECT/)).to_return(
+      body: {
+        records: [
+          { Id: first_id, Email: user.email, LeadSource: "Web" },
+          { Id: second_id, Email: other_user.email, LeadSource: "Web" },
+        ],
+      }.to_json,
+    )
+    stub_request(:patch, collection_url).to_return(
+      body: [
+        { id: "#{first_id}AAA", success: true },
+        { id: "003000000000003AAA", success: true },
+      ].to_json,
+    )
+    run_batch
+    expect(configuration.record_link_for(user.id).external_id).to eq("#{first_id}AAA")
+    expect(configuration.record_link_for(other_user.id).external_id).to eq(second_id)
+    expect(DiscourseCrm::SyncAttempt.find_by!(user_id: other_user.id)).to have_attributes(
+      outcome: "failed",
+      error_class: "Salesforce::ConfiguredUserBatchSync::UnconfirmedCollectionResult",
+    )
+    expect(DiscourseCrm::SyncAttempt.where(outcome: "success").pluck(:user_id)).to eq([user.id])
+    expect(Jobs::SyncSalesforceUser.jobs.sole.fetch("args").first.fetch("user_id")).to eq(
+      other_user.id,
+    )
+  end
+
+  {
+    "a malformed ID" => {
+      id: "not-a-salesforce-id",
+      success: true,
+    },
+    "a Lead ID for a Contact" => {
+      id: "00Q000000000001",
+      success: true,
+    },
+    "a success with a validation error" => {
+      id: "003000000000001",
+      success: true,
+      errors: [{ statusCode: "FIELD_CUSTOM_VALIDATION_EXCEPTION" }],
+    },
+  }.each do |description, result|
+    it "reconciles #{description} while keeping an independently confirmed contact" do
+      stub_request(:get, query_path).with(query: hash_including("q" => /SELECT/)).to_return(
+        body: { records: [] }.to_json,
+      )
+      stub_request(:post, collection_url).to_return(
+        body: [result, { id: "003000000000002", success: true, errors: [] }].to_json,
+      )
+
+      run_batch
+
+      expect(configuration.record_link_for(user.id)).to be_nil
+      expect(user.reload.salesforce_contact_id).to be_nil
+      expect(DiscourseCrm::SyncAttempt.find_by!(user_id: user.id)).to have_attributes(
+        outcome: "failed",
+        error_class: "Salesforce::ConfiguredUserBatchSync::UnconfirmedCollectionResult",
+      )
+      expect(other_user.reload.salesforce_contact_id).to eq("003000000000002")
+      expect(Jobs::SyncSalesforceUser.jobs.sole.fetch("args").first.fetch("user_id")).to eq(user.id)
+    end
+  end
+
+  it "reconciles repeated create IDs without linking either user" do
+    stub_request(:get, query_path).with(query: hash_including("q" => /SELECT/)).to_return(
+      body: { records: [] }.to_json,
+    )
+    stub_request(:post, collection_url).to_return(
+      body: [
+        { id: "003000000000001", success: true },
+        { id: "003000000000001AAA", success: true },
+      ].to_json,
+    )
+    run_batch
+    expect(configuration.record_links).to be_empty
+    expect(DiscourseCrm::SyncAttempt.pluck(:outcome)).to eq(%w[failed failed])
+    expect(
+      Jobs::SyncSalesforceUser.jobs.map { |job| job.fetch("args").first.fetch("user_id") },
+    ).to contain_exactly(user.id, other_user.id)
   end
 
   it "preserves Salesforce values and retries only failed collection entries" do
     stub_request(:get, query_path).with(query: hash_including("q" => /SELECT/)).to_return(
       body: {
         records: [
-          { Id: "contact1", Email: user.email, LastName: "CRM name", LeadSource: "Web" },
-          { Id: "contact2", Email: other_user.email, LastName: "", LeadSource: "Web" },
+          { Id: "003000000000001", Email: user.email, LastName: "CRM name", LeadSource: "Web" },
+          { Id: "003000000000002", Email: other_user.email, LastName: "", LeadSource: "Web" },
         ],
       }.to_json,
     )
@@ -251,12 +409,12 @@ RSpec.describe Jobs::SyncSalesforceUserBatch do
         body: {
           allOrNone: false,
           records: [
-            { attributes: { type: "Contact" }, Id: "contact1", LeadSource: "Discourse" },
+            { attributes: { type: "Contact" }, Id: "003000000000001", LeadSource: "Discourse" },
             {
               attributes: {
                 type: "Contact",
               },
-              Id: "contact2",
+              Id: "003000000000002",
               LastName: "Chen",
               LeadSource: "Discourse",
             },
@@ -264,14 +422,14 @@ RSpec.describe Jobs::SyncSalesforceUserBatch do
         },
       ).to_return(
         body: [
-          { id: "contact1", success: true },
+          { id: "003000000000001", success: true },
           { success: false, errors: [{ statusCode: "UNABLE_TO_LOCK_ROW" }] },
         ].to_json,
       )
     run_batch
     expect(update).to have_been_requested.once
-    expect(user.reload.salesforce_contact_id).to eq("contact1")
-    expect(configuration.record_link_for(other_user.id).external_id).to eq("contact2")
+    expect(user.reload.salesforce_contact_id).to eq("003000000000001")
+    expect(configuration.record_link_for(other_user.id).external_id).to eq("003000000000002")
     expect(Jobs::SyncSalesforceUser.jobs.map { |job| job["args"].first["user_id"] }).to eq(
       [other_user.id],
     )
@@ -290,7 +448,29 @@ RSpec.describe Jobs::SyncSalesforceUserBatch do
         records: [{ Id: "contact1", Email: user.email }, { Id: "contact2", Email: user.email }],
       }.to_json,
     )
-    run_batch
+    DiscourseCrm::SyncState.store(
+      configuration.id,
+      other_user.id,
+      error: "previous failure",
+      fingerprint: "previous fingerprint",
+    )
+    described_class.new.execute(
+      configuration_id: configuration.id,
+      user_ids: [user.id, other_user.id],
+      reason: "change",
+    )
+    retry_args =
+      Jobs::SyncSalesforceUser
+        .jobs
+        .map { |job| job["args"].first }
+        .find { |args| args["user_id"] == other_user.id }
+    expect(retry_args.fetch("reason")).to eq("retry")
+    expect(configuration.sync_states.find_by!(user_id: other_user.id).error).to eq(
+      "previous failure",
+    )
+    expect(DiscourseCrm::SyncAttempt.find_by!(user_id: other_user.id).reason).to eq(
+      "skipped_reconciliation",
+    )
     expect(
       Jobs::SyncSalesforceUser.jobs.map { |job| job["args"].first["user_id"] },
     ).to contain_exactly(user.id, other_user.id)
@@ -412,7 +592,7 @@ RSpec.describe Jobs::SyncSalesforceUserBatch do
             },
           ],
         },
-      ).to_return(body: [{ id: "new-lead", success: true }].to_json)
+      ).to_return(body: [{ id: "00Q000000000002", success: true }].to_json)
 
     run_batch
 
@@ -422,7 +602,15 @@ RSpec.describe Jobs::SyncSalesforceUserBatch do
     expect(user.reload.salesforce_lead_id).to be_nil
     expect(user.salesforce_contact_id).to be_nil
     expect(configuration.record_link_for(user.id)).to be_nil
-    expect(other_user.reload.salesforce_lead_id).to eq("new-lead")
+    expect(other_user.reload.salesforce_lead_id).to eq("00Q000000000002")
+    expect(DiscourseCrm::SyncAttempt.find_by(user_id: user.id)).to have_attributes(
+      outcome: "skipped",
+      reason: "skipped_existing_contact",
+    )
+    expect(DiscourseCrm::SyncAttempt.find_by(user_id: other_user.id)).to have_attributes(
+      outcome: "success",
+      reason: "created",
+    )
     expect(a_request(:patch, collection_url)).not_to have_been_made
     expect(Jobs::SyncSalesforceUser.jobs).to be_empty
   end
@@ -495,7 +683,9 @@ RSpec.describe Jobs::SyncSalesforceUserBatch do
           query: hash_including("q" => /FROM Lead WHERE/),
         ).to_return(
           body: {
-            records: [{ Id: "existing", Email: other_user.email, LastName: "Chen", Company: nil }],
+            records: [
+              { Id: "00Q000000000002", Email: other_user.email, LastName: "Chen", Company: nil },
+            ],
           }.to_json,
         )
         stub_request(:get, query_path).with(
@@ -507,14 +697,16 @@ RSpec.describe Jobs::SyncSalesforceUserBatch do
           stub_request(:patch, collection_url).with(
             body: {
               allOrNone: false,
-              records: [{ attributes: { type: "Lead" }, Id: "existing", Company: "Unknown" }],
+              records: [
+                { attributes: { type: "Lead" }, Id: "00Q000000000002", Company: "Unknown" },
+              ],
             },
-          ).to_return(body: [{ id: "existing", success: true }].to_json)
+          ).to_return(body: [{ id: "00Q000000000002", success: true }].to_json)
 
         expect { run_batch }.to raise_error(Salesforce::InvalidApiResponse)
 
         expect(update).to have_been_requested.once
-        expect(other_user.reload.salesforce_lead_id).to eq("existing")
+        expect(other_user.reload.salesforce_lead_id).to eq("00Q000000000002")
         expect(a_request(:post, collection_url)).not_to have_been_made
         expect(configuration.reload.last_error).to eq("Salesforce::InvalidApiResponse")
       end
@@ -597,7 +789,7 @@ RSpec.describe Jobs::SyncSalesforceUserBatch do
     expect(configuration.record_links).to be_empty
   end
 
-  it "skips Lead batches with only already-converted users without contacting Salesforce" do
+  it "summarizes repeated scheduled skips for converted leads and records each recovery" do
     configuration.update!(object: "Lead")
     [user, other_user].each do |member|
       DiscourseCrm::RecordLink.mark_converted!(
@@ -611,13 +803,62 @@ RSpec.describe Jobs::SyncSalesforceUserBatch do
       )
     end
 
-    run_batch
+    scheduled_batch = {
+      configuration_id: configuration.id,
+      user_ids: [user.id, other_user.id],
+      reason: "scheduled",
+    }
+    described_class.new.execute(scheduled_batch.merge(scheduled_at: 1.hour.ago.iso8601(6)))
+    configuration.record_result(other_user.id, error: StandardError.new)
+    described_class.new.execute(scheduled_batch.merge(scheduled_at: Time.current.iso8601(6)))
+
+    attempts = DiscourseCrm::SyncAttempt.where(configuration_id: configuration.id)
+    expect(attempts.where(user_id: user.id).pluck(:reason)).to eq(["skipped_converted"])
+    expect(attempts.where(user_id: other_user.id).order(:id).pluck(:reason)).to eq(
+      %w[skipped_converted failed skipped_converted],
+    )
+    expect(attempts.where(user_id: nil).sole).to have_attributes(
+      reason: "skipped_converted_summary",
+      outcome: "skipped",
+      diagnostics: {
+        "count" => 1,
+      },
+    )
 
     expect(a_request(:get, %r{/sobjects/Lead/describe})).not_to have_been_made
     expect(a_request(:get, query_path)).not_to have_been_made
     expect(a_request(:post, collection_url)).not_to have_been_made
     expect(a_request(:patch, collection_url)).not_to have_been_made
     expect(Jobs::SyncSalesforceUser.jobs).to be_empty
+  end
+
+  it "keeps checks from an undated batch separate from retries of a timestamped run" do
+    freeze_time(Time.current.change(nsec: 0))
+    scheduled_at = 5.minutes.ago
+    configuration.update!(object: "Lead", last_scheduled_at: scheduled_at)
+    DiscourseCrm::RecordLink.mark_converted!(
+      provider: "salesforce",
+      account: instance_url,
+      object: "Lead",
+      user_id: user.id,
+      external_id: "lead-1",
+      to_object: "Contact",
+      to_id: "contact-1",
+    )
+    configuration.record_result(user.id, reason: "skipped_converted")
+    batch = { configuration_id: configuration.id, user_ids: [user.id], reason: "scheduled" }
+
+    2.times { described_class.new.execute(batch.merge(scheduled_at: scheduled_at.iso8601(6))) }
+    described_class.new.execute(batch)
+
+    summaries =
+      DiscourseCrm::SyncAttempt.where(
+        configuration_id: configuration.id,
+        reason: "skipped_converted_summary",
+      )
+    expect(summaries.order(:created_at).pluck(:created_at, :diagnostics)).to eq(
+      [[scheduled_at, { "count" => 2 }], [Time.current, { "count" => 1 }]],
+    )
   end
 
   it "rechecks membership and configuration activation before making requests" do
@@ -678,6 +919,11 @@ RSpec.describe Jobs::SyncSalesforceUserBatch do
 
     run_batch
 
+    expect(DiscourseCrm::SyncAttempt.sole).to have_attributes(
+      user_id: nil,
+      outcome: "failed",
+      error_class: "Faraday::TimeoutError",
+    )
     retries = Jobs::SyncSalesforceUser.jobs.map { |job| job["args"].first }
     expect(retries.map { |args| args["user_id"] }).to contain_exactly(user.id, other_user.id)
     expect(retries).to all(include("configuration_id" => configuration.id, "reason" => "backfill"))
@@ -739,19 +985,21 @@ RSpec.describe Jobs::SyncSalesforceUserBatch do
   it "only retries failed updates while still creating other records" do
     stub_request(:get, query_path).with(query: hash_including("q" => /SELECT/)).to_return(
       body: {
-        records: [{ Id: "existing", Email: other_user.email, LastName: "Chen", LeadSource: nil }],
+        records: [
+          { Id: "003000000000002", Email: other_user.email, LastName: "Chen", LeadSource: nil },
+        ],
       }.to_json,
     )
     created =
       stub_request(:post, collection_url).to_return(
         status: 200,
-        body: [{ id: "created", success: true }].to_json,
+        body: [{ id: "003000000000001", success: true }].to_json,
       )
     stub_request(:patch, collection_url).to_return(status: 503, body: "Unavailable")
 
     run_batch
 
-    expect(user.reload.salesforce_contact_id).to eq("created")
+    expect(user.reload.salesforce_contact_id).to eq("003000000000001")
     expect(Jobs::SyncSalesforceUser.jobs.map { |job| job["args"].first["user_id"] }).to eq(
       [other_user.id],
     )
@@ -793,17 +1041,19 @@ RSpec.describe Jobs::SyncSalesforceUserBatch do
     )
     stub_request(:get, query_path).with(query: hash_including("q" => /SELECT/)).to_return(
       body: {
-        records: [{ Id: "existing", Email: user.email, LastName: "Morgan", LeadSource: "Web" }],
+        records: [
+          { Id: "003000000000002", Email: user.email, LastName: "Morgan", LeadSource: "Web" },
+        ],
       }.to_json,
     )
     stub_request(:patch, collection_url).to_return(
-      body: [{ id: "existing", success: true }].to_json,
+      body: [{ id: "003000000000002", success: true }].to_json,
     )
     stub_request(:post, collection_url).to_return(status: 403, body: "Rejected")
 
     expect { run_batch }.to raise_error(Salesforce::InvalidApiResponse)
 
-    expect(user.reload.salesforce_contact_id).to eq("existing")
+    expect(user.reload.salesforce_contact_id).to eq("003000000000002")
     expect(configuration.sync_states.find_by!(user_id: user.id).error).to be_nil
     expect(configuration.sync_states.where.not(error: nil).pluck(:user_id)).to eq([other_user.id])
     expect(configuration.reload.last_error).to eq("Salesforce::InvalidApiResponse")
@@ -818,13 +1068,16 @@ RSpec.describe Jobs::SyncSalesforceUserBatch do
     expect(a_request(:get, query_path)).not_to have_been_made
   end
 
-  it "records lookup failures and raises for Sidekiq to retry the batch" do
+  it "records one shared lookup failure for each batch attempt and keeps both users eligible for retry" do
     stub_request(:get, query_path).with(query: hash_including("q" => /SELECT/)).to_return(
       status: 503,
       body: "Unavailable",
     )
 
-    expect { run_batch }.to raise_error(Salesforce::InvalidApiResponse)
+    2.times { expect { run_batch }.to raise_error(Salesforce::InvalidApiResponse) }
+    expect(DiscourseCrm::SyncAttempt.pluck(:user_id, :outcome)).to eq(
+      [[nil, "failed"], [nil, "failed"]],
+    )
     expect(configuration.reload.last_error).to eq("Salesforce::InvalidApiResponse")
     expect(configuration.sync_states.where.not(error: nil).pluck(:user_id)).to contain_exactly(
       user.id,

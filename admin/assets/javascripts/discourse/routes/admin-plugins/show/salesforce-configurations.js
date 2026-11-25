@@ -1,18 +1,8 @@
-import { service } from "@ember/service";
 import { ajax } from "discourse/lib/ajax";
-import DiscourseRoute from "discourse/routes/discourse";
+import GuidedSyncRoute from "discourse/plugins/discourse-salesforce/discourse/lib/guided-sync-route";
 
-export default class SalesforceConfigurationsRoute extends DiscourseRoute {
-  @service router;
-  @service siteSettings;
-
+export default class SalesforceConfigurationsRoute extends GuidedSyncRoute {
   queryParams = { configuration: { refreshModel: true } };
-
-  beforeModel() {
-    if (!this.siteSettings.enable_guided_sync_configuration) {
-      return this.router.replaceWith("adminPlugins.show.settings");
-    }
-  }
 
   async model(params) {
     const result = await ajax(

@@ -20,12 +20,16 @@ module DiscourseCrm
     scope :hubspot, -> { where(provider: "hubspot") }
 
     def self.store_many!(rows)
-      return if rows.empty?
+      return [] if rows.empty?
       upsert_all(
         rows,
         unique_by: %i[provider account object external_id],
-        update_only: %i[data company_external_id],
-      )
+        on_duplicate: Arel.sql(<<~SQL),
+          data = EXCLUDED.data, company_external_id = EXCLUDED.company_external_id, updated_at = EXCLUDED.updated_at
+          WHERE (crm_records.data, crm_records.company_external_id) IS DISTINCT FROM (EXCLUDED.data, EXCLUDED.company_external_id)
+        SQL
+        returning: %w[external_id],
+      ).pluck("external_id")
     end
   end
 end

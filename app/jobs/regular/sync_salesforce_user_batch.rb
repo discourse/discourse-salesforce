@@ -12,18 +12,21 @@ module Jobs
         )
       return unless configuration
       pending_user_ids = Array(args[:user_ids]).map(&:to_i).uniq
-      Salesforce::ConfiguredUserBatchSync.sync(
-        args[:configuration_id],
-        args[:user_ids],
-        reason: args[:reason],
-      ) { |user_id| pending_user_ids.delete(user_id) }
-      ::DiscourseCrm::SyncConfiguration.record_batch_success(args[:configuration_id])
+      scheduled_at = args[:scheduled_at] || Time.current if args[:reason] == "scheduled"
+      ::DiscourseCrm::SyncAttempt.track_batch(
+        configuration,
+        pending_user_ids,
+        scheduled_at,
+      ) do |processed|
+        Salesforce::ConfiguredUserBatchSync.sync(
+          args[:configuration_id],
+          args[:user_ids],
+          reason: args[:reason],
+          &processed
+        )
+      end
     rescue => error
-      ::DiscourseCrm::SyncConfiguration.record_batch_failure(
-        args[:configuration_id],
-        pending_user_ids || args[:user_ids],
-        error: error,
-      )
+      configuration&.record_batch_failure(pending_user_ids || args[:user_ids], error: error)
       unless error.is_a?(Discourse::InvalidParameters) ||
                error.is_a?(Salesforce::AmbiguousEmailMatch)
         raise

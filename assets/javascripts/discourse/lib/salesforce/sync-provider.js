@@ -17,6 +17,7 @@ function contactMappings() {
 }
 
 export default {
+  enabledSetting: "salesforce_enabled",
   name: "Salesforce",
   emailField: "Email",
   metadataUrl: "/salesforce/admin/guided-sync/fields.json",

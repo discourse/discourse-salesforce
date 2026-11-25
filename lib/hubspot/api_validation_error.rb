@@ -2,5 +2,8 @@
 
 module Hubspot
   class ApiValidationError < InvalidApiResponse
+    def retryable?
+      false
+    end
   end
 end

@@ -1,6 +1,7 @@
 # frozen_string_literal: true
 
 Salesforce::Engine.routes.draw do
+  get "/admin/guided-sync/activity" => "/discourse_crm/sync_activity#attempts"
   post "/persons/create" => "persons#create"
   delete "/persons/contact" => "persons#unlink_contact"
   post "/cases/sync" => "cases#sync"
@@ -18,6 +19,9 @@ Salesforce::Engine.routes.draw do
 end
 
 Discourse::Application.routes.draw do
+  get "/admin/plugins/discourse-salesforce/activity" => "discourse_crm/sync_activity#index",
+      :constraints => AdminConstraint.new
+
   mount ::Salesforce::Engine, at: "salesforce"
 
   get "/admin/plugins/discourse-salesforce/configurations" =>

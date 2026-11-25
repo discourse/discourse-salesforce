@@ -42,8 +42,25 @@ RSpec.describe Jobs::Hubspot::PushUser do
     )
   end
 
-  def stub_contact(record = nil, status: 200)
-    stub_request(:get, "#{hubspot_url}/objects/contacts/#{ERB::Util.url_encode(user.email)}").with(
+  it "records a failed lock acquisition before retrying" do
+    DistributedMutex
+      .stubs(:synchronize)
+      .with("hubspot_person_create_#{user.id}", validity: 5.minutes)
+      .raises(Timeout::Error)
+    expect { run_sync }.to raise_error(Timeout::Error)
+    attempt = DiscourseCrm::SyncAttempt.where(configuration_id: configuration.id).sole
+    expect(attempt).to have_attributes(
+      user_id: user.id,
+      outcome: "failed",
+      error_class: "Timeout::Error",
+    )
+  end
+
+  def stub_contact(record = nil, status: 200, member: user)
+    stub_request(
+      :get,
+      "#{hubspot_url}/objects/contacts/#{ERB::Util.url_encode(member.email)}",
+    ).with(
       query: {
         idProperty: "email",
         properties: "firstname,lastname,community_source",
@@ -63,6 +80,81 @@ RSpec.describe Jobs::Hubspot::PushUser do
         status: "COMPLETE",
         results: [{ id: "42", properties: { email: user.email } }],
       }.to_json,
+    )
+  end
+
+  it "keeps a validation failure returned after its configuration is deleted" do
+    stub_contact(nil, status: 404)
+    stub_request(:post, "#{hubspot_url}/objects/contacts").to_return do
+      configuration.destroy!
+      {
+        status: 400,
+        body: { category: "VALIDATION_ERROR", errors: [{ code: "INVALID_EMAIL" }] }.to_json,
+      }
+    end
+
+    run_sync
+
+    attempt =
+      DiscourseCrm::SyncAttempt.where(configuration_id: configuration.id, user_id: user.id).sole
+    expect(attempt.outcome).to eq("failed")
+    expect(attempt.diagnostics.fetch("codes")).to eq(["INVALID_EMAIL"])
+    expect(DiscourseCrm::SyncState.where(configuration_id: configuration.id)).to be_empty
+  end
+
+  %w[read create].each do |operation|
+    it "attributes a rejected batch #{operation} email only to the matching input" do
+      other = Fabricate(:verified_user)
+      group.add(other)
+      stub_batch_contacts
+      stub_request(:post, "#{hubspot_url}/objects/contacts/batch/#{operation}").to_return(
+        status: 400,
+        body: {
+          category: "VALIDATION_ERROR",
+          errors: [{ code: "INVALID_EMAIL", name: "email", value: user.email }],
+        }.to_json,
+      )
+      Jobs::Hubspot::PushUser.clear
+      Jobs::Hubspot::PushUserBatch.new.execute(
+        configuration_id: configuration.id,
+        user_ids: [user.id, other.id],
+        reason: "backfill",
+      )
+      expect(
+        DiscourseCrm::SyncAttempt.find_by!(user_id: user.id).diagnostics.fetch("rejected_values"),
+      ).to eq([{ "property" => "email", "value" => user.email }])
+      expect(DiscourseCrm::SyncAttempt.find_by!(user_id: other.id).diagnostics).to eq(
+        "codes" => [operation == "read" ? "INVALID_BATCH_READ_RESPONSE" : "CONTACT_BATCH_REJECTED"],
+        "status" => 400,
+      )
+      if operation == "read"
+        job = described_class.jobs.sole.fetch("args").first
+        expect(job.fetch("user_id")).to eq(other.id)
+        stub_contact(nil, status: 404, member: other)
+        stub_request(:post, "#{hubspot_url}/objects/contacts").to_return(
+          body: { id: "other-id" }.to_json,
+        )
+        described_class.new.execute(job.symbolize_keys)
+        expect(DiscourseCrm::SyncAttempt.where(user_id: other.id).order(:id).pluck(:outcome)).to eq(
+          %w[failed success],
+        )
+      end
+    end
+  end
+
+  it "omits mapped values from the activity recorded for a successful batch create" do
+    stub_batch_contacts
+    stub_batch_create
+    Jobs::Hubspot::PushUserBatch.new.execute(
+      configuration_id: configuration.id,
+      user_ids: [user.id],
+      reason: "backfill",
+    )
+    expect(DiscourseCrm::SyncAttempt.last).to have_attributes(
+      user_id: user.id,
+      reason: "created",
+      diagnostics: {
+      },
     )
   end
 
@@ -131,13 +223,23 @@ RSpec.describe Jobs::Hubspot::PushUser do
       ).to_return(body: { id: "42" }.to_json)
 
     run_sync
+    previous_sync = 2.hours.ago.change(usec: 0)
+    configuration.update_columns(last_synced_at: previous_sync, last_error: "previous failure")
     run_sync("change")
 
     expect(request).to have_been_requested.once
     expect(configuration.record_link_for(user.id).external_id).to eq("42")
     expect(user.reload.salesforce_contact_id).to be_nil
-    expect(configuration.reload.sync_status["error"]).to be_nil
-    expect(configuration.last_synced_at).to be_present
+    expect(configuration.reload.last_error).to eq("previous failure")
+    expect(configuration.last_synced_at).to eq_time(previous_sync)
+    Jobs::Hubspot::PushUserBatch.new.execute(
+      configuration_id: configuration.id,
+      user_ids: [user.id],
+      reason: "change",
+    )
+    expect(configuration.reload.last_error).to eq("previous failure")
+    expect(configuration.last_synced_at).to eq_time(previous_sync)
+    expect(DiscourseCrm::SyncAttempt.order(:id).pluck(:reason)).to eq(%w[created])
   end
 
   it "retries an unchanged profile event after a scheduled refresh fails" do
@@ -232,6 +334,7 @@ RSpec.describe Jobs::Hubspot::PushUser do
 
     expect(request).to have_been_requested.once
     expect(changed).to have_been_requested.once
+    expect(DiscourseCrm::SyncAttempt.order(:id).pluck(:reason)).to eq(%w[updated updated])
     expect(configuration.record_link_for(user.id).external_id).to eq("42")
   end
 
@@ -285,7 +388,7 @@ RSpec.describe Jobs::Hubspot::PushUser do
         groups: [group],
       )
     DiscourseCrm::SyncState.store(related.id, user.id, fingerprint: "previous-contact")
-    Hubspot::SyncFailure.record(related.id, user.id, Hubspot::MissingContact.new)
+    Hubspot::SyncActivity.record_failure(related, user.id, Hubspot::MissingContact.new)
     invalid_mapping =
       Fabricate(
         :sync_configuration,
@@ -294,8 +397,8 @@ RSpec.describe Jobs::Hubspot::PushUser do
         object: "contact",
         groups: [group],
       )
-    Hubspot::SyncFailure.record(
-      invalid_mapping.id,
+    Hubspot::SyncActivity.record_failure(
+      invalid_mapping,
       user.id,
       Hubspot::ApiValidationError.new(status: 400),
     )
@@ -749,6 +852,43 @@ RSpec.describe Jobs::Hubspot::PushUser do
     expect(Jobs::Hubspot::PushUserBatch.jobs).to be_empty
   end
 
+  it "only attributes a grouped partial error's rejected email to its matching contact" do
+    other = Fabricate(:verified_user)
+    group.add(other)
+    stub_batch_contacts
+    stub_request(:post, "#{hubspot_url}/objects/contacts/batch/create").to_return(
+      status: 207,
+      body: {
+        results: [],
+        errors: [
+          {
+            category: "VALIDATION_ERROR",
+            code: "INVALID_EMAIL",
+            name: "email",
+            value: user.email,
+            context: {
+              objectWriteTraceId: [user.id.to_s, other.id.to_s],
+            },
+          },
+        ],
+      }.to_json,
+    )
+    described_class.clear
+    Jobs::Hubspot::PushUserBatch.new.execute(
+      configuration_id: configuration.id,
+      user_ids: [user.id, other.id],
+      reason: "backfill",
+    )
+    expect(
+      DiscourseCrm::SyncAttempt.find_by!(user_id: user.id).diagnostics.fetch("rejected_values"),
+    ).to eq([{ "property" => "email", "value" => user.email }])
+    expect(DiscourseCrm::SyncAttempt.find_by!(user_id: other.id).diagnostics).to eq(
+      "codes" => ["CONTACT_BATCH_REJECTED"],
+      "status" => 400,
+    )
+    expect(described_class.jobs.sole.fetch("args").first.fetch("user_id")).to eq(other.id)
+  end
+
   it "records deterministic API validation failures without retrying users" do
     stub_batch_contacts
     create =
@@ -1098,9 +1238,8 @@ RSpec.describe Jobs::Hubspot::PushUser do
         configuration.reload,
         group_ids_changed: false,
       )
-      expect(Jobs::Hubspot::PushUserBatch.jobs.map { |job| job["args"].first["user_ids"] }).to eq(
-        [remaining.map(&:id)],
-      )
+      retried_ids = Jobs::Hubspot::PushUserBatch.jobs.sole.fetch("args").first.fetch("user_ids")
+      expect(retried_ids).to match_array(remaining.map(&:id))
     end
   end
 

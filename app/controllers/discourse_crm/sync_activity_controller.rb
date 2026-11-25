@@ -45,6 +45,7 @@ module DiscourseCrm
       more = page.size > PAGE_SIZE
       page = page.first(PAGE_SIZE)
       render json: {
+               configured_providers: SyncConfiguration.distinct.pluck(:provider),
                attempts: serialize_data(page, SyncAttemptSerializer),
                next_before: more ? "#{page.last.created_at.utc.iso8601(6)}|#{page.last.id}" : nil,
              }

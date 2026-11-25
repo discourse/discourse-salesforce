@@ -1,5 +1,5 @@
 import Component from "@glimmer/component";
-import { tracked } from "@glimmer/tracking";
+import { cached, tracked } from "@glimmer/tracking";
 import { hash } from "@ember/helper";
 import { on } from "@ember/modifier";
 import { action } from "@ember/object";
@@ -11,7 +11,7 @@ import { longDate } from "discourse/lib/formatter";
 import getURL from "discourse/lib/get-url";
 import ComboBox from "discourse/select-kit/components/combo-box";
 import UserChooser from "discourse/select-kit/components/user-chooser";
-import { eq } from "discourse/truth-helpers";
+import { eq, or } from "discourse/truth-helpers";
 import DLoadMore from "discourse/ui-kit/d-load-more";
 import DUserLink from "discourse/ui-kit/d-user-link";
 import { i18n } from "discourse-i18n";
@@ -88,6 +88,15 @@ export default class CrmSyncActivity extends Component {
 
   get attempts() {
     return (this.result ?? this.args.model).attempts;
+  }
+
+  @cached
+  get showProviderColumn() {
+    const { configured_providers: providers } = this.result ?? this.args.model;
+    return (
+      providers?.length !== 1 ||
+      this.attempts.some((attempt) => attempt.provider !== providers[0])
+    );
   }
 
   get nextBefore() {
@@ -196,20 +205,22 @@ export default class CrmSyncActivity extends Component {
             }}
           />
         </label>
-        <label>
-          {{i18n "salesforce.activity.provider"}}
-          <ComboBox
-            class="crm-sync-activity__provider-filter"
-            @content={{providerOptions}}
-            @value={{this.provider}}
-            @onChange={{this.selectProvider}}
-            @options={{hash
-              none="salesforce.activity.all"
-              autoInsertNoneItem=true
-              filterable=false
-            }}
-          />
-        </label>
+        {{#if (or this.showProviderColumn this.provider)}}
+          <label>
+            {{i18n "salesforce.activity.provider"}}
+            <ComboBox
+              class="crm-sync-activity__provider-filter"
+              @content={{providerOptions}}
+              @value={{this.provider}}
+              @onChange={{this.selectProvider}}
+              @options={{hash
+                none="salesforce.activity.all"
+                autoInsertNoneItem=true
+                filterable=false
+              }}
+            />
+          </label>
+        {{/if}}
         <label class="crm-sync-activity__user-filter">
           {{i18n "salesforce.activity.user"}}
           <UserChooser
@@ -240,9 +251,11 @@ export default class CrmSyncActivity extends Component {
             <th class="d-table__header-cell" scope="col">{{i18n
                 "salesforce.activity.user"
               }}</th>
-            <th class="d-table__header-cell" scope="col">{{i18n
-                "salesforce.activity.provider"
-              }}</th>
+            {{#if this.showProviderColumn}}
+              <th class="d-table__header-cell" scope="col">{{i18n
+                  "salesforce.activity.provider"
+                }}</th>
+            {{/if}}
             <th class="d-table__header-cell" scope="col">{{i18n
                 "salesforce.activity.direction"
               }}</th>
@@ -276,11 +289,13 @@ export default class CrmSyncActivity extends Component {
                   }}{{else}}{{i18n
                     "salesforce.activity.configuration_wide"
                   }}{{/if}}</td>
-              <td class="d-table__cell --detail">
-                <span class="d-table__mobile-label">{{i18n
-                    "salesforce.activity.provider"
-                  }}</span>
-                <span>{{providerLabel attempt.provider}}</span></td>
+              {{#if this.showProviderColumn}}
+                <td class="d-table__cell --detail">
+                  <span class="d-table__mobile-label">{{i18n
+                      "salesforce.activity.provider"
+                    }}</span>
+                  <span>{{providerLabel attempt.provider}}</span></td>
+              {{/if}}
               <td class="d-table__cell --detail crm-sync-activity__direction">
                 <span class="d-table__mobile-label">{{i18n
                     "salesforce.activity.direction"
@@ -340,7 +355,10 @@ export default class CrmSyncActivity extends Component {
             </tr>
             {{#if (eq this.selected.id attempt.id)}}
               <tr class="d-table__row crm-sync-activity__details-row">
-                <td class="d-table__cell" colspan="5">
+                <td
+                  class="d-table__cell"
+                  colspan={{if this.showProviderColumn 5 4}}
+                >
                   <section
                     class="crm-sync-activity__details"
                     id="crm-sync-details-{{attempt.id}}"
@@ -379,7 +397,7 @@ export default class CrmSyncActivity extends Component {
           {{else}}
             <tr class="d-table__row"><td
                 class="d-table__cell"
-                colspan="5"
+                colspan={{if this.showProviderColumn 5 4}}
               >{{i18n "salesforce.activity.empty"}}</td></tr>
           {{/each}}
         </tbody>

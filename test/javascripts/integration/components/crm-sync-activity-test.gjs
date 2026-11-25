@@ -17,6 +17,7 @@ module("Integration | Component | CrmSyncActivity", function (hooks) {
 
   test("opens details below the selected attempt and links to its configuration", async function (assert) {
     this.model = {
+      configured_providers: ["salesforce"],
       attempts: [
         {
           id: 2,
@@ -43,6 +44,9 @@ module("Integration | Component | CrmSyncActivity", function (hooks) {
     await render(
       <template><CrmSyncActivity @model={{this.model}} /></template>
     );
+    assert.dom("thead").doesNotIncludeText("CRM provider");
+    assert.dom(".crm-sync-activity__provider-filter").doesNotExist();
+    assert.dom("tbody tr:first-child td").exists({ count: 4 });
     assert.dom("tbody tr").exists({ count: 2 });
     assert.dom("tbody tr:first-child").includesText("Skipped");
     assert.dom("tbody tr:first-child a").hasAttribute("href", "/u/jane");
@@ -87,6 +91,7 @@ module("Integration | Component | CrmSyncActivity", function (hooks) {
     settings.salesforce_enabled = true;
     settings.hubspot_enabled = false;
     this.model = {
+      configured_providers: ["salesforce"],
       attempts: ["hubspot", "legacy-crm"].map((provider, id) => ({
         id,
         provider,

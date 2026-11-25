@@ -124,6 +124,12 @@ module Jobs
             .where("last_synced_at IS NULL OR last_synced_at < ?", started_at)
             .update_all(last_synced_at: started_at, last_error: nil, last_error_at: nil)
         end
+        return unless SiteSetting.crm_segments_enabled
+        Jobs.enqueue(
+          ::Jobs::DiscourseCrm::EvaluateSegments,
+          provider: configuration.provider,
+          account: configuration.account,
+        )
       end
 
       def search_window(configuration, args)

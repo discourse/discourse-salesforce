@@ -130,6 +130,7 @@ after_initialize do
 
   DiscourseEvent.on(:user_destroyed) do |user|
     DiscourseCrm::SyncAttempt.scrub_rejected_values(user.id)
+    DiscourseCrm::SegmentMember.where(user_id: user.id).delete_all
   end
   # rubocop:enable Discourse/Plugins/UsePluginInstanceOn
 
@@ -138,6 +139,13 @@ after_initialize do
       user,
       reason: "change",
       inbound: Array(changed_fields).include?("email"),
+    )
+  end
+
+  on(:group_destroyed) do |group, *|
+    DiscourseCrm::Segment.where(group_id: group.id).update_all(
+      group_id: nil,
+      remove_unmatched: false,
     )
   end
 

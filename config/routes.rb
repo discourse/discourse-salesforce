@@ -15,6 +15,11 @@ Salesforce::Engine.routes.draw do
         "/discourse_crm/sync_configuration#save_configuration"
   delete "/admin/guided-sync/configurations/:id" =>
            "/discourse_crm/sync_configuration#destroy_configuration"
+  get "/admin/guided-sync/segments" => "/discourse_crm/segments#index"
+  post "/admin/guided-sync/segments" => "/discourse_crm/segments#create"
+  post "/admin/guided-sync/segments/preview" => "/discourse_crm/segments#preview"
+  put "/admin/guided-sync/segments/:id" => "/discourse_crm/segments#update"
+  delete "/admin/guided-sync/segments/:id" => "/discourse_crm/segments#destroy"
   get "/admin/authorize" => "admin#authorize"
 end
 

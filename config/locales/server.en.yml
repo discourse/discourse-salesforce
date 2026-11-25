@@ -46,6 +46,7 @@ en:
   site_settings:
     salesforce_leads_enabled: "Enable Salesforce Lead lookups, creation, conversion sync, feed items, and association cleanup. Disable for Salesforce organizations where the integration user cannot access Leads. Contact operations continue and existing Lead links are retained."
     enable_guided_sync_configuration: "Send Discourse user data to Salesforce or HubSpot using configurable field mappings, group membership, and a refresh schedule."
+    crm_segments_enabled: "Let admins define segments of users from pulled CRM data and keep Discourse groups in sync with them. Requires a CRM pull configured through {{setting:enable_guided_sync_configuration}}."
     crm_sync_activity_retention_days: "Number of days to keep CRM sync activity. Set to 0 to keep the full history."
     salesforce_enabled: 'Enable the discourse-salesforce plugin'
     salesforce_login_enabled: 'Enable Salesforce Social Login'
@@ -86,6 +87,10 @@ en:
       records:
         unknown_provider: "\"%{value}\" does not pull records from a CRM"
         unknown_object: "\"%{value}\" is not an object the pull keeps"
+    segments:
+      errors:
+        no_pull_configured: "Set up a pull from the CRM before defining segments."
+        property_not_pulled: "%{property} is not pulled from the CRM. Add it to the pull or remove the condition."
     error:
       connection:
         authentication: "Salesforce authentication failed. Check the API credentials and the integration user’s app authorization, then retry."
@@ -108,6 +113,21 @@ en:
         temporary: "HubSpot could not be reached or is temporarily unavailable. Try again shortly."
         invalid_response: "HubSpot returned an unexpected response. Check the server logs for details, then retry."
       invalid_response: "Invalid response from HubSpot API"
+  activerecord:
+    errors:
+      models:
+        discourse_crm/segment:
+          attributes:
+            conditions:
+              invalid: "must have at least one complete condition"
+              too_many: "can have at most %{count} conditions"
+              taken: "has duplicate conditions"
+            group_id:
+              not_found: "does not exist"
+              automatic: "cannot be an automatic group"
+              taken: "is already targeted by another segment"
+            remove_unmatched:
+              requires_group: "needs a group to sync to"
   dashboard:
     problem:
       salesforce_invalid_credentials: "There was an issue with the Salesforce credentials. Please confirm the validity of the Salesforce consumer key and client secret settings"

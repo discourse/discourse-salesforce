@@ -11,7 +11,11 @@ RSpec.describe Jobs::Hubspot::SyncUser do
 
   fab!(:user) { Fabricate(:verified_user, email: "ada@example.com") }
 
-  before { freeze_time Time.utc(2026, 11, 2, 12) }
+  before do
+    freeze_time Time.utc(2026, 11, 2, 12)
+    Jobs::DiscourseCrm::EvaluateSegments.clear
+    SiteSetting.crm_segments_enabled = true
+  end
 
   it "records daily quota exhaustion without scheduling another import" do
     stub_request(:post, %r{api.hubapi.com/crm/v3/objects/contacts/batch/read}).to_return(
@@ -47,6 +51,11 @@ RSpec.describe Jobs::Hubspot::SyncUser do
       direction: "inbound",
     )
     expect(configuration.reload.last_synced_at).to eq_time(Time.utc(2026, 11, 1, 12))
+    expect(
+      Jobs::DiscourseCrm::EvaluateSegments.jobs.map { |job| job["args"].first },
+    ).to contain_exactly(
+      hash_including("provider" => "hubspot", "account" => "12345", "user_ids" => [user.id]),
+    )
   end
 
   it "rolls back a contact unlink when its history write fails and records it on retry" do

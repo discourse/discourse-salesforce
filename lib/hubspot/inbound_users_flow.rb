@@ -37,6 +37,10 @@ module ::Hubspot
         end
     end
 
+    def self.property_labels(object)
+      Api.cached_properties(object).to_h { |property| [property[:name], property[:label]] }
+    end
+
     def self.configuration_job
       Jobs::Hubspot::SyncConfiguration
     end

@@ -19,6 +19,13 @@ module Jobs
         import.import_user(user) do |reasons|
           configuration.record_import_results(reasons, clear_errors_for: user.id)
         end
+        return unless SiteSetting.crm_segments_enabled
+        Jobs.enqueue(
+          ::Jobs::DiscourseCrm::EvaluateSegments,
+          provider: configuration.provider,
+          account: configuration.account,
+          user_ids: [user.id],
+        )
       rescue ::Hubspot::RateLimited => error
         ::Hubspot::SyncActivity.record_failure(configuration, args[:user_id], error)
         Jobs.enqueue_in(error.retry_after, self.class, args)

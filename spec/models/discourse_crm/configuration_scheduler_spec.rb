@@ -108,6 +108,22 @@ RSpec.describe DiscourseCrm::ConfigurationScheduler do
       )
     end
 
+    it "backfills when the pull's properties change" do
+      Jobs::Hubspot::SyncConfiguration.clear
+      hubspot.update!(
+        mappings:
+          hubspot.mappings + [{ "id" => 3, "object" => "company", "source" => "plan_tier" }],
+      )
+
+      described_class.configuration_saved(hubspot, group_ids_changed: false)
+
+      expect(
+        Jobs::Hubspot::SyncConfiguration.jobs.map do |job|
+          job["args"].first.slice("configuration_id", "reason")
+        end,
+      ).to eq([{ "configuration_id" => hubspot.id, "reason" => "backfill" }])
+    end
+
     it "enqueues user matching for every user change except group-driven ones" do
       user = Fabricate(:user)
       Jobs::Hubspot::SyncUser.clear

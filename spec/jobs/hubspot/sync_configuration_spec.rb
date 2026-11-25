@@ -13,7 +13,11 @@ RSpec.describe Jobs::Hubspot::SyncConfiguration do
     Jobs::Hubspot::SyncConfiguration.jobs.map { |job| job["args"].first.except("current_site_id") }
   end
 
-  before { Jobs::Hubspot::SyncConfiguration.clear }
+  before do
+    Jobs::Hubspot::SyncConfiguration.clear
+    Jobs::DiscourseCrm::EvaluateSegments.clear
+    SiteSetting.crm_segments_enabled = true
+  end
 
   it "keeps a paged contact unlink and its history atomic across retries" do
     args = { configuration_id: configuration.id, reason: "backfill" }
@@ -187,6 +191,7 @@ RSpec.describe Jobs::Hubspot::SyncConfiguration do
     ).to have_been_made.once
     expect(DiscourseCrm::RecordLink.where(user_id: user.id).pluck(:external_id)).to eq(["501"])
     expect(configuration.reload.last_synced_at).to be_nil
+    expect(Jobs::DiscourseCrm::EvaluateSegments.jobs).to be_empty
     expect(enqueued_args).to eq(
       [
         {
@@ -205,6 +210,9 @@ RSpec.describe Jobs::Hubspot::SyncConfiguration do
 
     expect(DiscourseCrm::SyncAttempt.where(user_id: nil)).to be_empty
     expect(configuration.reload.last_synced_at).to eq_time(started_at)
+    expect(
+      Jobs::DiscourseCrm::EvaluateSegments.jobs.map { |job| job["args"].first },
+    ).to contain_exactly(hash_including("provider" => "hubspot", "account" => "12345"))
   end
 
   it "searches contacts modified since the previous run with an overlap and never moves the sync time backwards" do

@@ -44,8 +44,15 @@ module PageObjects
       end
 
       def choose_group(group)
-        form.field("group_id").select(group.id)
+        find('[data-name="group_id"] .d-multi-select-trigger__expand-btn').click
+        find(".d-multi-select__search-input").fill_in(with: group.name)
+        find(".d-multi-select__result", text: group.name).click
+        find(".crm-segment-editor__heading").click
         self
+      end
+
+      def has_group?(group)
+        has_css?('[data-name="group_id"] .d-multi-select-trigger__selected-item', text: group.name)
       end
 
       def enable_removal

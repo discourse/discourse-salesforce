@@ -16,7 +16,8 @@
     }
   }
 
-  &__group-controls {
+  &__group-controls,
+  .crm-segment-editor__group-controls {
     display: flex;
     flex-wrap: wrap;
     align-items: center;
@@ -656,7 +657,8 @@
   }
 }
 
-.salesforce-sync-configuration__create-group {
+.salesforce-sync-configuration__create-group,
+.crm-segment-editor__create-group {
   width: 100%;
   justify-content: flex-start;
   color: var(--tertiary);

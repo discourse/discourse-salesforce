@@ -143,6 +143,7 @@ module DiscourseCrm
 
     def property_labels(definition, properties)
       flow = definition.flow("inbound", "users")
+      return {} if flow.nil?
       properties
         .map { |property| property[:object] }
         .uniq

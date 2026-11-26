@@ -151,8 +151,12 @@ export default class CrmSegments extends Component {
       {{else}}
         <AdminConfigAreaEmptyList
           @ctaAction={{@onAdd}}
-          @ctaLabel="salesforce.guided_sync.segments.add"
-          @emptyLabel="salesforce.guided_sync.segments.empty"
+          @ctaLabel={{if @onAdd "salesforce.guided_sync.segments.add"}}
+          @emptyLabel={{if
+            @onAdd
+            "salesforce.guided_sync.segments.empty"
+            "salesforce.guided_sync.segments.requires_pull"
+          }}
         />
       {{/if}}
     </div>

@@ -97,6 +97,7 @@ RSpec.describe "Define CRM segments" do
 
     expect(segments_page).to have_condition_value(0, "enterprise")
     expect(segments_page).to have_match("any")
+    expect(segments_page).to have_group(group)
     expect(segments_page).to have_removal_enabled
 
     group_members_page.visit(group)

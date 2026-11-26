@@ -8,7 +8,9 @@ import Form from "discourse/components/form";
 import discourseDebounce from "discourse/lib/debounce";
 import { not } from "discourse/truth-helpers";
 import DButton from "discourse/ui-kit/d-button";
+import DMultiSelect from "discourse/ui-kit/d-multi-select";
 import { i18n } from "discourse-i18n";
+import CrmCreateGroupModal from "discourse/plugins/discourse-salesforce/discourse/components/crm-create-group-modal";
 import SyncConfigurationHeading from "discourse/plugins/discourse-salesforce/discourse/components/sync-configuration-heading";
 import {
   conditionNeedsValue,
@@ -25,7 +27,9 @@ const PREVIEW_USERNAMES = 8;
 export default class CrmSegmentEditor extends Component {
   @service a11y;
   @service dialog;
+  @service modal;
 
+  @tracked createdGroups = [];
   @tracked preview;
   @tracked saving = false;
   @tracked segment = structuredClone(this.args.record);
@@ -53,13 +57,21 @@ export default class CrmSegmentEditor extends Component {
   }
 
   get groups() {
-    return this.args.groups.map((group) => ({
-      ...group,
-      label: i18n("salesforce.guided_sync.group_option", {
-        name: group.name,
-        count: group.user_count,
-      }),
-    }));
+    return [
+      ...new Map(
+        [...this.args.groups, ...this.createdGroups].map((group) => [
+          String(group.id),
+          group,
+        ])
+      ).values(),
+    ];
+  }
+
+  get selectedGroups() {
+    const group = this.groups.find(
+      (item) => String(item.id) === String(this.segment.group_id)
+    );
+    return group ? [group] : [];
   }
 
   get missingProperty() {
@@ -97,17 +109,12 @@ export default class CrmSegmentEditor extends Component {
     return this.args.properties.map((property) => ({
       ...property,
       label: i18n(`${PREFIX}.property_option`, {
-        object: i18n(`${PREFIX}.objects.${property.object}`),
+        object: i18n(`${PREFIX}.objects.${property.object}`, {
+          defaultValue: property.object,
+        }),
         label: property.label,
       }),
     }));
-  }
-
-  get selectedGroupLabel() {
-    const group = this.groups.find(
-      (item) => String(item.id) === String(this.segment.group_id)
-    );
-    return group?.label || i18n(`${PREFIX}.choose_group`);
   }
 
   get submitLabel() {
@@ -150,6 +157,44 @@ export default class CrmSegmentEditor extends Component {
       cancelButtonLabel: "salesforce.guided_sync.keep_editing",
       didConfirm: () => this.args.onCancel(),
     });
+  }
+
+  @action
+  compareGroups(a, b) {
+    return String(a.id) === String(b.id);
+  }
+
+  @action
+  async createGroup(menu) {
+    await menu.close();
+    this.modal.show(CrmCreateGroupModal, {
+      model: { onCreated: this.groupCreated },
+    });
+  }
+
+  @action
+  async findGroups(query) {
+    const term = (query || "").toLowerCase();
+    return this.groups.filter((group) =>
+      group.name.toLowerCase().includes(term)
+    );
+  }
+
+  @action
+  groupCreated(group) {
+    this.createdGroups = [...this.createdGroups, group];
+    this.selectGroups([group]);
+    this.a11y.announce(
+      i18n("salesforce.guided_sync.group_created", { name: group.name })
+    );
+  }
+
+  @action
+  selectGroups(groups) {
+    const group = groups.at(-1);
+    const groupId = group ? group.id : null;
+    this.#form?.set("group_id", groupId);
+    this.segment = { ...this.segment, group_id: groupId };
   }
 
   @action
@@ -475,16 +520,36 @@ export default class CrmSegmentEditor extends Component {
                 @format="full"
                 @helpText={{i18n "salesforce.guided_sync.segments.group_help"}}
                 @name="group_id"
-                @onSet={{this.setField}}
                 @showOptional={{false}}
                 @title={{i18n "salesforce.guided_sync.segments.group"}}
-                @type="menu"
+                @type="custom"
                 as |field|
               >
-                <field.Control @selection={{this.selectedGroupLabel}} as |menu|>
-                  {{#each this.groups key="id" as |group|}}
-                    <menu.Item @value={{group.id}}>{{group.label}}</menu.Item>
-                  {{/each}}
+                <field.Control>
+                  <div class="crm-segment-editor__group-controls">
+                    <DMultiSelect
+                      @compareFn={{this.compareGroups}}
+                      @label={{i18n
+                        "salesforce.guided_sync.segments.choose_group"
+                      }}
+                      @loadFn={{this.findGroups}}
+                      @matchTriggerWidth={{true}}
+                      @onChange={{this.selectGroups}}
+                      @selection={{this.selectedGroups}}
+                    >
+                      <:selection as |group|>{{group.name}}</:selection>
+                      <:result as |group|>{{group.name}}</:result>
+                      <:footer as |menu|>
+                        <DButton
+                          class="btn-flat crm-segment-editor__create-group"
+                          data-test-create-group
+                          @action={{fn this.createGroup menu}}
+                          @icon="plus"
+                          @label="salesforce.guided_sync.create_group"
+                        />
+                      </:footer>
+                    </DMultiSelect>
+                  </div>
                 </field.Control>
               </form.Field>
               <form.Field

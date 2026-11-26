@@ -28,7 +28,8 @@ module DiscourseCrm
       if configuration.backfill &&
            (
              activated || connection_changed || group_ids_changed ||
-               configuration.saved_change_to_backfill?(from: false, to: true)
+               configuration.saved_change_to_backfill?(from: false, to: true) ||
+               (configuration.inbound? && configuration.saved_change_to_mappings?)
            )
         Jobs.enqueue(
           configuration.flow.configuration_job,

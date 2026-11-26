@@ -9,6 +9,11 @@ discourse_salesforce:
       impact: "feature,admins"
       allow_enabled_for:
         - everyone
+  crm_segments_enabled:
+    default: false
+    hidden: true
+    client: true
+    refresh: true
   crm_sync_activity_retention_days:
     default: 90
     min: 0

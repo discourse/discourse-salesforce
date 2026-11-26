@@ -5,6 +5,10 @@ export default <template>
   {{#each (array @model) as |model|}}
     <CrmSyncConfigurations
       @groups={{model.groups}}
+      @segmentConfigurations={{model.segmentConfigurations}}
+      @segmentGroups={{model.segmentGroups}}
+      @segmentProperties={{model.segmentProperties}}
+      @segments={{model.segments}}
       @targets={{model.targets}}
       @onClose={{@controller.clearConfiguration}}
       @onSelect={{@controller.selectConfiguration}}

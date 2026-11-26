@@ -253,6 +253,35 @@ RSpec.describe DiscourseCrm::SyncConfiguration do
       end
     end
 
+    it "lists the properties its mappings keep" do
+      hubspot =
+        Fabricate(
+          :hubspot_sync_configuration,
+          mappings: [
+            { "id" => 1, "object" => "contact", "source" => "jobtitle" },
+            { "id" => 2, "object" => "company", "source" => "plan_tier" },
+            { "id" => 3, "object" => "contact", "source" => "jobtitle" },
+          ],
+        )
+
+      expect(hubspot.pulled_properties).to eq(
+        [{ object: "contact", name: "jobtitle" }, { object: "company", name: "plan_tier" }],
+      )
+    end
+
+    it "removes its segments with the configuration but keeps the group's members" do
+      hubspot = Fabricate(:hubspot_sync_configuration)
+      segment = Fabricate(:crm_segment, configuration: hubspot, group_id: group.id)
+      segment.members.create!(user:)
+      group.add(user)
+
+      described_class.remove!(hubspot.id, guardian: Fabricate(:admin).guardian)
+
+      expect(DiscourseCrm::Segment.where(id: segment.id)).to be_empty
+      expect(DiscourseCrm::SegmentMember.where(segment_id: segment.id)).to be_empty
+      expect(group.reload.users).to eq([user])
+    end
+
     it "keeps links and records when the configuration is removed" do
       hubspot = Fabricate(:hubspot_sync_configuration)
       DiscourseCrm::RecordLink.link_many!(

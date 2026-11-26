@@ -62,6 +62,23 @@ Fabricator(:hubspot_sync_configuration, class_name: DiscourseCrm::SyncConfigurat
   end
 end
 
+Fabricator(:crm_segment, class_name: DiscourseCrm::Segment) do
+  name "Enterprise customers"
+  conditions do
+    {
+      "all" => [
+        {
+          "id" => 1,
+          "object" => "company",
+          "property" => "plan_tier",
+          "operator" => "contains",
+          "value" => "enterprise",
+        },
+      ],
+    }
+  end
+end
+
 Fabricator(:crm_record, class_name: DiscourseCrm::Record) do
   provider "hubspot"
   account { SiteSetting.hubspot_portal_id }

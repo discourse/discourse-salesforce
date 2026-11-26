@@ -5,21 +5,22 @@ module DiscourseCrm
     PAGE_SIZE = 1000
     PREVIEW_USERNAMES = 8
 
-    def self.run_page(provider:, account:, after: nil)
-      new(provider:, account:).run_page(after)
+    def self.run_page(configuration_id:, after: nil)
+      configuration = SyncConfiguration.active.inbound.find_by(id: configuration_id)
+      new(configuration).run_page(after) if configuration
     end
 
-    def self.run_for_users(provider:, account:, user_ids:)
-      new(provider:, account:).run_for_users(user_ids)
+    def self.run_for_users(configuration_id:, user_ids:)
+      configuration = SyncConfiguration.active.inbound.find_by(id: configuration_id)
+      new(configuration).run_for_users(user_ids) if configuration
     end
 
     def self.preview(segment)
-      new(provider: segment.provider, account: segment.account).preview(segment)
+      new(segment.configuration).preview(segment)
     end
 
-    def initialize(provider:, account:)
-      @provider = provider
-      @account = account
+    def initialize(configuration)
+      @configuration = configuration
     end
 
     def run_page(after)
@@ -63,20 +64,24 @@ module DiscourseCrm
     def segments
       @segments ||=
         begin
-          pulled = Segment.pulled_properties(provider: @provider, account: @account)
-          Segment
-            .within(provider: @provider, account: @account)
+          pulled = @configuration.pulled_properties
+          @configuration
+            .segments
             .order(:id)
             .reject { |segment| segment.missing_properties(pulled).any? }
         end
     end
 
     def linked_user_ids
-      RecordLink
-        .where(provider: @provider, account: @account, direction: "inbound")
-        .select(:user_id)
-        .distinct
-        .order(:user_id)
+      inbound_links.select(:user_id).distinct.order(:user_id)
+    end
+
+    def inbound_links
+      RecordLink.where(
+        provider: @configuration.provider,
+        account: @configuration.account,
+        direction: "inbound",
+      )
     end
 
     def eligible_ids(user_ids)
@@ -84,8 +89,8 @@ module DiscourseCrm
     end
 
     def records_by_user(user_ids)
-      RecordLink
-        .where(provider: @provider, account: @account, direction: "inbound", user_id: user_ids)
+      inbound_links
+        .where(user_id: user_ids)
         .includes(record: :company)
         .group_by(&:user_id)
         .transform_values { |links| links.filter_map(&:record) }

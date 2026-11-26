@@ -20,10 +20,16 @@ RSpec.describe DiscourseCrm::Segment::Update do
     fab!(:new_group, :group)
     fab!(:member, :verified_user)
 
+    let!(:configuration) do
+      Fabricate(
+        :hubspot_sync_configuration,
+        mappings: [{ "id" => 1, "object" => "company", "source" => "plan_tier" }],
+      )
+    end
     let!(:segment) do
       Fabricate(
         :crm_segment,
-        account: "99999",
+        configuration:,
         group_id: old_group.id,
         remove_unmatched: true,
         last_evaluated_at: 1.hour.ago,
@@ -43,10 +49,6 @@ RSpec.describe DiscourseCrm::Segment::Update do
     let(:dependencies) { { guardian: admin.guardian } }
 
     before do
-      Fabricate(
-        :hubspot_sync_configuration,
-        mappings: [{ "id" => 1, "object" => "company", "source" => "plan_tier" }],
-      )
       segment.members.create!(user: member)
       old_group.add(member)
       Jobs::DiscourseCrm::EvaluateSegments.clear
@@ -92,11 +94,11 @@ RSpec.describe DiscourseCrm::Segment::Update do
     context "when everything is ok" do
       it { is_expected.to run_successfully }
 
-      it "saves the changes against the current account, keeps the old group's members and enqueues an evaluation" do
+      it "saves the changes, keeps the old group's members and enqueues an evaluation" do
         result
 
         expect(segment.reload).to have_attributes(
-          account: "12345",
+          configuration:,
           name: "Renamed",
           group_id: new_group.id,
           remove_unmatched: false,
@@ -110,7 +112,7 @@ RSpec.describe DiscourseCrm::Segment::Update do
         expect(old_group.reload.users).to eq([member])
         expect(
           Jobs::DiscourseCrm::EvaluateSegments.jobs.map { |job| job["args"].first },
-        ).to contain_exactly(hash_including("provider" => "hubspot", "account" => "12345"))
+        ).to contain_exactly(hash_including("configuration_id" => configuration.id))
       end
     end
   end

@@ -7,6 +7,8 @@ RSpec.describe DiscourseCrm::Segment do
 
   fab!(:group)
 
+  let!(:configuration) { Fabricate(:hubspot_sync_configuration) }
+
   def condition(object, property, operator, value = "")
     {
       "id" => 1,
@@ -24,7 +26,7 @@ RSpec.describe DiscourseCrm::Segment do
 
   describe "validations" do
     it "requires a single combinator holding complete, distinct conditions" do
-      segment = Fabricate.build(:crm_segment)
+      segment = Fabricate.build(:crm_segment, configuration:)
       expect(segment).to be_valid
 
       segment.conditions = { "all" => [], "any" => [] }
@@ -62,8 +64,21 @@ RSpec.describe DiscourseCrm::Segment do
       expect(segment.conditions.keys).to eq(["any"])
     end
 
+    it "belongs to a pull configuration" do
+      segment = Fabricate.build(:crm_segment, configuration: nil)
+      expect(segment).to be_invalid
+
+      segment.configuration = Fabricate(:sync_configuration)
+      expect(segment).to be_invalid
+      expect(segment.errors.full_messages).to eq(["Configuration must be a pull configuration"])
+
+      segment.configuration = configuration
+      expect(segment).to be_valid
+    end
+
     it "accepts only an existing non-automatic group that no other segment targets" do
-      segment = Fabricate.build(:crm_segment, group_id: Group::AUTO_GROUPS[:trust_level_1])
+      segment =
+        Fabricate.build(:crm_segment, configuration:, group_id: Group::AUTO_GROUPS[:trust_level_1])
       expect(segment).to be_invalid
       segment.group_id = -1
       expect(segment).to be_invalid
@@ -74,28 +89,10 @@ RSpec.describe DiscourseCrm::Segment do
       expect(segment).to be_valid
       segment.save!
 
-      competitor = Fabricate.build(:crm_segment, name: "Other", group_id: group.id)
+      competitor = Fabricate.build(:crm_segment, configuration:, name: "Other", group_id: group.id)
       expect(competitor).to be_invalid
       expect(competitor.errors.full_messages).to eq(
         ["Group is already targeted by another segment"],
-      )
-    end
-  end
-
-  describe ".pulled_properties" do
-    it "lists the properties of the active pull and nothing when there is none" do
-      expect(described_class.pulled_properties(provider: "hubspot", account: "12345")).to eq([])
-
-      Fabricate(
-        :hubspot_sync_configuration,
-        mappings: [
-          { "id" => 1, "object" => "contact", "source" => "jobtitle" },
-          { "id" => 2, "object" => "company", "source" => "plan_tier" },
-        ],
-      )
-
-      expect(described_class.pulled_properties(provider: "hubspot", account: "12345")).to eq(
-        [{ object: "contact", name: "jobtitle" }, { object: "company", name: "plan_tier" }],
       )
     end
   end
@@ -105,6 +102,7 @@ RSpec.describe DiscourseCrm::Segment do
       segment =
         Fabricate.build(
           :crm_segment,
+          configuration:,
           conditions: {
             "all" => [
               condition("company", "plan_tier", "set"),
@@ -128,6 +126,7 @@ RSpec.describe DiscourseCrm::Segment do
       segment =
         Fabricate.build(
           :crm_segment,
+          configuration:,
           conditions: {
             "all" => [
               condition("company", "plan_tier", "contains", "ENTERPRISE"),
@@ -153,6 +152,7 @@ RSpec.describe DiscourseCrm::Segment do
           segment =
             Fabricate.build(
               :crm_segment,
+              configuration:,
               conditions: {
                 "all" => [condition("company", "industry", operator, "soft")],
               },
@@ -178,10 +178,14 @@ RSpec.describe DiscourseCrm::Segment do
       ]
 
       expect(
-        Fabricate.build(:crm_segment, conditions: { "all" => conditions }).matches?([record]),
+        Fabricate.build(:crm_segment, configuration:, conditions: { "all" => conditions }).matches?(
+          [record],
+        ),
       ).to eq(false)
       expect(
-        Fabricate.build(:crm_segment, conditions: { "any" => conditions }).matches?([record]),
+        Fabricate.build(:crm_segment, configuration:, conditions: { "any" => conditions }).matches?(
+          [record],
+        ),
       ).to eq(true)
     end
   end

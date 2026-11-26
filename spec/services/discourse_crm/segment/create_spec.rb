@@ -9,7 +9,7 @@ RSpec.describe DiscourseCrm::Segment::Create do
     it { is_expected.to validate_presence_of(:name) }
     it { is_expected.to validate_length_of(:name).is_at_most(60) }
     it { is_expected.to validate_presence_of(:conditions) }
-    it { is_expected.to validate_inclusion_of(:provider).in_array(%w[salesforce hubspot]) }
+    it { is_expected.to validate_presence_of(:configuration_id) }
   end
 
   describe ".call" do
@@ -18,9 +18,15 @@ RSpec.describe DiscourseCrm::Segment::Create do
     fab!(:admin)
     fab!(:group)
 
+    let!(:configuration) do
+      Fabricate(
+        :hubspot_sync_configuration,
+        mappings: [{ "id" => 1, "object" => "company", "source" => "plan_tier" }],
+      )
+    end
     let(:params) do
       {
-        provider: "hubspot",
+        configuration_id: configuration.id,
         name: " Enterprise customers ",
         conditions: {
           all: [
@@ -40,10 +46,6 @@ RSpec.describe DiscourseCrm::Segment::Create do
     let(:dependencies) { { guardian: admin.guardian } }
 
     before do
-      Fabricate(
-        :hubspot_sync_configuration,
-        mappings: [{ "id" => 1, "object" => "company", "source" => "plan_tier" }],
-      )
       Jobs::DiscourseCrm::EvaluateSegments.clear
       SiteSetting.crm_segments_enabled = true
     end
@@ -66,8 +68,14 @@ RSpec.describe DiscourseCrm::Segment::Create do
       it { is_expected.to fail_a_policy(:can_manage) }
     end
 
-    context "when no pull is configured" do
-      before { DiscourseCrm::SyncConfiguration.delete_all }
+    context "when the configuration is not an active pull" do
+      let(:params) { super().merge(configuration_id: Fabricate(:sync_configuration).id) }
+
+      it { is_expected.to fail_to_find_a_model(:configuration) }
+    end
+
+    context "when the pull keeps no properties" do
+      before { configuration.update_columns(mappings: []) }
 
       it { is_expected.to fail_to_find_a_model(:pulled_properties) }
     end
@@ -93,11 +101,10 @@ RSpec.describe DiscourseCrm::Segment::Create do
     context "when everything is ok" do
       it { is_expected.to run_successfully }
 
-      it "creates the segment for the provider's account and enqueues its evaluation" do
+      it "creates the segment on the pull configuration and enqueues its evaluation" do
         expect { result }.to change { DiscourseCrm::Segment.count }.by(1)
         expect(result[:segment]).to have_attributes(
-          provider: "hubspot",
-          account: "12345",
+          configuration:,
           name: "Enterprise customers",
           group_id: group.id,
           remove_unmatched: true,
@@ -115,7 +122,7 @@ RSpec.describe DiscourseCrm::Segment::Create do
         )
         expect(
           Jobs::DiscourseCrm::EvaluateSegments.jobs.map { |job| job["args"].first },
-        ).to contain_exactly(hash_including("provider" => "hubspot", "account" => "12345"))
+        ).to contain_exactly(hash_including("configuration_id" => configuration.id))
       end
     end
   end

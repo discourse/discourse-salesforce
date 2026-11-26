@@ -22,8 +22,7 @@ module Jobs
         return unless SiteSetting.crm_segments_enabled
         Jobs.enqueue(
           ::Jobs::DiscourseCrm::EvaluateSegments,
-          provider: configuration.provider,
-          account: configuration.account,
+          configuration_id: configuration.id,
           user_ids: [user.id],
         )
       rescue ::Hubspot::RateLimited => error

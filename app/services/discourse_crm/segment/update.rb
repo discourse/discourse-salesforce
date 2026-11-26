@@ -35,7 +35,6 @@ module DiscourseCrm
         .find_by(id: params.segment_id)
         &.tap do |segment|
           segment.assign_attributes(
-            account: DiscourseCrm::SyncConfiguration.provider_definition(segment.provider).account,
             name: params.name.strip,
             conditions: params.conditions,
             group_id: params.group_id,
@@ -46,7 +45,7 @@ module DiscourseCrm
     end
 
     def fetch_pulled_properties(segment:)
-      DiscourseCrm::Segment.pulled_properties(provider: segment.provider, account: segment.account)
+      segment.configuration.pulled_properties
     end
 
     def properties_are_pulled(segment:, pulled_properties:)
@@ -61,11 +60,7 @@ module DiscourseCrm
     end
 
     def enqueue_evaluation(segment:)
-      Jobs.enqueue(
-        Jobs::DiscourseCrm::EvaluateSegments,
-        provider: segment.provider,
-        account: segment.account,
-      )
+      Jobs.enqueue(Jobs::DiscourseCrm::EvaluateSegments, configuration_id: segment.configuration_id)
     end
   end
 end

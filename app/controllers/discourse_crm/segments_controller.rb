@@ -9,16 +9,23 @@ module DiscourseCrm
     before_action :ensure_segments_enabled
 
     def index
-      pulled_properties = pulled_properties_by_scope
+      configurations = SyncConfiguration.active.inbound.order(:id).to_a
       render json: {
                segments:
                  serialize_data(
-                   Segment.includes(:group).order(:id),
+                   Segment.includes(:group, :configuration).order(:id),
                    SegmentSerializer,
-                   pulled_properties:,
                    member_counts: SegmentMember.group(:segment_id).count,
                  ),
-               properties: available_properties(pulled_properties),
+               configurations:
+                 configurations.map do |configuration|
+                   {
+                     id: configuration.id,
+                     name: configuration.name,
+                     provider: configuration.provider,
+                   }
+                 end,
+               properties: available_properties(configurations),
                groups: available_groups,
              }
     end
@@ -30,7 +37,7 @@ module DiscourseCrm
           render_json_error(contract.errors.full_messages, status: :bad_request)
         end
         on_failed_policy(:can_manage) { raise Discourse::InvalidAccess }
-        on_model_not_found(:account) { render_no_pull }
+        on_model_not_found(:configuration) { render_no_pull }
         on_model_not_found(:pulled_properties) { render_no_pull }
         on_model_errors(:segment) { |segment| render_json_error(segment) }
         on_failed_policy(:properties_are_pulled) do |_, segment:, pulled_properties:|
@@ -75,6 +82,7 @@ module DiscourseCrm
           render_json_error(contract.errors.full_messages, status: :bad_request)
         end
         on_failed_policy(:can_manage) { raise Discourse::InvalidAccess }
+        on_model_not_found(:configuration) { render_no_pull }
         on_model_not_found(:pulled_properties) { render_no_pull }
         on_model_errors(:segment) { |segment| render_json_error(segment) }
         on_failed_policy(:properties_are_pulled) do |_, segment:, pulled_properties:|
@@ -114,25 +122,14 @@ module DiscourseCrm
       )
     end
 
-    def pulled_properties_by_scope
-      SyncConfiguration.active.inbound.to_h do |configuration|
-        [
-          [configuration.provider, configuration.account],
-          Segment.pulled_properties(
-            provider: configuration.provider,
-            account: configuration.account,
-          ),
-        ]
-      end
-    end
-
-    def available_properties(pulled_properties)
-      pulled_properties.flat_map do |(provider, _account), properties|
-        labels = property_labels(SyncConfiguration.provider_definition(provider), properties)
+    def available_properties(configurations)
+      configurations.flat_map do |configuration|
+        properties = configuration.pulled_properties
+        labels = property_labels(configuration.provider_definition, properties)
         properties.map do |property|
           {
             id: "#{property[:object]}.#{property[:name]}",
-            provider:,
+            configuration_id: configuration.id,
             object: property[:object],
             name: property[:name],
             label: labels.dig(property[:object], property[:name]) || property[:name],

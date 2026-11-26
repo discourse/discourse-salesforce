@@ -54,7 +54,7 @@ RSpec.describe Jobs::Hubspot::SyncUser do
     expect(
       Jobs::DiscourseCrm::EvaluateSegments.jobs.map { |job| job["args"].first },
     ).to contain_exactly(
-      hash_including("provider" => "hubspot", "account" => "12345", "user_ids" => [user.id]),
+      hash_including("configuration_id" => configuration.id, "user_ids" => [user.id]),
     )
   end
 

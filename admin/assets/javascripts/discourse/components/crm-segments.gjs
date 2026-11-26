@@ -10,6 +10,7 @@ import dAgeWithTooltip from "discourse/ui-kit/helpers/d-age-with-tooltip";
 import dIcon from "discourse/ui-kit/helpers/d-icon";
 import { i18n } from "discourse-i18n";
 import {
+  configurationProperties,
   describeConditions,
   propertyLabel,
 } from "discourse/plugins/discourse-salesforce/discourse/lib/crm-segments";
@@ -20,22 +21,28 @@ export default class CrmSegments extends Component {
   @service dialog;
 
   get segments() {
-    return this.args.segments.map((segment) => ({
-      ...segment,
-      conditions: describeConditions(segment, this.args.properties),
-      missingProperty:
-        segment.missing_properties[0] &&
-        propertyLabel(segment.missing_properties[0], this.args.properties),
-      status: segment.connection_changed
-        ? "connection_changed"
-        : segment.missing_properties.length
-          ? "error"
-          : !segment.group_id
-            ? "unsynced"
-            : segment.last_evaluated_at
-              ? "synced"
-              : "pending",
-    }));
+    return this.args.segments.map((segment) => {
+      const properties = configurationProperties(
+        this.args.properties,
+        segment.configuration_id
+      );
+      return {
+        ...segment,
+        conditions: describeConditions(segment, properties),
+        missingProperty:
+          segment.missing_properties[0] &&
+          propertyLabel(segment.missing_properties[0], properties),
+        status: segment.connection_changed
+          ? "connection_changed"
+          : segment.missing_properties.length
+            ? "error"
+            : !segment.group_id
+              ? "unsynced"
+              : segment.last_evaluated_at
+                ? "synced"
+                : "pending",
+      };
+    });
   }
 
   @action
@@ -58,6 +65,9 @@ export default class CrmSegments extends Component {
         <table class="d-table crm-segments__table">
           <thead class="d-table__header"><tr>
               <th>{{i18n "salesforce.guided_sync.segments.columns.name"}}</th>
+              <th>{{i18n
+                  "salesforce.guided_sync.segments.columns.configuration"
+                }}</th>
               <th>{{i18n
                   "salesforce.guided_sync.segments.columns.conditions"
                 }}</th>
@@ -104,6 +114,12 @@ export default class CrmSegments extends Component {
                     {{/if}}
                   </div>
                 </td>
+                <td
+                  class="d-table__cell --detail"
+                  data-test-segment-configuration
+                ><div class="d-table__mobile-label">{{i18n
+                      "salesforce.guided_sync.segments.columns.configuration"
+                    }}</div>{{segment.configuration_name}}</td>
                 <td class="d-table__cell --detail"><div
                     class="d-table__mobile-label"
                   >{{i18n

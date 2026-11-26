@@ -5,15 +5,15 @@ module DiscourseCrm
     include Service::Base
 
     params do
-      attribute :provider, :string
+      attribute :configuration_id, :integer
       attribute :conditions
 
-      validates :provider, inclusion: { in: DiscourseCrm::SyncConfiguration::PROVIDERS.keys }
+      validates :configuration_id, presence: true
       validates :conditions, presence: true
     end
 
     policy :can_manage
-    model :account
+    model :configuration
     model :pulled_properties
     model :segment, :instantiate_segment
     policy :properties_are_pulled
@@ -26,21 +26,16 @@ module DiscourseCrm
         guardian.user.upcoming_change_enabled?(:enable_guided_sync_configuration)
     end
 
-    def fetch_account(params:)
-      DiscourseCrm::SyncConfiguration.provider_definition(params.provider).account
+    def fetch_configuration(params:)
+      DiscourseCrm::SyncConfiguration.active.inbound.find_by(id: params.configuration_id)
     end
 
-    def fetch_pulled_properties(params:, account:)
-      DiscourseCrm::Segment.pulled_properties(provider: params.provider, account:)
+    def fetch_pulled_properties(configuration:)
+      configuration.pulled_properties
     end
 
-    def instantiate_segment(params:, account:)
-      DiscourseCrm::Segment.new(
-        provider: params.provider,
-        account:,
-        name: "preview",
-        conditions: params.conditions,
-      )
+    def instantiate_segment(params:, configuration:)
+      DiscourseCrm::Segment.new(configuration:, name: "preview", conditions: params.conditions)
     end
 
     def properties_are_pulled(segment:, pulled_properties:)

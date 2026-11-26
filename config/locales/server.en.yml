@@ -118,6 +118,8 @@ en:
       models:
         discourse_crm/segment:
           attributes:
+            configuration_id:
+              not_pull: "must be a pull configuration"
             conditions:
               invalid: "must have at least one complete condition"
               too_many: "can have at most %{count} conditions"

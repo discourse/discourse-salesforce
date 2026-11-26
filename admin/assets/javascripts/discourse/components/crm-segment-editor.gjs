@@ -15,6 +15,7 @@ import SyncConfigurationHeading from "discourse/plugins/discourse-salesforce/dis
 import {
   conditionNeedsValue,
   conditionsPayload,
+  configurationProperties,
   OPERATORS,
   previewSegment,
   propertyLabel,
@@ -74,14 +75,22 @@ export default class CrmSegmentEditor extends Component {
     return group ? [group] : [];
   }
 
+  get configurationProperties() {
+    return configurationProperties(
+      this.args.properties,
+      this.segment.configuration_id
+    );
+  }
+
   get missingProperty() {
+    const properties = this.configurationProperties;
     const missing = this.segment.conditions
       .map((item) => item.property)
       .filter(
         (propertyId) =>
-          propertyId && !this.args.properties.some((p) => p.id === propertyId)
+          propertyId && !properties.some((item) => item.id === propertyId)
       );
-    return missing[0] && propertyLabel(missing[0], this.args.properties);
+    return missing[0] && propertyLabel(missing[0], properties);
   }
 
   get operators() {
@@ -106,7 +115,7 @@ export default class CrmSegmentEditor extends Component {
   }
 
   get properties() {
-    return this.args.properties.map((property) => ({
+    return this.configurationProperties.map((property) => ({
       ...property,
       label: i18n(`${PREFIX}.property_option`, {
         object: i18n(`${PREFIX}.objects.${property.object}`, {
@@ -212,7 +221,7 @@ export default class CrmSegmentEditor extends Component {
     return (
       this.properties.find((item) => item.id === propertyId)?.label ||
       (propertyId
-        ? propertyLabel(propertyId, this.args.properties)
+        ? propertyLabel(propertyId, this.configurationProperties)
         : i18n(`${PREFIX}.choose_property`))
     );
   }
@@ -251,6 +260,20 @@ export default class CrmSegmentEditor extends Component {
         itemIndex === index ? { ...item, [property]: value } : item
       )
     );
+  }
+
+  @action
+  setConfiguration(value, { set }) {
+    set("configuration_id", value);
+    this.segment = { ...this.segment, configuration_id: value };
+    this.#setConditions([
+      {
+        id: this.#nextConditionId++,
+        property: "",
+        operator: "equals",
+        value: "",
+      },
+    ]);
   }
 
   @action
@@ -312,7 +335,7 @@ export default class CrmSegmentEditor extends Component {
     }
     const request = this.#previewRequest;
     try {
-      const result = await previewSegment(this.segment.provider, {
+      const result = await previewSegment(this.segment.configuration_id, {
         [this.segment.match]: complete,
       });
       if (request === this.#previewRequest) {
@@ -355,6 +378,25 @@ export default class CrmSegmentEditor extends Component {
           <p class="crm-segment-editor__description">{{i18n
               "salesforce.guided_sync.segments.conditions_description"
             }}</p>
+          <form.Field
+            class="crm-segment-editor__configuration"
+            @disabled={{@record.id}}
+            @format="large"
+            @name="configuration_id"
+            @onSet={{this.setConfiguration}}
+            @title={{i18n "salesforce.guided_sync.segments.configuration"}}
+            @type="select"
+            @validation="required"
+            as |field|
+          >
+            <field.Control as |select|>
+              {{#each @configurations key="id" as |configuration|}}
+                <select.Option
+                  @value={{configuration.id}}
+                >{{configuration.name}}</select.Option>
+              {{/each}}
+            </field.Control>
+          </form.Field>
           {{#if this.missingProperty}}
             <form.Alert @type="warning">{{i18n
                 "salesforce.guided_sync.segments.errors.property_not_pulled"

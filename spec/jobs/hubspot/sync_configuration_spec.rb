@@ -212,7 +212,7 @@ RSpec.describe Jobs::Hubspot::SyncConfiguration do
     expect(configuration.reload.last_synced_at).to eq_time(started_at)
     expect(
       Jobs::DiscourseCrm::EvaluateSegments.jobs.map { |job| job["args"].first },
-    ).to contain_exactly(hash_including("provider" => "hubspot", "account" => "12345"))
+    ).to contain_exactly(hash_including("configuration_id" => configuration.id))
   end
 
   it "searches contacts modified since the previous run with an overlap and never moves the sync time backwards" do

@@ -17,9 +17,9 @@ export function conditionNeedsValue(operatorId) {
   return OPERATORS.find((item) => item.id === operatorId)?.valued ?? true;
 }
 
-export function createSegment(provider) {
+export function createSegment(configurationId) {
   return {
-    provider,
+    configuration_id: configurationId,
     name: "",
     match: "all",
     conditions: [{ id: 1, property: "", operator: "equals", value: "" }],
@@ -33,7 +33,7 @@ export function segmentForm(segment) {
   const match = Object.keys(segment.conditions)[0];
   return {
     id: segment.id,
-    provider: segment.provider,
+    configuration_id: segment.configuration_id,
     name: segment.name,
     match,
     conditions: segment.conditions[match].map((condition) => ({
@@ -67,12 +67,18 @@ export function conditionsPayload(form) {
 
 export function segmentPayload(form) {
   return {
-    provider: form.provider,
+    configuration_id: form.configuration_id,
     name: form.name,
     conditions: conditionsPayload(form),
     group_id: form.sync_group ? form.group_id : null,
     remove_unmatched: form.sync_group && form.remove_unmatched,
   };
+}
+
+export function configurationProperties(properties, configurationId) {
+  return properties.filter(
+    (property) => String(property.configuration_id) === String(configurationId)
+  );
 }
 
 export function propertyLabel(propertyId, properties) {
@@ -106,10 +112,10 @@ export function deleteSegment(id) {
   return ajax(`${URL}/${id}.json`, { type: "DELETE" });
 }
 
-export function previewSegment(provider, conditions) {
+export function previewSegment(configurationId, conditions) {
   return ajax(`${URL}/preview.json`, {
     type: "POST",
     contentType: "application/json",
-    data: JSON.stringify({ provider, conditions }),
+    data: JSON.stringify({ configuration_id: configurationId, conditions }),
   });
 }

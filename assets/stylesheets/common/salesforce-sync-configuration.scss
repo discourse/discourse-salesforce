@@ -476,6 +476,10 @@
 }
 
 .crm-segment-editor {
+  &__configuration {
+    margin-block-end: 1.5em;
+  }
+
   &__match .form-kit__container-content {
     margin-block-start: 0.5em;
   }

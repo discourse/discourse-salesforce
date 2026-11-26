@@ -18,6 +18,7 @@ RSpec.describe Jobs::DiscourseCrm::EvaluateSegments do
   let!(:segment) do
     Fabricate(
       :crm_segment,
+      configuration:,
       group_id: group.id,
       conditions: {
         "all" => [
@@ -54,10 +55,10 @@ RSpec.describe Jobs::DiscourseCrm::EvaluateSegments do
   describe "#execute" do
     it "re-enqueues itself with the cursor until the last page" do
       stub_const(DiscourseCrm::SegmentEvaluation, :PAGE_SIZE, 1) do
-        described_class.new.execute(provider: "hubspot", account: "12345")
+        described_class.new.execute(configuration_id: configuration.id)
 
         expect(enqueued_args).to eq(
-          [{ "provider" => "hubspot", "account" => "12345", "after" => first_user.id }],
+          [{ "configuration_id" => configuration.id, "after" => first_user.id }],
         )
         expect(group.reload.users).to eq([first_user])
 
@@ -74,7 +75,7 @@ RSpec.describe Jobs::DiscourseCrm::EvaluateSegments do
     end
 
     it "evaluates only the given users without paging" do
-      described_class.new.execute(provider: "hubspot", account: "12345", user_ids: [second_user.id])
+      described_class.new.execute(configuration_id: configuration.id, user_ids: [second_user.id])
 
       expect(described_class.jobs).to be_empty
       expect(group.reload.users).to eq([second_user])
@@ -83,13 +84,13 @@ RSpec.describe Jobs::DiscourseCrm::EvaluateSegments do
 
     it "does nothing while segments or every provider are disabled" do
       SiteSetting.crm_segments_enabled = false
-      described_class.new.execute(provider: "hubspot", account: "12345")
+      described_class.new.execute(configuration_id: configuration.id)
       expect(group.reload.users).to be_empty
 
       SiteSetting.crm_segments_enabled = true
       SiteSetting.hubspot_enabled = false
 
-      described_class.new.execute(provider: "hubspot", account: "12345")
+      described_class.new.execute(configuration_id: configuration.id)
 
       expect(described_class.jobs).to be_empty
       expect(group.reload.users).to be_empty

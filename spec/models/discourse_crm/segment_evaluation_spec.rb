@@ -50,7 +50,7 @@ RSpec.describe DiscourseCrm::SegmentEvaluation do
   def run_all
     after = nil
     loop do
-      after = described_class.run_page(provider: "hubspot", account: "12345", after:)
+      after = described_class.run_page(configuration_id: configuration.id, after:)
       break if after.nil?
     end
   end
@@ -58,30 +58,35 @@ RSpec.describe DiscourseCrm::SegmentEvaluation do
   describe ".run_page" do
     it "stops before loading any user when no segment can be evaluated" do
       stub_const(described_class, :PAGE_SIZE, 1) do
-        expect(described_class.run_page(provider: "hubspot", account: "12345")).to be_nil
+        expect(described_class.run_page(configuration_id: configuration.id)).to be_nil
 
         configuration.update!(
           mappings: [{ "id" => 1, "object" => "contact", "source" => "jobtitle" }],
         )
-        Fabricate(:crm_segment, group_id: group.id)
+        Fabricate(:crm_segment, configuration:, group_id: group.id)
 
-        expect(described_class.run_page(provider: "hubspot", account: "12345")).to be_nil
+        expect(described_class.run_page(configuration_id: configuration.id)).to be_nil
+        expect(group.reload.users).to be_empty
+
+        configuration.update!(active: false)
+
+        expect(described_class.run_page(configuration_id: configuration.id)).to be_nil
         expect(group.reload.users).to be_empty
       end
     end
 
     it "pages through linked users with the cursor and finishes on a short page" do
       stub_const(described_class, :PAGE_SIZE, 1) do
-        segment = Fabricate(:crm_segment, group_id: group.id)
+        segment = Fabricate(:crm_segment, configuration:, group_id: group.id)
 
-        first = described_class.run_page(provider: "hubspot", account: "12345")
+        first = described_class.run_page(configuration_id: configuration.id)
         expect(first).to eq(enterprise_user.id)
         expect(segment.reload.last_evaluated_at).to be_nil
 
-        second = described_class.run_page(provider: "hubspot", account: "12345", after: first)
+        second = described_class.run_page(configuration_id: configuration.id, after: first)
         expect(second).to eq(business_user.id)
 
-        third = described_class.run_page(provider: "hubspot", account: "12345", after: second)
+        third = described_class.run_page(configuration_id: configuration.id, after: second)
         expect(third).to be_nil
         expect(segment.reload.last_evaluated_at).to be_present
         expect(segment.members.pluck(:user_id)).to eq([enterprise_user.id])
@@ -90,7 +95,7 @@ RSpec.describe DiscourseCrm::SegmentEvaluation do
     end
 
     it "only adds users unless the segment removes unmatched users" do
-      adding = Fabricate(:crm_segment, group_id: group.id)
+      adding = Fabricate(:crm_segment, configuration:, group_id: group.id)
       group.add(manual_user)
       group.add(business_user)
 
@@ -105,7 +110,7 @@ RSpec.describe DiscourseCrm::SegmentEvaluation do
     end
 
     it "drops members whose link is gone and leaves users who are no longer eligible out" do
-      segment = Fabricate(:crm_segment, group_id: group.id, remove_unmatched: true)
+      segment = Fabricate(:crm_segment, configuration:, group_id: group.id, remove_unmatched: true)
       run_all
       expect(group.reload.users).to eq([enterprise_user])
 
@@ -119,7 +124,7 @@ RSpec.describe DiscourseCrm::SegmentEvaluation do
     end
 
     it "skips a segment whose property is no longer pulled and leaves its group alone" do
-      segment = Fabricate(:crm_segment, group_id: group.id, remove_unmatched: true)
+      segment = Fabricate(:crm_segment, configuration:, group_id: group.id, remove_unmatched: true)
       group.add(manual_user)
       configuration.update!(
         mappings: [{ "id" => 1, "object" => "contact", "source" => "jobtitle" }],
@@ -135,12 +140,11 @@ RSpec.describe DiscourseCrm::SegmentEvaluation do
 
   describe ".run_for_users" do
     it "updates only the given users" do
-      segment = Fabricate(:crm_segment, group_id: group.id, remove_unmatched: true)
+      segment = Fabricate(:crm_segment, configuration:, group_id: group.id, remove_unmatched: true)
       group.add(business_user)
 
       described_class.run_for_users(
-        provider: "hubspot",
-        account: "12345",
+        configuration_id: configuration.id,
         user_ids: [enterprise_user.id],
       )
 
@@ -154,7 +158,7 @@ RSpec.describe DiscourseCrm::SegmentEvaluation do
     it "counts matching eligible users and names the first of them" do
       link(manual_user, "503", company: "acme")
       manual_user.update!(active: false)
-      segment = Fabricate.build(:crm_segment)
+      segment = Fabricate.build(:crm_segment, configuration:)
 
       expect(described_class.preview(segment)).to eq(
         count: 1,

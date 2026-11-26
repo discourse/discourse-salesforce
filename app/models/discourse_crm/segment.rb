@@ -12,26 +12,16 @@ module DiscourseCrm
     MAX_NAME_LENGTH = 60
     MAX_VALUE_LENGTH = 255
 
+    belongs_to :configuration, class_name: "DiscourseCrm::SyncConfiguration"
     belongs_to :group, optional: true
     has_many :members, class_name: "DiscourseCrm::SegmentMember", dependent: :delete_all
 
-    validates :provider, inclusion: { in: SyncConfiguration::PROVIDERS.keys }
-    validates :account, presence: true
+    validates :configuration, presence: true
     validates :name, presence: true, length: { maximum: MAX_NAME_LENGTH }
     validates :group_id, uniqueness: true, allow_nil: true
+    validate :configuration_is_a_pull
     validate :conditions_shape
     validate :group_shape
-
-    scope :within, ->(provider:, account:) { where(provider:, account:) }
-
-    def self.pulled_properties(provider:, account:)
-      configuration = SyncConfiguration.active.inbound.find_by(provider:, account:)
-      return [] if configuration.nil?
-      configuration
-        .mappings
-        .map { |mapping| { object: mapping["object"], name: mapping["source"] } }
-        .uniq
-    end
 
     def conditions=(value)
       super(value.is_a?(Hash) ? value.deep_stringify_keys : value)
@@ -47,7 +37,7 @@ module DiscourseCrm
     end
 
     def connection_changed?
-      account != SyncConfiguration.provider_definition(provider).account
+      configuration.connection_changed?
     end
 
     def missing_properties(pulled)
@@ -100,6 +90,10 @@ module DiscourseCrm
       company if company && condition["object"] == company.object
     end
 
+    def configuration_is_a_pull
+      errors.add(:configuration_id, :not_pull) if configuration && !configuration.inbound?
+    end
+
     def conditions_shape
       unless conditions.is_a?(Hash) && conditions.keys.size == 1 &&
                COMBINATORS.include?(combinator) && conditions[combinator].is_a?(Array) &&
@@ -143,18 +137,17 @@ end
 # Table name: crm_segments
 #
 #  id                :bigint           not null, primary key
-#  account           :string           not null
 #  conditions        :jsonb            not null
 #  last_evaluated_at :datetime
 #  name              :string           not null
-#  provider          :string           not null
 #  remove_unmatched  :boolean          default(FALSE), not null
 #  created_at        :datetime         not null
 #  updated_at        :datetime         not null
+#  configuration_id  :bigint           not null
 #  group_id          :integer
 #
 # Indexes
 #
-#  index_crm_segments_on_group_id              (group_id) UNIQUE WHERE (group_id IS NOT NULL)
-#  index_crm_segments_on_provider_and_account  (provider,account)
+#  index_crm_segments_on_configuration_id  (configuration_id)
+#  index_crm_segments_on_group_id          (group_id) UNIQUE WHERE (group_id IS NOT NULL)
 #

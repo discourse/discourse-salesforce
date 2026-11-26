@@ -5,19 +5,19 @@ module DiscourseCrm
     include Service::Base
 
     params do
-      attribute :provider, :string
+      attribute :configuration_id, :integer
       attribute :name, :string
       attribute :conditions
       attribute :group_id, :integer
       attribute :remove_unmatched, :boolean, default: false
 
-      validates :provider, inclusion: { in: DiscourseCrm::SyncConfiguration::PROVIDERS.keys }
+      validates :configuration_id, presence: true
       validates :name, presence: true, length: { maximum: DiscourseCrm::Segment::MAX_NAME_LENGTH }
       validates :conditions, presence: true
     end
 
     policy :can_manage
-    model :account
+    model :configuration
     model :pulled_properties
     model :segment, :instantiate_segment
     policy :properties_are_pulled
@@ -31,18 +31,17 @@ module DiscourseCrm
         guardian.user.upcoming_change_enabled?(:enable_guided_sync_configuration)
     end
 
-    def fetch_account(params:)
-      DiscourseCrm::SyncConfiguration.provider_definition(params.provider).account
+    def fetch_configuration(params:)
+      DiscourseCrm::SyncConfiguration.active.inbound.find_by(id: params.configuration_id)
     end
 
-    def fetch_pulled_properties(params:, account:)
-      DiscourseCrm::Segment.pulled_properties(provider: params.provider, account:)
+    def fetch_pulled_properties(configuration:)
+      configuration.pulled_properties
     end
 
-    def instantiate_segment(params:, account:)
+    def instantiate_segment(params:, configuration:)
       DiscourseCrm::Segment.new(
-        provider: params.provider,
-        account:,
+        configuration:,
         name: params.name.strip,
         conditions: params.conditions,
         group_id: params.group_id,
@@ -62,11 +61,7 @@ module DiscourseCrm
     end
 
     def enqueue_evaluation(segment:)
-      Jobs.enqueue(
-        Jobs::DiscourseCrm::EvaluateSegments,
-        provider: segment.provider,
-        account: segment.account,
-      )
+      Jobs.enqueue(Jobs::DiscourseCrm::EvaluateSegments, configuration_id: segment.configuration_id)
     end
   end
 end

@@ -17,6 +17,7 @@ export default class SalesforceConfigurationsRoute extends GuidedSyncRoute {
     return {
       ...result,
       segments: segments?.segments,
+      segmentConfigurations: segments?.configurations,
       segmentProperties: segments?.properties,
       segmentGroups: segments?.groups,
       selectedId: params.configuration,

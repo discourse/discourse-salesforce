@@ -13,7 +13,7 @@ RSpec.describe "Define CRM segments" do
   let(:segments_page) { PageObjects::Pages::CrmSegments.new }
   let(:group_members_page) { PageObjects::Pages::GroupMembers.new }
 
-  before do
+  let!(:configuration) do
     Fabricate(
       :hubspot_sync_configuration,
       mappings: [
@@ -21,6 +21,9 @@ RSpec.describe "Define CRM segments" do
         { "id" => 2, "object" => "company", "source" => "plan_tier" },
       ],
     )
+  end
+
+  before do
     stub_hubspot_properties(%w[jobtitle])
     stub_hubspot_properties(%w[plan_tier], object: "company")
     SiteSetting.crm_segments_enabled = true
@@ -71,6 +74,8 @@ RSpec.describe "Define CRM segments" do
   it "lets an admin define a segment, see who it matches and keep a group in sync with it" do
     segments_page.visit.define_segment
 
+    expect(segments_page).to have_configuration(configuration)
+
     segments_page
       .choose_match("any")
       .choose_property(0, "company.plan_tier")
@@ -85,9 +90,14 @@ RSpec.describe "Define CRM segments" do
 
     page.refresh
 
-    expect(segments_page).to have_segment("New segment", group: group, status: "pending")
+    expect(segments_page).to have_segment(
+      "New segment",
+      configuration: configuration,
+      group: group,
+      status: "pending",
+    )
 
-    Jobs::DiscourseCrm::EvaluateSegments.new.execute(provider: "hubspot", account: "12345")
+    Jobs::DiscourseCrm::EvaluateSegments.new.execute(configuration_id: configuration.id)
     page.refresh
 
     expect(segments_page).to have_segment("New segment", group: group, status: "synced")
@@ -95,6 +105,7 @@ RSpec.describe "Define CRM segments" do
 
     segments_page.open_segment("New segment")
 
+    expect(segments_page).to have_configuration(configuration)
     expect(segments_page).to have_condition_value(0, "enterprise")
     expect(segments_page).to have_match("any")
     expect(segments_page).to have_group(group)
@@ -107,7 +118,7 @@ RSpec.describe "Define CRM segments" do
   end
 
   it "lets an admin delete a segment from the list" do
-    Fabricate(:crm_segment, name: "Churn risk", group_id: group.id)
+    Fabricate(:crm_segment, configuration:, name: "Churn risk", group_id: group.id)
 
     segments_page.visit
     expect(segments_page).to have_segment("Churn risk", group: group)

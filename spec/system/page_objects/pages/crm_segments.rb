@@ -14,6 +14,10 @@ module PageObjects
         has_css?("[data-test-define-segment][disabled]")
       end
 
+      def has_configuration?(configuration)
+        form.field("configuration_id").has_value?(configuration.id.to_s)
+      end
+
       def choose_property(index, property_id)
         form.collection_field("conditions", index, "property").select(property_id)
         self
@@ -77,9 +81,13 @@ module PageObjects
         self
       end
 
-      def has_segment?(name, group: nil, status: nil)
+      def has_segment?(name, configuration: nil, group: nil, status: nil)
         row = "[data-test-segment]"
-        has_css?(row, text: name) && (group.nil? || has_css?(row, text: group.name)) &&
+        has_css?(row, text: name) &&
+          (
+            configuration.nil? ||
+              has_css?("#{row} [data-test-segment-configuration]", text: configuration.name)
+          ) && (group.nil? || has_css?(row, text: group.name)) &&
           (status.nil? || has_css?("#{row} [data-test-segment-status='#{status}']"))
       end
 

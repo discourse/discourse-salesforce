@@ -23,7 +23,7 @@ RSpec.describe DiscourseCrm::SegmentsController do
     }
   end
 
-  before do
+  let!(:configuration) do
     Fabricate(
       :hubspot_sync_configuration,
       mappings: [
@@ -31,6 +31,9 @@ RSpec.describe DiscourseCrm::SegmentsController do
         { "id" => 2, "object" => "company", "source" => "plan_tier" },
       ],
     )
+  end
+
+  before do
     stub_hubspot_properties(%w[jobtitle])
     stub_hubspot_properties(%w[plan_tier], object: "company")
     SiteSetting.crm_segments_enabled = true
@@ -38,8 +41,8 @@ RSpec.describe DiscourseCrm::SegmentsController do
   end
 
   describe "#index" do
-    it "lists segments with their state, the pulled properties and the syncable groups" do
-      segment = Fabricate(:crm_segment, group_id: group.id, remove_unmatched: true)
+    it "lists segments with their state, the pull configurations, their properties and the syncable groups" do
+      segment = Fabricate(:crm_segment, configuration:, group_id: group.id, remove_unmatched: true)
       segment.members.create!(user:)
 
       get "/salesforce/admin/guided-sync/segments.json"
@@ -50,7 +53,8 @@ RSpec.describe DiscourseCrm::SegmentsController do
           {
             "id" => segment.id,
             "name" => "Enterprise customers",
-            "provider" => "hubspot",
+            "configuration_id" => configuration.id,
+            "configuration_name" => "Import contacts",
             "conditions" => segment.conditions,
             "group_id" => group.id,
             "group_name" => "enterprise",
@@ -62,18 +66,21 @@ RSpec.describe DiscourseCrm::SegmentsController do
           },
         ],
       )
+      expect(response.parsed_body["configurations"]).to eq(
+        [{ "id" => configuration.id, "name" => "Import contacts", "provider" => "hubspot" }],
+      )
       expect(response.parsed_body["properties"]).to eq(
         [
           {
             "id" => "contact.jobtitle",
-            "provider" => "hubspot",
+            "configuration_id" => configuration.id,
             "object" => "contact",
             "name" => "jobtitle",
             "label" => "Jobtitle",
           },
           {
             "id" => "company.plan_tier",
-            "provider" => "hubspot",
+            "configuration_id" => configuration.id,
             "object" => "company",
             "name" => "plan_tier",
             "label" => "Plan tier",
@@ -86,11 +93,13 @@ RSpec.describe DiscourseCrm::SegmentsController do
       )
     end
 
-    it "flags a segment created under a previous portal" do
-      segment = Fabricate(:crm_segment, account: "99999")
+    it "flags a segment whose pull was configured under a previous portal" do
+      segment = Fabricate(:crm_segment, configuration:)
+      configuration.update_columns(account: "99999")
 
       get "/salesforce/admin/guided-sync/segments.json"
 
+      expect(response.parsed_body["configurations"]).to be_empty
       expect(response.parsed_body["segments"].first).to include(
         "id" => segment.id,
         "connection_changed" => true,
@@ -102,6 +111,7 @@ RSpec.describe DiscourseCrm::SegmentsController do
       segment =
         Fabricate(
           :crm_segment,
+          configuration:,
           conditions: {
             "all" => [
               { "id" => 1, "object" => "contact", "property" => "city", "operator" => "set" },
@@ -137,7 +147,7 @@ RSpec.describe DiscourseCrm::SegmentsController do
       expect(response.status).to eq(404)
       post "/salesforce/admin/guided-sync/segments.json",
            params: {
-             provider: "hubspot",
+             configuration_id: configuration.id,
              name: "Enterprise",
              conditions:,
            },
@@ -150,7 +160,7 @@ RSpec.describe DiscourseCrm::SegmentsController do
     it "creates a segment and returns it" do
       post "/salesforce/admin/guided-sync/segments.json",
            params: {
-             provider: "hubspot",
+             configuration_id: configuration.id,
              name: "Enterprise",
              conditions:,
              group_id: group.id,
@@ -166,13 +176,15 @@ RSpec.describe DiscourseCrm::SegmentsController do
         "member_count" => 0,
         "missing_properties" => [],
       )
-      expect(DiscourseCrm::Segment.find(response.parsed_body["id"]).account).to eq("12345")
+      expect(DiscourseCrm::Segment.find(response.parsed_body["id"]).configuration).to eq(
+        configuration,
+      )
     end
 
     it "rejects a blank name with a 400" do
       post "/salesforce/admin/guided-sync/segments.json",
            params: {
-             provider: "hubspot",
+             configuration_id: configuration.id,
              name: "",
              conditions:,
            },
@@ -185,7 +197,7 @@ RSpec.describe DiscourseCrm::SegmentsController do
     it "rejects an automatic group, a taken group and an unpulled property with a 422" do
       post "/salesforce/admin/guided-sync/segments.json",
            params: {
-             provider: "hubspot",
+             configuration_id: configuration.id,
              name: "Staff",
              conditions:,
              group_id: Group::AUTO_GROUPS[:staff],
@@ -194,10 +206,10 @@ RSpec.describe DiscourseCrm::SegmentsController do
       expect(response.status).to eq(422)
       expect(response.parsed_body["errors"]).to eq(["Group cannot be an automatic group"])
 
-      Fabricate(:crm_segment, group_id: group.id)
+      Fabricate(:crm_segment, configuration:, group_id: group.id)
       post "/salesforce/admin/guided-sync/segments.json",
            params: {
-             provider: "hubspot",
+             configuration_id: configuration.id,
              name: "Second segment",
              conditions:,
              group_id: group.id,
@@ -208,7 +220,7 @@ RSpec.describe DiscourseCrm::SegmentsController do
 
       post "/salesforce/admin/guided-sync/segments.json",
            params: {
-             provider: "hubspot",
+             configuration_id: configuration.id,
              name: "Cities",
              conditions: {
                all: [{ id: 1, object: "contact", property: "city", operator: "set" }],
@@ -224,7 +236,7 @@ RSpec.describe DiscourseCrm::SegmentsController do
     it "rejects a condition that is not an object with a 422" do
       post "/salesforce/admin/guided-sync/segments.json",
            params: {
-             provider: "hubspot",
+             configuration_id: configuration.id,
              name: "Broken",
              conditions: {
                all: ["plan_tier is set"],
@@ -243,7 +255,7 @@ RSpec.describe DiscourseCrm::SegmentsController do
 
       post "/salesforce/admin/guided-sync/segments.json",
            params: {
-             provider: "hubspot",
+             configuration_id: configuration.id,
              name: "Racing",
              conditions:,
              group_id: group.id,
@@ -259,7 +271,7 @@ RSpec.describe DiscourseCrm::SegmentsController do
 
       post "/salesforce/admin/guided-sync/segments.json",
            params: {
-             provider: "hubspot",
+             configuration_id: configuration.id,
              name: "Enterprise",
              conditions:,
            },
@@ -273,12 +285,12 @@ RSpec.describe DiscourseCrm::SegmentsController do
   end
 
   describe "#update" do
-    it "updates the segment and keeps its provider" do
-      segment = Fabricate(:crm_segment)
+    it "updates the segment and keeps its pull configuration" do
+      segment = Fabricate(:crm_segment, configuration:)
 
       put "/salesforce/admin/guided-sync/segments/#{segment.id}.json",
           params: {
-            provider: "salesforce",
+            configuration_id: -1,
             name: "Renamed",
             conditions:,
             group_id: group.id,
@@ -289,7 +301,7 @@ RSpec.describe DiscourseCrm::SegmentsController do
       expect(response.parsed_body).to include(
         "id" => segment.id,
         "name" => "Renamed",
-        "provider" => "hubspot",
+        "configuration_id" => configuration.id,
         "group_id" => group.id,
       )
     end
@@ -303,7 +315,7 @@ RSpec.describe DiscourseCrm::SegmentsController do
 
   describe "#destroy" do
     it "deletes the segment" do
-      segment = Fabricate(:crm_segment)
+      segment = Fabricate(:crm_segment, configuration:)
 
       delete "/salesforce/admin/guided-sync/segments/#{segment.id}.json"
 
@@ -351,7 +363,7 @@ RSpec.describe DiscourseCrm::SegmentsController do
 
       post "/salesforce/admin/guided-sync/segments/preview.json",
            params: {
-             provider: "hubspot",
+             configuration_id: configuration.id,
              conditions:,
            },
            as: :json
@@ -363,7 +375,7 @@ RSpec.describe DiscourseCrm::SegmentsController do
     it "rejects malformed conditions with a 422" do
       post "/salesforce/admin/guided-sync/segments/preview.json",
            params: {
-             provider: "hubspot",
+             configuration_id: configuration.id,
              conditions: {
                all: [{ object: "contact" }],
              },

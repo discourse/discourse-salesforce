@@ -4,7 +4,8 @@ module DiscourseCrm
   class SegmentSerializer < ApplicationSerializer
     attributes :id,
                :name,
-               :provider,
+               :configuration_id,
+               :configuration_name,
                :conditions,
                :group_id,
                :group_name,
@@ -13,6 +14,10 @@ module DiscourseCrm
                :last_evaluated_at,
                :connection_changed,
                :missing_properties
+
+    def configuration_name
+      object.configuration.name
+    end
 
     def group_name
       object.group&.name
@@ -28,9 +33,7 @@ module DiscourseCrm
     end
 
     def missing_properties
-      pulled = @options[:pulled_properties]&.dig([object.provider, object.account])
-      pulled ||= Segment.pulled_properties(provider: object.provider, account: object.account)
-      object.missing_properties(pulled)
+      object.missing_properties(object.configuration.pulled_properties)
     end
   end
 end

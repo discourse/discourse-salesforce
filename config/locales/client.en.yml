@@ -196,6 +196,9 @@ en:
         delete_title: "Delete configuration?"
         delete_message: "Delete ‘%{name}’? This cannot be undone."
         delete_scope: "Other configurations and CRM records will be kept."
+        delete_segments:
+          one: "Its %{count} segment is deleted too. Users it added to a group stay in the group."
+          other: "Its %{count} segments are deleted too. Users they added to groups stay in the groups."
         deleted_message: "Configuration deleted."
         save_success: "Configuration saved."
         connection_changed: "CRM connection changed. Configure and save again to resume syncing."
@@ -208,7 +211,8 @@ en:
           default_name: "New segment"
           editor_description: "Users whose pulled CRM data matches the conditions below belong to this segment. Segments are re-evaluated after every CRM pull."
           conditions_title: "Who is in this segment"
-          conditions_description: "Conditions use the properties your pull configurations keep."
+          conditions_description: "Conditions use the properties the chosen pull configuration keeps."
+          configuration: "Pull configuration"
           match: "Include users matching"
           match_all: "All of the conditions"
           match_any: "Any of the conditions"
@@ -260,6 +264,7 @@ en:
           empty: "No segments yet."
           columns:
             name: "Segment"
+            configuration: "Pull configuration"
             conditions: "Conditions"
             group: "Group"
             members: "Members"

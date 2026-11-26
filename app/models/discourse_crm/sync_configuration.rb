@@ -29,6 +29,10 @@ module DiscourseCrm
              class_name: "DiscourseCrm::Record",
              primary_key: %i[provider account object],
              foreign_key: %i[provider account object]
+    has_many :segments,
+             class_name: "DiscourseCrm::Segment",
+             foreign_key: :configuration_id,
+             dependent: :destroy
 
     # Serialize dependent deletion with workers inserting sync states.
     before_destroy(prepend: true) { self.class.where(id: id).lock.pick(:id) }
@@ -310,6 +314,10 @@ module DiscourseCrm
 
     def connection_changed?
       account != provider_definition.account
+    end
+
+    def pulled_properties
+      mappings.map { |mapping| { object: mapping["object"], name: mapping["source"] } }.uniq
     end
 
     def record_link_for(user_id)

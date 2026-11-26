@@ -16,7 +16,10 @@ RSpec.describe DiscourseCrm::Segment::Destroy do
     fab!(:group)
     fab!(:member, :verified_user)
 
-    let!(:segment) { Fabricate(:crm_segment, group_id: group.id, remove_unmatched: true) }
+    let!(:configuration) { Fabricate(:hubspot_sync_configuration) }
+    let!(:segment) do
+      Fabricate(:crm_segment, configuration:, group_id: group.id, remove_unmatched: true)
+    end
     let(:params) { { segment_id: segment.id } }
     let(:dependencies) { { guardian: admin.guardian } }
 

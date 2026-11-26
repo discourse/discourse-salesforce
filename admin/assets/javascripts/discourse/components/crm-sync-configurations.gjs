@@ -70,7 +70,7 @@ export default class CrmSyncConfigurations extends Component {
       this.add(direction);
     } else if (selectedId === NEW_SEGMENT_KEY && this.canDefineSegments) {
       this.selected = this.#segmentEditorFor(
-        createSegment(this.segmentProvider),
+        createSegment(this.args.segmentConfigurations[0].id),
         NEW_SEGMENT_KEY
       );
     } else if (selectedId.startsWith(SEGMENT_KEY_PREFIX)) {
@@ -115,11 +115,7 @@ export default class CrmSyncConfigurations extends Component {
   }
 
   get canDefineSegments() {
-    return this.args.segmentProperties?.length > 0;
-  }
-
-  get segmentProvider() {
-    return this.args.segmentProperties[0].provider;
+    return this.args.segmentConfigurations?.length > 0;
   }
 
   get displayRecords() {
@@ -155,7 +151,7 @@ export default class CrmSyncConfigurations extends Component {
       return;
     }
     this.selected = this.#segmentEditorFor(
-      createSegment(this.segmentProvider),
+      createSegment(this.args.segmentConfigurations[0].id),
       NEW_SEGMENT_KEY
     );
   }
@@ -297,6 +293,7 @@ export default class CrmSyncConfigurations extends Component {
       key,
       configuration: segment,
       component: CrmSegmentEditor,
+      configurations: this.args.segmentConfigurations,
       groups: this.args.segmentGroups,
       properties: this.args.segmentProperties,
       onSave: this.saveSegment,
@@ -320,6 +317,7 @@ export default class CrmSyncConfigurations extends Component {
     {{else if this.selected}}
       {{#each this.editors key="key" as |editor|}}
         <editor.component
+          @configurations={{editor.configurations}}
           @groups={{editor.groups}}
           @properties={{editor.properties}}
           @targets={{@targets}}
@@ -471,6 +469,7 @@ export default class CrmSyncConfigurations extends Component {
         {{/if}}
         {{#if this.segmentsEnabled}}
           <CrmSegments
+            @configurations={{@segmentConfigurations}}
             @properties={{@segmentProperties}}
             @segments={{this.segments}}
             @onAdd={{if this.canDefineSegments this.addSegment}}

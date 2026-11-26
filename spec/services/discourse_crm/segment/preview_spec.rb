@@ -7,7 +7,7 @@ RSpec.describe DiscourseCrm::Segment::Preview do
 
   describe described_class::Contract, type: :model do
     it { is_expected.to validate_presence_of(:conditions) }
-    it { is_expected.to validate_inclusion_of(:provider).in_array(%w[salesforce hubspot]) }
+    it { is_expected.to validate_presence_of(:configuration_id) }
   end
 
   describe ".call" do
@@ -17,9 +17,15 @@ RSpec.describe DiscourseCrm::Segment::Preview do
     fab!(:matching_user, :verified_user)
     fab!(:other_user, :verified_user)
 
+    let!(:configuration) do
+      Fabricate(
+        :hubspot_sync_configuration,
+        mappings: [{ "id" => 1, "object" => "contact", "source" => "jobtitle" }],
+      )
+    end
     let(:params) do
       {
-        provider: "hubspot",
+        configuration_id: configuration.id,
         conditions: {
           all: [
             { id: 1, object: "contact", property: "jobtitle", operator: "equals", value: "cto" },
@@ -31,10 +37,6 @@ RSpec.describe DiscourseCrm::Segment::Preview do
 
     before do
       SiteSetting.crm_segments_enabled = true
-      Fabricate(
-        :hubspot_sync_configuration,
-        mappings: [{ "id" => 1, "object" => "contact", "source" => "jobtitle" }],
-      )
       { matching_user => "CTO", other_user => "Engineer" }.each_with_index do |(user, title), index|
         Fabricate(:crm_record, external_id: "50#{index}", data: { "jobtitle" => title })
         DiscourseCrm::RecordLink.link_many!(
@@ -53,7 +55,7 @@ RSpec.describe DiscourseCrm::Segment::Preview do
     end
 
     context "when the contract is invalid" do
-      let(:params) { super().merge(provider: "pipedrive") }
+      let(:params) { super().merge(configuration_id: nil) }
 
       it { is_expected.to fail_a_contract }
     end
@@ -64,10 +66,10 @@ RSpec.describe DiscourseCrm::Segment::Preview do
       it { is_expected.to fail_a_policy(:can_manage) }
     end
 
-    context "when no pull is configured" do
-      before { DiscourseCrm::SyncConfiguration.delete_all }
+    context "when the configuration is not an active pull" do
+      before { configuration.update!(active: false) }
 
-      it { is_expected.to fail_to_find_a_model(:pulled_properties) }
+      it { is_expected.to fail_to_find_a_model(:configuration) }
     end
 
     context "when the conditions are malformed" do

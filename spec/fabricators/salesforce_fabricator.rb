@@ -63,8 +63,6 @@ Fabricator(:hubspot_sync_configuration, class_name: DiscourseCrm::SyncConfigurat
 end
 
 Fabricator(:crm_segment, class_name: DiscourseCrm::Segment) do
-  provider "hubspot"
-  account { SiteSetting.hubspot_portal_id }
   name "Enterprise customers"
   conditions do
     {

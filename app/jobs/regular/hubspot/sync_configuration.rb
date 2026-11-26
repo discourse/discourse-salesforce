@@ -125,11 +125,7 @@ module Jobs
             .update_all(last_synced_at: started_at, last_error: nil, last_error_at: nil)
         end
         return unless SiteSetting.crm_segments_enabled
-        Jobs.enqueue(
-          ::Jobs::DiscourseCrm::EvaluateSegments,
-          provider: configuration.provider,
-          account: configuration.account,
-        )
+        Jobs.enqueue(::Jobs::DiscourseCrm::EvaluateSegments, configuration_id: configuration.id)
       end
 
       def search_window(configuration, args)

@@ -26,6 +26,19 @@ RSpec.describe DiscourseCrm::SyncActivityController do
     end
   end
 
+  it "lists each configured provider once even when the filtered history is empty" do
+    sign_in(admin)
+    Fabricate(:sync_configuration)
+    Fabricate(:hubspot_sync_configuration)
+
+    get "/salesforce/admin/guided-sync/activity.json", params: { provider: "salesforce" }
+
+    expect(response.parsed_body.fetch("configured_providers")).to contain_exactly(
+      "salesforce",
+      "hubspot",
+    )
+  end
+
   it "returns a readable failure reason without exposing stored diagnostics" do
     sign_in(admin)
     success =

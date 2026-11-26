@@ -52,6 +52,18 @@ tr_TR:
         keep_editing: "Düzenlemeye devam et"
         cancel_setup: "İptal et"
         configure: "Yapılandır"
+        segments:
+          value: "Değer"
+          choose_group: "Grup seçin"
+          objects:
+            contact: "İletişim"
+          preview_more: "ve %{count} tane daha"
+          group: "Grup"
+          no_group: "Hiçbiri"
+          columns:
+            conditions: "Koşullar"
+            group: "Grup"
+            members: "Üyeler"
         group_name: "Grup adı"
         email: "E-posta"
         custom_field: "Özel"

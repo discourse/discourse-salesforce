@@ -51,6 +51,17 @@ he:
         keep_editing: "להמשיך לערוך"
         cancel_setup: "ביטול"
         configure: "הגדרה"
+        segments:
+          value: "ערך"
+          objects:
+            contact: "איש/אשת קשר"
+          preview_more: "ו־%{count} נוספות"
+          group: "קבוצה"
+          no_group: "ללא"
+          columns:
+            conditions: "תנאים"
+            group: "קבוצה"
+            members: "חברים"
         group_name: "שם הקבוצה"
         email: "דוא״ל"
         custom_field: "מותאם"

@@ -33,6 +33,16 @@ gl:
       guided_sync:
         keep_editing: "Seguir editando"
         cancel_setup: "Cancelar"
+        segments:
+          value: "Valor"
+          objects:
+            contact: "Contacto"
+          preview_more: "e %{count} máis"
+          group: "Grupo"
+          no_group: "Ningunha"
+          columns:
+            group: "Grupo"
+            members: "Membros"
         group_name: "Nome do grupo"
         email: "Enderezo de correo"
         custom_field: "Personalizado"

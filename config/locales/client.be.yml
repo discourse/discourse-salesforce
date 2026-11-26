@@ -29,6 +29,15 @@ be:
           contact: "кантакт"
       guided_sync:
         cancel_setup: "Скасаваць"
+        segments:
+          value: "Значэнне"
+          objects:
+            contact: "кантакт"
+          group: "група"
+          no_group: "Няма"
+          columns:
+            group: "група"
+            members: "Члены"
         email: "Электронная пошта"
         overwrite: "гаворка"
         source_groups:

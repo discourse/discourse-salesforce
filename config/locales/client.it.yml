@@ -52,6 +52,17 @@ it:
         keep_editing: "Continua modifica"
         cancel_setup: "Annulla"
         configure: "Configura"
+        segments:
+          value: "Valore"
+          choose_group: "Scegli un gruppo"
+          objects:
+            contact: "Contatto"
+          preview_more: "e %{count} altro"
+          group: "Gruppo"
+          no_group: "Nessuna"
+          columns:
+            group: "Gruppo"
+            members: "Membri"
         group_name: "Nome gruppo"
         email: "E-mail"
         custom_field: "Personalizzato"

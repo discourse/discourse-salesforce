@@ -44,6 +44,16 @@ zh_TW:
         keep_editing: "繼續編輯"
         cancel_setup: "取消"
         configure: "設定"
+        segments:
+          value: "值"
+          objects:
+            contact: "聯繫"
+          group: "群組"
+          no_group: "無"
+          columns:
+            conditions: "條件"
+            group: "群組"
+            members: "成員"
         group_name: "群組名稱"
         email: "Email"
         custom_field: "客製"

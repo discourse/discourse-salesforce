@@ -29,6 +29,13 @@ sq:
           skipped: "Skipped"
       guided_sync:
         cancel_setup: "Anulo"
+        segments:
+          value: "Vlera"
+          group: "Grupi"
+          no_group: "Asnjë"
+          columns:
+            group: "Grupi"
+            members: "Anëtarë"
         group_name: "Emri i grupit"
         email: "Email"
         custom_field: "Grupet e krijuara"

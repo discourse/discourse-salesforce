@@ -27,6 +27,13 @@ sl:
       guided_sync:
         keep_editing: "Nadaljuj z urejanjem"
         cancel_setup: "Prekliči"
+        segments:
+          value: "Stanje"
+          group: "Skupina"
+          no_group: "Brez"
+          columns:
+            group: "Skupina"
+            members: "Člani"
         group_name: "Ime skupine"
         email: "E-naslov"
         custom_field: "Po meri"

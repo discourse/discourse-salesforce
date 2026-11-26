@@ -30,6 +30,13 @@ te:
       guided_sync:
         keep_editing: "సవరించడం కొనసాగించండి"
         cancel_setup: "రద్దుచేయండి"
+        segments:
+          value: "విలువ"
+          group: "సమూహం"
+          no_group: "ఏదీ లేదు"
+          columns:
+            group: "సమూహం"
+            members: "సభ్యులు"
         group_name: "సమూహం పేరు"
         email: "మెయిల్"
         custom_field: "అనుకూల"

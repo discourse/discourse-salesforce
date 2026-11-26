@@ -35,6 +35,14 @@ sk:
         keep_editing: "Pokračujte v úpravách"
         cancel_setup: "Zrušiť"
         configure: "Konfigurovať"
+        segments:
+          value: "Hodnota"
+          preview_more: "a %{count} ďalšie"
+          group: "Skupina"
+          no_group: "Žiadny"
+          columns:
+            group: "Skupina"
+            members: "Členovia"
         group_name: "Názov skupiny"
         email: "Email"
         custom_field: "Vlastné"

@@ -38,6 +38,16 @@ ur:
         keep_editing: "ترمیم کرتے رہیں"
         cancel_setup: "منسوخ کریں"
         configure: "ترتیب دیں"
+        segments:
+          value: "وَیلِیو"
+          objects:
+            contact: "رابطہ"
+          group: "گروپ"
+          no_group: "کوئی نہیں"
+          columns:
+            conditions: "شرائط"
+            group: "گروپ"
+            members: "صارفین"
         group_name: "گروپ کا نام"
         email: "ای میل"
         custom_field: "اپنی مرضی کا"

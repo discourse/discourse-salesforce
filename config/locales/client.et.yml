@@ -30,6 +30,15 @@ et:
           contact: "Kontakt"
       guided_sync:
         cancel_setup: "Tühista"
+        segments:
+          value: "Väärtus"
+          objects:
+            contact: "Kontakt"
+          group: "Rühm"
+          no_group: "Pole"
+          columns:
+            group: "Rühm"
+            members: "Liikmed"
         group_name: "Rühma nimi"
         email: "Meiliaadress"
         custom_field: "Individuaalne"

@@ -52,6 +52,17 @@ fi:
         keep_editing: "Jatka muokkaamista"
         cancel_setup: "Peruuta"
         configure: "Määritä"
+        segments:
+          value: "Arvo"
+          choose_group: "Valitse ryhmä"
+          objects:
+            contact: "Yhteystiedot"
+          preview_more: "ja %{count} muuta"
+          group: "Ryhmä"
+          no_group: "Ei valittu"
+          columns:
+            group: "Ryhmä"
+            members: "Jäsenet"
         group_name: "Ryhmän nimi"
         email: "Sähköpostiosoite"
         custom_field: "Mukautettu"

@@ -38,6 +38,14 @@ vi:
         keep_editing: "Tiếp tục chỉnh sửa"
         cancel_setup: "Hủy"
         configure: "Cấu hình"
+        segments:
+          value: "Giá trị"
+          preview_more: "và %{count} nữa"
+          group: "Nhóm"
+          no_group: "Không"
+          columns:
+            group: "Nhóm"
+            members: "Thành viên kênh"
         group_name: "Tên nhóm"
         email: "Email"
         custom_field: "Tùy chỉnh"

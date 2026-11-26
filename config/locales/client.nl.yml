@@ -52,6 +52,18 @@ nl:
         keep_editing: "Blijven bewerken"
         cancel_setup: "Annuleren"
         configure: "Configureren"
+        segments:
+          value: "Waarde"
+          choose_group: "Kies een groep"
+          objects:
+            contact: "Contact"
+          preview_more: "en nog %{count}"
+          group: "Groep"
+          no_group: "Geen"
+          columns:
+            conditions: "Voorwaarden"
+            group: "Groep"
+            members: "Leden"
         group_name: "Groepsnaam"
         email: "E-mail"
         custom_field: "Aangepast"

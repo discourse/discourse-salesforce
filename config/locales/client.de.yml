@@ -56,6 +56,18 @@ de:
         keep_editing: "Weiter bearbeiten"
         cancel_setup: "Abbrechen"
         configure: "Konfigurieren"
+        segments:
+          value: "Wert"
+          choose_group: "Wähle eine Gruppe"
+          objects:
+            contact: "Kontakt"
+          preview_more: "und %{count} mehr"
+          group: "Gruppe"
+          no_group: "Keine Auswahl"
+          columns:
+            conditions: "Bedingungen"
+            group: "Gruppe"
+            members: "Mitglieder"
         group_name: "Gruppenname"
         email: "E-Mail"
         custom_field: "Benutzerdefiniert"

@@ -27,6 +27,14 @@ bs_BA:
           skipped: "Skipped"
       guided_sync:
         cancel_setup: "Odustani"
+        segments:
+          value: "Value"
+          preview_more: "i %{count} više"
+          group: "Grupa"
+          no_group: "Ništa"
+          columns:
+            group: "Grupa"
+            members: "Članovi"
         group_name: "Ime grupe"
         email: "Email"
         custom_field: "Custom"

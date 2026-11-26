@@ -23,6 +23,13 @@ sr:
       guided_sync:
         cancel_setup: "Odustani"
         configure: "Konfiguriši"
+        segments:
+          value: "Vriednost"
+          group: "Grupa"
+          no_group: "Ništa"
+          columns:
+            group: "Grupa"
+            members: "Članovi"
         email: "Email"
         custom_field: "Posebna"
         overwrite: "Discourse"

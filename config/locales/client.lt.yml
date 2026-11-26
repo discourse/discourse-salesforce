@@ -38,6 +38,17 @@ lt:
         discard_changes: "Atmesti pakeitimus"
         keep_editing: "Tęskite redagavimą"
         cancel_setup: "Atšaukti"
+        segments:
+          value: "Reikšmė"
+          objects:
+            contact: "Susisiekite"
+          preview_more: "ir %{count} daugiau"
+          group: "Grupė"
+          no_group: "Nėra"
+          columns:
+            conditions: "Sąlygos"
+            group: "Grupė"
+            members: "Nariai"
         save_changes: "Išsaugoti konfigūraciją"
         group_name: "Grupės pavadinimas"
         email: "E. paštas"

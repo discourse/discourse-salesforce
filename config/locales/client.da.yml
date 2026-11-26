@@ -37,6 +37,16 @@ da:
         all_users: "Alle brugere"
         keep_editing: "Fortsæt redigering"
         cancel_setup: "Annuller"
+        segments:
+          value: "værdi"
+          objects:
+            contact: "Kontakt"
+          preview_more: "og %{count} mere"
+          group: "Gruppe"
+          no_group: "Ingen"
+          columns:
+            group: "Gruppe"
+            members: "Brugere"
         group_name: "Gruppe navn"
         email: "E-mail"
         custom_field: "Tilpasset"

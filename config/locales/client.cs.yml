@@ -34,6 +34,14 @@ cs:
         discard_changes: "Zahodit změny"
         keep_editing: "Pokračovat v úpravách"
         cancel_setup: "Zrušit"
+        segments:
+          value: "Hodnota"
+          preview_more: "%{count} navíc"
+          group: "Skupina"
+          no_group: "Žádný"
+          columns:
+            group: "Skupina"
+            members: "Členové"
         group_name: "Název skupiny"
         email: "Emaily"
         custom_field: "Přizpůsobené"

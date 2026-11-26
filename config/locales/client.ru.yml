@@ -52,6 +52,18 @@ ru:
         keep_editing: "Продолжить редактирование"
         cancel_setup: "Нет"
         configure: "Настроить"
+        segments:
+          value: "Значение"
+          choose_group: "Выберите группу"
+          objects:
+            contact: "Контакты"
+          preview_more: "и еще %{count}"
+          group: "Группа"
+          no_group: "Отсутствует"
+          columns:
+            conditions: "Условия"
+            group: "Группа"
+            members: "Участники"
         group_name: "Название группы"
         email: "Эл. почта"
         custom_field: "Другое"

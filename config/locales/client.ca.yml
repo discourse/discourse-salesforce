@@ -30,6 +30,16 @@ ca:
           contact: "Contacte"
       guided_sync:
         cancel_setup: "Cancel·la"
+        segments:
+          value: "Valor"
+          objects:
+            contact: "Contacte"
+          preview_more: "i %{count} més"
+          group: "Grup"
+          no_group: "Cap"
+          columns:
+            group: "Grup"
+            members: "Membres"
         group_name: "Nom del grup"
         email: "Correu electrònic"
         custom_field: "Personalitzat"

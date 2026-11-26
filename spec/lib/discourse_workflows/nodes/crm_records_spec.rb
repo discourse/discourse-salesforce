@@ -149,8 +149,11 @@ RSpec.describe DiscourseWorkflows::Nodes::CrmRecords::V1, discourse_workflows: t
 
   it "rejects providers without a pull and objects the pull does not offer" do
     expect {
-      execute_node_output(configuration: configuration_params.merge("provider" => "salesforce"))
-    }.to raise_error(DiscourseWorkflows::NodeError, /salesforce/)
+      execute_node_output(configuration: configuration_params.merge("provider" => "pipedrive"))
+    }.to raise_error(DiscourseWorkflows::NodeError, /pipedrive/)
+    expect {
+      execute_node_output(configuration: configuration_params.merge("object" => "Lead"))
+    }.to raise_error(DiscourseWorkflows::NodeError, /Lead/)
     expect {
       execute_node_output(configuration: configuration_params.merge("object" => "company"))
     }.to raise_error(DiscourseWorkflows::NodeError, /company/)

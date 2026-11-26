@@ -24,8 +24,6 @@ module DiscourseCrm
       type
     end
 
-    private_class_method :field_type
-
     def self.validate!(mappings, fields, email_field:, required_fields:)
       unless mappings.is_a?(Array) && mappings.all? { |mapping| mapping.is_a?(Hash) }
         raise Discourse::InvalidParameters.new(:mappings)

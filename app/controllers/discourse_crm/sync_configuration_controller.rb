@@ -12,6 +12,7 @@ module DiscourseCrm
                configurations: serialize_data(records, SyncConfigurationSerializer),
                providers: SyncConfiguration.available_providers,
                targets: SyncConfiguration.available_targets,
+               pull_targets: SyncConfiguration.available_targets("inbound"),
                groups: SyncConfiguration.available_groups,
              }
     end
@@ -47,6 +48,13 @@ module DiscourseCrm
                errors: [I18n.t("hubspot.error.invalid_property_value", property: error.property)],
                error_type: "invalid_property_value",
              },
+             status: :unprocessable_entity
+    rescue InvalidMapping => error
+      render json: {
+               errors: [error.message],
+               error_type: "invalid_mapping",
+               mapping_index: error.mapping_index,
+             }.compact,
              status: :unprocessable_entity
     rescue Salesforce::InvalidCredentials,
            Salesforce::InvalidApiResponse,

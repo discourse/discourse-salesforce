@@ -16,10 +16,13 @@ RSpec.describe "Define CRM segments" do
   let!(:configuration) do
     Fabricate(
       :hubspot_sync_configuration,
-      mappings: [
-        { "id" => 1, "object" => "contact", "source" => "jobtitle" },
-        { "id" => 2, "object" => "company", "source" => "plan_tier" },
-      ],
+      mappings: [{ "id" => 1, "object" => "contact", "source" => "jobtitle" }],
+    )
+  end
+  let!(:company_pull) do
+    Fabricate(
+      :hubspot_company_pull,
+      mappings: [{ "id" => 1, "object" => "company", "source" => "plan_tier" }],
     )
   end
 

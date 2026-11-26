@@ -36,6 +36,7 @@ module DiscourseCrm
 
     # Serialize dependent deletion with workers inserting sync states.
     before_destroy(prepend: true) { self.class.where(id: id).lock.pick(:id) }
+    after_destroy { flow.removed(self) if flow.respond_to?(:removed) }
 
     enum :direction, { outbound: "outbound", inbound: "inbound" }, validate: true
 
@@ -50,6 +51,9 @@ module DiscourseCrm
               if: :inbound?
     validate :provider_shape
     validate :mappings_shape
+
+    # Pulls that match records to users, which segments can build on.
+    scope :user_pulls, -> { inbound.where(kind: "users") }
 
     scope :for_provider,
           ->(name) { where(provider: name, account: self.provider_definition(name).account) }
@@ -68,13 +72,13 @@ module DiscourseCrm
       end
     end
 
-    def self.available_targets
+    def self.available_targets(direction = "outbound")
       enabled_providers
         .select(&:credentials?)
         .flat_map do |provider|
           provider
             .flows
-            .select { |flow| flow.direction == "outbound" }
+            .select { |flow| flow.direction == direction }
             .flat_map do |flow|
               flow.objects.map { |object| { provider: provider.key, object: object } }
             end
@@ -173,11 +177,15 @@ module DiscourseCrm
 
       previous_group_ids = record.persisted? ? record.group_ids.sort : []
       new_group_ids = groups.map(&:id).sort
-      transaction do
-        record.save!
-        if previous_group_ids != new_group_ids
-          record.configuration_groups.delete_all
-          record.configuration_groups.insert_all(new_group_ids.map { |group_id| { group_id: } })
+      # Serialize saves so two configurations cannot each pass the loop check and together form a loop.
+      DistributedMutex.synchronize("discourse_crm_sync_configuration_mappings") do
+        MappingGraph.validate!(record)
+        transaction do
+          record.save!
+          if previous_group_ids != new_group_ids
+            record.configuration_groups.delete_all
+            record.configuration_groups.insert_all(new_group_ids.map { |group_id| { group_id: } })
+          end
         end
       end
       ConfigurationScheduler.configuration_saved(
@@ -185,6 +193,9 @@ module DiscourseCrm
         group_ids_changed: previous_group_ids != new_group_ids,
       )
       record
+    rescue InvalidMapping => error
+      error.locate(record.mappings) if record
+      raise
     end
 
     def self.remove!(id, guardian:)
@@ -246,7 +257,14 @@ module DiscourseCrm
       end
     end
 
-    def record_import_results(reasons, clear_errors_for: reasons.keys, scheduled_at: nil)
+    def record_import_results(
+      reasons,
+      clear_errors_for: reasons.keys,
+      scheduled_at: nil,
+      errors: {}
+    )
+      # A user whose pulled value Discourse rejected is reported as failed, not as unchanged.
+      reasons = reasons.reject { |user_id, reason| reason == "unchanged" && errors.key?(user_id) }
       self.class.transaction do
         unchanged = reasons.select { |_, reason| reason == "unchanged" }.keys
         if unchanged.any?
@@ -265,7 +283,59 @@ module DiscourseCrm
         reasons
           .except(*unchanged)
           .each { |user_id, reason| SyncAttempt.record(self, user_id, reason: reason) }
-        sync_states.where(user_id: clear_errors_for).update_all(error: nil, error_at: nil)
+        sync_states.where(user_id: Array(clear_errors_for) - errors.keys).update_all(
+          error: nil,
+          error_at: nil,
+        )
+        errors.each { |user_id, error| record_result(user_id, error: error) }
+      end
+    end
+
+    # Ends a configuration-wide pull. A run that recorded no per-user history still leaves
+    # one attempt, so the activity log shows that it ran.
+    def finish_pull(started_at, history_result, empty_reason: "no_contacts")
+      SyncAttempt.transaction do
+        if history_result != "recorded"
+          SyncAttempt.record(self, nil, reason: history_result || empty_reason)
+        end
+        self
+          .class
+          .where(id: id)
+          .where("last_synced_at IS NULL OR last_synced_at < ?", started_at)
+          .update_all(last_synced_at: started_at, last_error: nil, last_error_at: nil)
+      end
+      evaluate_segments_later
+    end
+
+    # Locks the pull for one page's writes. Pages of the same pull take turns, which also lets
+    # them update shared summaries without deadlocking. Deleting the pull or its last group
+    # waits for the page, and a page that starts afterwards finds the pull gone or paused.
+    # Also reloads the configuration, so a page writes with the mappings saved right now
+    # rather than those loaded before its CRM request. A response fetched from a CRM account
+    # the pull no longer uses is dropped.
+    def lock_for_import!
+      fetched_from = account
+      reload(lock: "FOR NO KEY UPDATE")
+      raise RecordImport::Paused if !active || account != fetched_from
+    rescue ActiveRecord::RecordNotFound
+      raise RecordImport::Paused
+    end
+
+    # Segments belong to user pulls and also read the companies a company pull stores, so a
+    # company pull re-evaluates the segments of its provider's user pulls.
+    def evaluate_segments_later(user_ids: nil)
+      return unless SiteSetting.crm_segments_enabled
+      pull_ids =
+        if kind == "users"
+          [id]
+        else
+          self.class.active.user_pulls.where(provider:, account:).pluck(:id)
+        end
+      pull_ids.each do |pull_id|
+        Jobs.enqueue(
+          Jobs::DiscourseCrm::EvaluateSegments,
+          { configuration_id: pull_id, user_ids: }.compact,
+        )
       end
     end
 
@@ -301,7 +371,7 @@ module DiscourseCrm
 
     def reason_enabled?(reason)
       case reason
-      when "join", "change", "retry"
+      when "join", "change", "retry", "contacts_pulled"
         true
       when "backfill"
         backfill
@@ -316,8 +386,26 @@ module DiscourseCrm
       account != provider_definition.account
     end
 
+    # The CRM fields kept in this configuration's stored records.
+    def record_sources
+      mappings.filter_map { |mapping| mapping["source"] if (mapping["object"] || object) == object }
+    end
+
+    def destination_mappings
+      mappings.select { |mapping| mapping["destination"].present? }
+    end
+
+    # Segments match on a user's records and the companies those records point to, so a user
+    # pull also offers the properties its provider's company pull stores.
     def pulled_properties
-      mappings.map { |mapping| { object: mapping["object"], name: mapping["source"] } }.uniq
+      pulls = [self]
+      if kind == "users"
+        pulls += self.class.active.inbound.where(provider:, account:, kind: "companies").to_a
+      end
+      pulls
+        .flat_map(&:mappings)
+        .map { |mapping| { object: mapping["object"], name: mapping["source"] } }
+        .uniq
     end
 
     def record_link_for(user_id)

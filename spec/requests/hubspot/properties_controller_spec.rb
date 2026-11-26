@@ -47,7 +47,7 @@ RSpec.describe Hubspot::PropertiesController do
       )
     end
 
-    it "serves push fields and Discourse sources for contacts from the same cached metadata" do
+    it "serves pull fields with source types, push fields, Discourse sources and destinations for contacts from the same cached metadata" do
       SiteSetting.salesforce_enabled = false
       sign_in(admin)
       stub_request(:get, hubspot_url("properties/contacts")).to_return(
@@ -64,16 +64,17 @@ RSpec.describe Hubspot::PropertiesController do
       2.times { get "/salesforce/admin/hubspot/properties.json", params: { object: "contact" } }
 
       expect(response).to have_http_status(:ok)
-      expect(response.parsed_body["properties"].map { |field| field["name"] }).to contain_exactly(
-        "email",
-        "firstname",
-        "calculated",
-      )
+      expect(
+        response.parsed_body["properties"].to_h { |field| [field["name"], field["source_type"]] },
+      ).to eq("email" => "text", "firstname" => "text", "calculated" => "number")
       expect(response.parsed_body["fields"].map { |field| field["name"] }).to contain_exactly(
         "email",
         "firstname",
       )
       expect(response.parsed_body["custom_sources"]).to eq([])
+      expect(response.parsed_body["destinations"].map { |field| field["id"] }).to eq(
+        %w[name bio website],
+      )
       expect(a_request(:get, hubspot_url("properties/contacts"))).to have_been_made.once
 
       get "/salesforce/admin/hubspot/properties.json", params: { object: "company" }

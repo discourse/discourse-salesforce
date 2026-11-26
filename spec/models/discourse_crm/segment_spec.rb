@@ -64,13 +64,15 @@ RSpec.describe DiscourseCrm::Segment do
       expect(segment.conditions.keys).to eq(["any"])
     end
 
-    it "belongs to a pull configuration" do
+    it "belongs to a pull that matches users" do
       segment = Fabricate.build(:crm_segment, configuration: nil)
       expect(segment).to be_invalid
 
-      segment.configuration = Fabricate(:sync_configuration)
-      expect(segment).to be_invalid
-      expect(segment.errors.full_messages).to eq(["Configuration must be a pull configuration"])
+      [Fabricate(:sync_configuration), Fabricate(:hubspot_company_pull)].each do |other|
+        segment.configuration = other
+        expect(segment).to be_invalid
+        expect(segment.errors.full_messages).to eq(["Configuration must be a pull configuration"])
+      end
 
       segment.configuration = configuration
       expect(segment).to be_valid

@@ -2,7 +2,7 @@
 
 require_relative "../../spec_helper"
 
-RSpec.describe Jobs::Hubspot::SyncUser do
+RSpec.describe Jobs::DiscourseCrm::PullUser do
   include_context "with hubspot spec helper"
 
   let!(:configuration) do
@@ -58,6 +58,27 @@ RSpec.describe Jobs::Hubspot::SyncUser do
     )
   end
 
+  it "asks the company pull for the user's companies" do
+    company_pull = Fabricate(:hubspot_company_pull)
+    stub_hubspot_batch_read([hubspot_contact(501, user.email, associatedcompanyid: "900")])
+
+    described_class.new.execute(
+      configuration_id: configuration.id,
+      user_id: user.id,
+      reason: "change",
+    )
+
+    expect(Jobs::Hubspot::PullCompanies.jobs.map { |job| job["args"].first }).to contain_exactly(
+      a_hash_including(
+        "configuration_id" => company_pull.id,
+        "reason" => "contacts_pulled",
+        "company_ids" => %w[900],
+        "account" => company_pull.account,
+        "user_id" => user.id,
+      ),
+    )
+  end
+
   it "rolls back a contact unlink when its history write fails and records it on retry" do
     args = { configuration_id: configuration.id, user_id: user.id, reason: "change" }
     stub_hubspot_batch_read([hubspot_contact(501, user.email)])
@@ -75,6 +96,36 @@ RSpec.describe Jobs::Hubspot::SyncUser do
     expect(DiscourseCrm::SyncAttempt.order(:id).pluck(:reason)).to eq(
       %w[imported failed contact_unlinked],
     )
+  end
+
+  it "records a failed attempt for a pulled value that Discourse rejects" do
+    tier = Fabricate(:user_field, name: "Tier", field_type: "dropdown")
+    tier.user_field_options.create!(value: "Gold")
+    configuration.update!(
+      mappings: [
+        {
+          "object" => "contact",
+          "source" => "tier",
+          "destination" => "user_field_#{tier.id}",
+          "policy" => "overwrite",
+        },
+      ],
+    )
+    stub_hubspot_batch_read([hubspot_contact(501, "ada@example.com", tier: "Platinum")])
+
+    described_class.new.execute(
+      configuration_id: configuration.id,
+      user_id: user.id,
+      reason: "change",
+    )
+
+    attempts = DiscourseCrm::SyncAttempt.where(user_id: user.id).order(:id)
+    expect(attempts.pluck(:outcome, :reason)).to eq([%w[success imported], %w[failed failed]])
+    expect(DiscourseCrm::FailureReason.for(attempts.last)).to eq(
+      "Discourse rejected the pulled value for Tier. Check the field’s allowed values and length.",
+    )
+    expect(configuration.reload.sync_status["error"]).to eq("DiscourseCrm::InvalidDestinationValue")
+    expect(configuration.record_link_for(user.id).external_id).to eq("501")
   end
 
   it "records one import for a user with multiple matching email addresses" do
@@ -108,25 +159,6 @@ RSpec.describe Jobs::Hubspot::SyncUser do
     expect(configuration.record_links).to be_empty
     expect(DiscourseCrm::SyncAttempt.order(:id).pluck(:outcome, :reason)).to eq(
       [%w[success imported], %w[success contact_unlinked], %w[skipped skipped_no_match]],
-    )
-  end
-
-  it "reports both a missing company and a stale contact removed during the same pull" do
-    configuration.update!(mappings: [{ "id" => 1, "object" => "company", "source" => "name" }])
-    args = { configuration_id: configuration.id, user_id: user.id, reason: "change" }
-    stub_hubspot_batch_read([hubspot_contact(501, user.email)])
-    described_class.new.execute(args)
-
-    stub_hubspot_batch_read([hubspot_contact(502, user.email, associatedcompanyid: "c001")])
-    stub_hubspot_company_batch_read(
-      [],
-      errors: [{ category: "OBJECT_NOT_FOUND", context: { ids: ["c001"] } }],
-    )
-    described_class.new.execute(args)
-
-    expect(configuration.record_links.pluck(:external_id)).to eq(["502"])
-    expect(DiscourseCrm::SyncAttempt.where(user_id: user.id).order(:id).pluck(:reason)).to eq(
-      %w[imported imported_and_unlinked_missing_company],
     )
   end
 
@@ -179,7 +211,8 @@ RSpec.describe Jobs::Hubspot::SyncUser do
     end
   end
 
-  it "records the former and current owners when an individual pull moves a contact" do
+  it "records and re-evaluates the former and current owners when an individual pull moves a contact" do
+    SiteSetting.crm_segments_enabled = true
     next_owner = Fabricate(:verified_user)
     args = { configuration_id: configuration.id, reason: "change" }
     stub_hubspot_batch_read([hubspot_contact(501, user.email)])
@@ -192,6 +225,9 @@ RSpec.describe Jobs::Hubspot::SyncUser do
       %w[imported contact_unlinked],
     )
     expect(DiscourseCrm::SyncAttempt.where(user_id: next_owner.id).sole.reason).to eq("imported")
+    expect(
+      Jobs::DiscourseCrm::EvaluateSegments.jobs.last["args"].first["user_ids"],
+    ).to contain_exactly(next_owner.id, user.id)
   end
 
   it "retries a partial response containing a server error regardless of error order" do

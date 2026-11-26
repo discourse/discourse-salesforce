@@ -27,6 +27,21 @@ RSpec.describe ::Salesforce::Associations do
       { provider: "salesforce", account: instance_url, object: "Contact", user_id: stale_user.id }
     end
 
+    it "ignores links made by a Contact pull" do
+      stale_user.upsert_custom_fields(Salesforce::Contact::ID_FIELD => dead_contact_id)
+      DiscourseCrm::RecordLink.link_many!(
+        [scope.merge(direction: "inbound", external_id: live_contact_id)],
+      )
+      DiscourseCrm::RecordLink.link!(**scope, external_id: dead_contact_id)
+
+      expect(described_class.unlink_contact!(user: stale_user, expected_id: dead_contact_id)).to eq(
+        true,
+      )
+      expect(DiscourseCrm::RecordLink.where(**scope).pluck(:direction, :external_id)).to eq(
+        [["inbound", live_contact_id]],
+      )
+    end
+
     it "removes matching local associations and only their Contact sync state and membership" do
       stale_user.upsert_custom_fields(
         Salesforce::Contact::ID_FIELD => dead_contact_id,

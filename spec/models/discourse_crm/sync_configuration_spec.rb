@@ -85,7 +85,8 @@ RSpec.describe DiscourseCrm::SyncConfiguration do
   end
 
   it "validates direction, kind and object against the provider" do
-    expect(Fabricate.build(:sync_configuration, direction: "inbound")).to be_invalid
+    expect(Fabricate.build(:sync_configuration, direction: "inbound")).to be_valid
+    expect(Fabricate.build(:sync_configuration, direction: "inbound", object: "Case")).to be_invalid
     expect(Fabricate.build(:sync_configuration, direction: "sideways")).to be_invalid
     expect(Fabricate.build(:sync_configuration, kind: "posts")).to be_invalid
     expect(Fabricate.build(:hubspot_sync_configuration, direction: "outbound")).to be_valid
@@ -121,7 +122,7 @@ RSpec.describe DiscourseCrm::SyncConfiguration do
       )
     end
 
-    it "rejects hubspot configurations while the provider is disabled or given groups" do
+    it "rejects hubspot configurations while the provider is disabled" do
       stub_hubspot_properties(%w[lifecyclestage])
       admin = Fabricate(:admin)
       params = {
@@ -134,13 +135,6 @@ RSpec.describe DiscourseCrm::SyncConfiguration do
         mappings: [{ id: 1, object: "contact", source: "lifecyclestage" }],
       }
 
-      expect {
-        described_class.create_or_update!(
-          params.merge(group_ids: [group.id]),
-          id: nil,
-          guardian: admin.guardian,
-        )
-      }.to raise_error(Discourse::InvalidParameters, /group_ids/)
       SiteSetting.hubspot_enabled = false
       expect {
         described_class.create_or_update!(params, id: nil, guardian: admin.guardian)
@@ -208,33 +202,30 @@ RSpec.describe DiscourseCrm::SyncConfiguration do
       }.to raise_error(Discourse::InvalidParameters, /configuration/)
     end
 
-    it "checks company properties against the portal's company list" do
-      stub_hubspot_properties(%w[lifecyclestage name])
+    it "saves company pulls with company fields only, rejecting Discourse fields and groups, and starts a backfill" do
+      stub_hubspot_properties(%w[lifecyclestage])
       stub_hubspot_properties(%w[name plan_tier], object: "company")
       admin = Fabricate(:admin)
       params = {
         provider: "hubspot",
         direction: "inbound",
-        kind: "users",
-        object: "contact",
-        name: "Pull contacts",
+        kind: "companies",
+        object: "company",
+        name: "Pull companies",
         schedule: "daily",
-        backfill: false,
+        backfill: true,
         mappings: [
-          { id: 1, object: "contact", source: "name" },
-          { id: 2, object: "company", source: "name" },
-          { id: 3, object: "company", source: "plan_tier" },
+          { id: 1, object: "company", source: "name" },
+          { id: 2, object: "company", source: "plan_tier" },
         ],
       }
+      Jobs::Hubspot::PullCompanies.clear
 
       record = described_class.create_or_update!(params, id: nil, guardian: admin.guardian)
 
-      expect(record.mappings.map { |mapping| mapping.slice("object", "source") }).to eq(
-        [
-          { "object" => "contact", "source" => "name" },
-          { "object" => "company", "source" => "name" },
-          { "object" => "company", "source" => "plan_tier" },
-        ],
+      expect(record).to have_attributes(kind: "companies", object: "company", account: "12345")
+      expect(Jobs::Hubspot::PullCompanies.jobs.map { |job| job["args"].first }).to contain_exactly(
+        hash_including("configuration_id" => record.id, "reason" => "backfill"),
       )
       [
         [{ id: 1, object: "company", source: "lifecyclestage" }],
@@ -242,6 +233,8 @@ RSpec.describe DiscourseCrm::SyncConfiguration do
           { id: 1, object: "company", source: "name" },
           { id: 2, object: "company", source: "name" },
         ],
+        [{ id: 1, object: "contact", source: "name" }],
+        [{ id: 1, object: "company", source: "name", destination: "bio", policy: "keep" }],
       ].each do |mappings|
         expect {
           described_class.create_or_update!(
@@ -251,22 +244,61 @@ RSpec.describe DiscourseCrm::SyncConfiguration do
           )
         }.to raise_error(Discourse::InvalidParameters, /mappings/)
       end
+      expect {
+        described_class.create_or_update!(
+          params.merge(kind: "users", mappings: [{ id: 1, object: "contact", source: "name" }]),
+          id: nil,
+          guardian: admin.guardian,
+        )
+      }.to raise_error(Discourse::InvalidParameters)
+      expect {
+        described_class.create_or_update!(
+          params.merge(group_ids: [Fabricate(:group).id]),
+          id: record.id,
+          guardian: admin.guardian,
+        )
+      }.to raise_error(Discourse::InvalidParameters, /group_ids/)
     end
 
-    it "lists the properties its mappings keep" do
+    it "lists the properties its mappings keep, plus those its company pull stores" do
+      SiteSetting.hubspot_enabled = true
+      SiteSetting.enable_guided_sync_configuration = true
       hubspot =
         Fabricate(
           :hubspot_sync_configuration,
           mappings: [
             { "id" => 1, "object" => "contact", "source" => "jobtitle" },
-            { "id" => 2, "object" => "company", "source" => "plan_tier" },
-            { "id" => 3, "object" => "contact", "source" => "jobtitle" },
+            { "id" => 2, "object" => "contact", "source" => "jobtitle" },
           ],
         )
+      Fabricate(
+        :hubspot_company_pull,
+        mappings: [{ "id" => 1, "object" => "company", "source" => "plan_tier" }],
+      )
 
       expect(hubspot.pulled_properties).to eq(
         [{ object: "contact", name: "jobtitle" }, { object: "company", name: "plan_tier" }],
       )
+    end
+
+    it "re-evaluates its active contact pull's segments when a company pull finishes" do
+      SiteSetting.crm_segments_enabled = true
+      hubspot = Fabricate(:hubspot_sync_configuration)
+      companies = Fabricate(:hubspot_company_pull)
+      Jobs::DiscourseCrm::EvaluateSegments.clear
+
+      companies.finish_pull(Time.zone.now, "recorded")
+
+      expect(
+        Jobs::DiscourseCrm::EvaluateSegments.jobs.map do |job|
+          job["args"].first["configuration_id"]
+        end,
+      ).to eq([hubspot.id])
+
+      hubspot.update!(active: false)
+      Jobs::DiscourseCrm::EvaluateSegments.clear
+      companies.finish_pull(1.minute.from_now, "recorded")
+      expect(Jobs::DiscourseCrm::EvaluateSegments.jobs).to be_empty
     end
 
     it "removes its segments with the configuration but keeps the group's members" do

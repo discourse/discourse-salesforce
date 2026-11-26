@@ -6,15 +6,15 @@ import { service } from "@ember/service";
 import AdminConfigAreaCard from "discourse/admin/components/admin-config-area-card";
 import { ajax } from "discourse/lib/ajax";
 import { popupAjaxError } from "discourse/lib/ajax-error";
-import { eq, not, or } from "discourse/truth-helpers";
+import { and, eq, not } from "discourse/truth-helpers";
 import DButton from "discourse/ui-kit/d-button";
 import DPageSubheader from "discourse/ui-kit/d-page-subheader";
 import { i18n } from "discourse-i18n";
 import CrmDeleteSyncConfirmation from "discourse/plugins/discourse-salesforce/discourse/components/crm-delete-sync-confirmation";
+import CrmInboundSyncConfiguration from "discourse/plugins/discourse-salesforce/discourse/components/crm-inbound-sync-configuration";
 import CrmOutboundSyncConfiguration from "discourse/plugins/discourse-salesforce/discourse/components/crm-outbound-sync-configuration";
 import CrmSegmentEditor from "discourse/plugins/discourse-salesforce/discourse/components/crm-segment-editor";
 import CrmSegments from "discourse/plugins/discourse-salesforce/discourse/components/crm-segments";
-import HubspotSyncConfiguration from "discourse/plugins/discourse-salesforce/discourse/components/hubspot-sync-configuration";
 import {
   createSegment,
   deleteSegment,
@@ -23,8 +23,9 @@ import {
   segmentPayload,
 } from "discourse/plugins/discourse-salesforce/discourse/lib/crm-segments";
 import {
-  createHubspotSyncConfiguration,
+  createPullConfiguration,
   createSyncConfiguration,
+  mappingSaveError,
   targetLabel,
 } from "discourse/plugins/discourse-salesforce/discourse/lib/sync-configuration";
 
@@ -34,11 +35,8 @@ const FLOWS = {
     create: (target) => createSyncConfiguration(target),
   },
   inbound: {
-    newKey: "new-hubspot-users",
-    create: () => ({
-      ...createHubspotSyncConfiguration(),
-      name: i18n("salesforce.guided_sync.hubspot.default_name"),
-    }),
+    newKey: "new-crm-pull",
+    create: (target) => createPullConfiguration(target),
   },
 };
 const NEW_SEGMENT_KEY = "new-segment";
@@ -95,19 +93,27 @@ export default class CrmSyncConfigurations extends Component {
     return this.args.providers || [];
   }
 
-  get hubspotProvider() {
-    return this.providers.find((provider) => provider.name === "hubspot");
-  }
-
   get credentialsConfigured() {
     return this.providers.some((provider) => provider.credentials_configured);
   }
 
-  get hubspotConfigured() {
-    return this.records.some(
-      (record) =>
-        record.provider === "hubspot" && record.direction === "inbound"
-    );
+  // Each CRM object can be pulled by one configuration.
+  get pullTargets() {
+    return (this.args.pullTargets || []).map((target) => ({
+      ...target,
+      // A pull saved for a previous CRM account does not block one for the current account.
+      configured: this.records.some(
+        (record) =>
+          record.direction === "inbound" &&
+          !record.connection_changed &&
+          record.provider === target.provider &&
+          record.object === target.object
+      ),
+    }));
+  }
+
+  get openPullTargets() {
+    return this.pullTargets.filter((target) => !target.configured);
   }
 
   get segmentsEnabled() {
@@ -122,12 +128,7 @@ export default class CrmSyncConfigurations extends Component {
     return this.records.map((record) => ({
       ...record,
       targetLabel: targetLabel(record.provider || "salesforce", record.object),
-      scope:
-        record.kind === "posts"
-          ? record.category
-          : record.direction === "inbound"
-            ? i18n("salesforce.guided_sync.all_users")
-            : (record.groups || []).join(", "),
+      scope: this.#scopeLabel(record),
       typeLabel: i18n(
         `salesforce.guided_sync.types.${record.direction}_${record.kind}`
       ),
@@ -141,7 +142,15 @@ export default class CrmSyncConfigurations extends Component {
       this.args.onSelect(newKey);
       return;
     }
-    this.selected = this.#editorFor(create(this.args.targets?.[0]), newKey);
+    const target =
+      direction === "inbound"
+        ? this.openPullTargets[0]
+        : this.args.targets?.[0];
+    // Every pull target already has a configuration, so there is nothing new to set up.
+    if (direction === "inbound" && !target) {
+      return;
+    }
+    this.selected = this.#editorFor(create(target), newKey);
   }
 
   @action
@@ -247,6 +256,10 @@ export default class CrmSyncConfigurations extends Component {
       this.close();
       return true;
     } catch (error) {
+      const mappingError = mappingSaveError(error);
+      if (mappingError) {
+        return { mappingError };
+      }
       popupAjaxError(error);
       return false;
     }
@@ -275,14 +288,29 @@ export default class CrmSyncConfigurations extends Component {
     }
   }
 
+  #scopeLabel(record) {
+    if (record.kind === "posts") {
+      return record.category;
+    }
+    if (record.kind === "companies") {
+      return i18n("salesforce.guided_sync.hubspot.company_scope");
+    }
+    if (record.direction === "inbound") {
+      return i18n("salesforce.guided_sync.all_users");
+    }
+    return (record.groups || []).join(", ");
+  }
+
   #editorFor(configuration, key = configuration.id) {
     return {
       key,
       configuration,
-      component:
-        configuration.direction === "inbound"
-          ? HubspotSyncConfiguration
-          : CrmOutboundSyncConfiguration,
+      ...(configuration.direction === "inbound"
+        ? { component: CrmInboundSyncConfiguration, targets: this.pullTargets }
+        : {
+            component: CrmOutboundSyncConfiguration,
+            targets: this.args.targets,
+          }),
       groups: this.args.groups,
       onSave: this.save,
     };
@@ -320,7 +348,7 @@ export default class CrmSyncConfigurations extends Component {
           @configurations={{editor.configurations}}
           @groups={{editor.groups}}
           @properties={{editor.properties}}
-          @targets={{@targets}}
+          @targets={{editor.targets}}
           @record={{editor.configuration}}
           @onCancel={{this.close}}
           @onSave={{editor.onSave}}
@@ -352,28 +380,25 @@ export default class CrmSyncConfigurations extends Component {
                 @label="salesforce.guided_sync.send_users"
               /></:content>
           </AdminConfigAreaCard>
-          {{#if this.hubspotProvider}}
-            <AdminConfigAreaCard
-              @heading="salesforce.guided_sync.pull_from_crm"
-              @description="salesforce.guided_sync.pull_description"
-            >
-              <:content><DButton
-                  class="btn-primary"
-                  data-test-pull-crm
-                  @action={{fn this.add "inbound"}}
-                  @disabled={{or
-                    (not this.hubspotProvider.credentials_configured)
-                    this.hubspotConfigured
-                  }}
-                  @icon="address-card"
-                  @label={{if
-                    this.hubspotConfigured
-                    "salesforce.guided_sync.hubspot.already_configured"
-                    "salesforce.guided_sync.pull_from_crm"
-                  }}
-                /></:content>
-            </AdminConfigAreaCard>
-          {{/if}}
+          <AdminConfigAreaCard
+            @heading="salesforce.guided_sync.pull_from_crm"
+            @description="salesforce.guided_sync.pull_description"
+          >
+            <:content><DButton
+                class="btn-primary"
+                data-test-pull-crm
+                @action={{fn this.add "inbound"}}
+                @disabled={{not this.openPullTargets.length}}
+                @icon="address-card"
+                @label={{if
+                  (and
+                    this.pullTargets.length (not this.openPullTargets.length)
+                  )
+                  "salesforce.guided_sync.pull.already_configured"
+                  "salesforce.guided_sync.pull_from_crm"
+                }}
+              /></:content>
+          </AdminConfigAreaCard>
           {{#if this.segmentsEnabled}}
             <AdminConfigAreaCard
               @heading="salesforce.guided_sync.segments.card_title"

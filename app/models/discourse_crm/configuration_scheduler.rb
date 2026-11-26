@@ -25,11 +25,12 @@ module DiscourseCrm
       if activated || connection_changed || configuration.saved_change_to_schedule?
         configuration.update_column(:last_scheduled_at, Time.zone.now)
       end
+      # Scheduled pulls only see changed records, so new pull mappings need every record again.
+      remapped_pull = configuration.inbound? && mappings_changed?(configuration)
       if configuration.backfill &&
            (
-             activated || connection_changed || group_ids_changed ||
-               configuration.saved_change_to_backfill?(from: false, to: true) ||
-               (configuration.inbound? && configuration.saved_change_to_mappings?)
+             activated || connection_changed || group_ids_changed || remapped_pull ||
+               configuration.saved_change_to_backfill?(from: false, to: true)
            )
         Jobs.enqueue(
           configuration.flow.configuration_job,
@@ -40,6 +41,16 @@ module DiscourseCrm
         retry_failed_users(configuration)
       end
     end
+
+    # Mapping ids only order the form's rows, so renumbering them changes nothing pulled.
+    def self.mappings_changed?(configuration)
+      change = configuration.saved_change_to_mappings
+      return false unless change
+      before, after =
+        change.map { |mappings| Array(mappings).map { |mapping| mapping.except("id") } }
+      before != after
+    end
+    private_class_method :mappings_changed?
 
     def self.retry_failed_users(configuration)
       failed_ids = configuration.sync_states.where.not(error: nil).select(:user_id)
@@ -90,13 +101,9 @@ module DiscourseCrm
 
     def self.enqueue_user_jobs(configurations, user, reason)
       configurations.find_each do |configuration|
-        next unless configuration.reason_enabled?(reason)
-        Jobs.enqueue(
-          configuration.flow.user_job,
-          user_id: user.id,
-          configuration_id: configuration.id,
-          reason: reason,
-        )
+        user_job = configuration.flow.user_job
+        next unless user_job && configuration.reason_enabled?(reason)
+        Jobs.enqueue(user_job, user_id: user.id, configuration_id: configuration.id, reason: reason)
       end
     end
     private_class_method :enqueue_user_jobs

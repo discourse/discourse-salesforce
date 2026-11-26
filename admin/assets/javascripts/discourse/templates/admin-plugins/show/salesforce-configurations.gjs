@@ -10,6 +10,7 @@ export default <template>
       @segmentProperties={{model.segmentProperties}}
       @segments={{model.segments}}
       @targets={{model.targets}}
+      @pullTargets={{model.pull_targets}}
       @onClose={{@controller.clearConfiguration}}
       @onSelect={{@controller.selectConfiguration}}
       @providers={{model.providers}}

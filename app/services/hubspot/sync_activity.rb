@@ -20,8 +20,8 @@ module Hubspot
       attempt
     end
 
-    def self.record_company_results(configuration, ids, result, started_at)
-      references = configuration.records.where(company_external_id: ids).joins(:record_links)
+    # Reports company changes on the users whose pulled contacts point to those companies.
+    def self.record_company_results(configuration, references, result, started_at)
       user_column = "crm_record_links.user_id"
       changed = references.where(company_external_id: result.changed).distinct.pluck(user_column)
       changed.each do |user_id|

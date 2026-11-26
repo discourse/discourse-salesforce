@@ -46,7 +46,7 @@ RSpec.describe Jobs::Hubspot::SyncConfiguration do
       status: 429,
       body: { policyName: "DAILY" }.to_json,
     )
-    Jobs::Hubspot::SyncUser.new.execute(
+    Jobs::DiscourseCrm::PullUser.new.execute(
       configuration_id: configuration.id,
       user_id: user.id,
       reason: "change",
@@ -79,6 +79,47 @@ RSpec.describe Jobs::Hubspot::SyncConfiguration do
     stub_hubspot_contact_search([hubspot_contact(502, other_user.email)])
     described_class.new.execute(configuration_id: configuration.id, reason: "scheduled")
     expect(configuration.reload.sync_status).not_to have_key("error")
+  end
+
+  it "fills mapped Discourse fields and records rejected values once per scheduled pull" do
+    title = Fabricate(:user_field, name: "Job title", field_type: "text")
+    renewal = Fabricate(:user_field, name: "Renewal", field_type: "date")
+    configuration.update!(
+      mappings: [
+        {
+          "object" => "contact",
+          "source" => "jobtitle",
+          "destination" => "user_field_#{title.id}",
+          "policy" => "overwrite",
+        },
+        {
+          "object" => "contact",
+          "source" => "renewal",
+          "destination" => "user_field_#{renewal.id}",
+          "policy" => "overwrite",
+        },
+      ],
+    )
+    stub_hubspot_contact_list(
+      [hubspot_contact(501, user.email, jobtitle: "CTO", renewal: "next spring")],
+    )
+
+    described_class.new.execute(configuration_id: configuration.id, reason: "scheduled")
+
+    expect(user.reload.user_fields[title.id.to_s]).to eq("CTO")
+    expect(user.user_fields[renewal.id.to_s]).to be_nil
+    failure = DiscourseCrm::SyncAttempt.find_by(user_id: user.id, outcome: "failed")
+    expect(failure.error_class).to eq("DiscourseCrm::InvalidDestinationValue")
+    expect(failure.diagnostics).to eq("destinations" => ["user_field_#{renewal.id}"])
+    expect(configuration.reload.last_synced_at).to be_present
+
+    stub_hubspot_contact_search(
+      [hubspot_contact(501, user.email, jobtitle: "CTO", renewal: "next spring")],
+    )
+    expect {
+      described_class.new.execute(configuration_id: configuration.id, reason: "scheduled")
+    }.to change { DiscourseCrm::SyncAttempt.where(configuration_id: configuration.id).count }.by(1)
+    expect(DiscourseCrm::SyncAttempt.last).to have_attributes(user_id: user.id, outcome: "failed")
   end
 
   it "records an unlink for the previous owner when a contact changes email" do
@@ -120,7 +161,7 @@ RSpec.describe Jobs::Hubspot::SyncConfiguration do
         "Retry-After" => "17",
       },
     )
-    Jobs::Hubspot::SyncUser.new.execute(
+    Jobs::DiscourseCrm::PullUser.new.execute(
       configuration_id: configuration.id,
       user_id: user.id,
       reason: "change",
@@ -196,6 +237,7 @@ RSpec.describe Jobs::Hubspot::SyncConfiguration do
       [
         {
           "configuration_id" => configuration.id,
+          "account" => configuration.account,
           "reason" => "backfill",
           "started_at" => started_at.iso8601,
           "history_result" => "recorded",
@@ -286,6 +328,7 @@ RSpec.describe Jobs::Hubspot::SyncConfiguration do
     expect(enqueued_args).to contain_exactly(
       {
         "configuration_id" => configuration.id,
+        "account" => configuration.account,
         "reason" => "scheduled",
         "started_at" => Time.zone.now.iso8601,
         "since" => Time.utc(2026, 11, 2, 9, 30).iso8601,
@@ -381,420 +424,6 @@ RSpec.describe Jobs::Hubspot::SyncConfiguration do
     expect(configuration.reload.last_error).to eq("Hubspot::InvalidApiResponse")
   end
 
-  context "with company properties" do
-    let!(:configuration) do
-      Fabricate(
-        :hubspot_sync_configuration,
-        last_synced_at: Time.utc(2026, 11, 1, 12),
-        mappings: [{ "id" => 1, "object" => "company", "source" => "name" }],
-      )
-    end
-
-    def reference_companies(count)
-      DiscourseCrm::Record.store_many!(
-        (1..count).map do |index|
-          {
-            provider: "hubspot",
-            account: "12345",
-            object: "contact",
-            external_id: "contact-#{index}",
-            company_external_id: format("c%03d", index),
-            data: {
-            },
-          }
-        end,
-      )
-    end
-
-    def company_data
-      DiscourseCrm::Record
-        .within(provider: "hubspot", account: "12345", object: "company")
-        .pluck(:external_id, :data)
-        .to_h
-    end
-
-    def company_batch_of(size)
-      a_request(:post, hubspot_url("objects/companies/batch/read")).with do |request|
-        JSON.parse(request.body).fetch("inputs").size == size
-      end
-    end
-
-    it "fetches company data before opening the write transaction for a backfill or scheduled refresh" do
-      stub_hubspot_contact_list([hubspot_contact(501, user.email, associatedcompanyid: "c001")])
-      baseline = DiscourseCrm::Record.connection.open_transactions
-      request =
-        stub_request(:post, hubspot_url("objects/companies/batch/read")).to_return do
-          expect(DiscourseCrm::Record.connection.open_transactions).to eq(baseline)
-          { body: { results: [hubspot_company("c001", name: "Acme")] }.to_json }
-        end
-
-      described_class.new.execute(configuration_id: configuration.id, reason: "backfill")
-      described_class.new.execute(
-        configuration_id: configuration.id,
-        reason: "scheduled",
-        companies_after: "",
-      )
-      expect(request).to have_been_requested.twice
-    end
-
-    it "attributes a shared company change to both users when only one contact was modified" do
-      other = Fabricate(:verified_user)
-      contacts =
-        [user, other].map do |member|
-          hubspot_contact(member.id, member.email, associatedcompanyid: "c001")
-        end
-      stub_hubspot_company_batch_read([hubspot_company("c001", name: "Original")])
-      Hubspot::ContactImport.new(configuration).import_page(contacts)
-      stub_hubspot_contact_search([contacts.first])
-      stub_hubspot_company_batch_read([hubspot_company("c001", name: "Updated")])
-      described_class.new.execute(configuration_id: configuration.id, reason: "scheduled")
-      expect(company_data.fetch("c001")).to eq("name" => "Original")
-      described_class.new.execute(enqueued_args.last.symbolize_keys)
-      expect(company_data.fetch("c001")).to eq("name" => "Updated")
-      expect(
-        DiscourseCrm::SyncAttempt.where(reason: "imported_company").pluck(:user_id),
-      ).to contain_exactly(user.id, other.id)
-      expect(DiscourseCrm::SyncAttempt.where(reason: "unchanged_summary").sole.diagnostics).to eq(
-        "count" => 1,
-      )
-    end
-
-    it "pulls the companies of unchanged contacts once company properties are added" do
-      freeze_time Time.utc(2026, 11, 2, 12)
-      reference_companies(1)
-      DiscourseCrm::RecordLink.create!(
-        provider: "hubspot",
-        account: "12345",
-        object: "contact",
-        direction: "inbound",
-        user_id: user.id,
-        external_id: "contact-1",
-      )
-      stub_hubspot_contact_search([])
-      stub_hubspot_company_batch_read([hubspot_company("c001", name: "Acme")], ids: %w[c001])
-
-      described_class.new.execute(configuration_id: configuration.id, reason: "scheduled")
-      described_class.new.execute(enqueued_args.last.symbolize_keys)
-
-      expect(company_data).to eq("c001" => { "name" => "Acme" })
-      expect(DiscourseCrm::SyncAttempt.last).to have_attributes(
-        user_id: user.id,
-        reason: "imported_company",
-        diagnostics: {
-        },
-      )
-      described_class.new.execute(enqueued_args.last.symbolize_keys)
-      expect(configuration.reload.last_synced_at).to eq_time(Time.utc(2026, 11, 2, 12))
-    end
-
-    it "continues a scheduled refresh when a merged company cannot be matched to its requested ID" do
-      reference_companies(1)
-      stub_hubspot_company_batch_read([hubspot_company("merged", name: "Acme")], ids: %w[c001])
-      described_class.new.execute(
-        configuration_id: configuration.id,
-        reason: "scheduled",
-        companies_after: "",
-      )
-      expect(company_data).to be_empty
-      expect(DiscourseCrm::SyncAttempt.sole.diagnostics).to include(
-        "codes" => ["UNEXPECTED_COMPANY"],
-      )
-      expect(enqueued_args.last).to include(
-        "companies_after" => "c001",
-        "history_result" => "recorded",
-      )
-      described_class.new.execute(enqueued_args.last.symbolize_keys)
-      expect(DiscourseCrm::SyncAttempt.sole.outcome).to eq("failed")
-    end
-
-    it "retries mixed company errors in either order without advancing the cursor" do
-      reference_companies(1)
-      errors = %w[VALIDATION_ERROR INTERNAL_ERROR].map { |category| { category: category } }
-      [errors, errors.reverse].each do |ordered_errors|
-        stub_hubspot_company_batch_read([], errors: ordered_errors)
-        expect {
-          described_class.new.execute(
-            configuration_id: configuration.id,
-            reason: "scheduled",
-            companies_after: "",
-          )
-        }.to raise_error(Hubspot::InvalidApiResponse)
-        expect(DiscourseCrm::SyncAttempt.last.diagnostics).to include(
-          "category" => ["INTERNAL_ERROR"],
-        )
-        expect(enqueued_args).to be_empty
-      end
-    end
-
-    it "summarizes unchanged company checks across pages and logs mapped changes per user" do
-      reference_companies(3)
-      other_user = Fabricate(:user)
-      members = [user, other_user, user]
-      members.each_with_index do |member, i|
-        DiscourseCrm::RecordLink.create!(
-          provider: "hubspot",
-          account: "12345",
-          object: "contact",
-          direction: "inbound",
-          user_id: member.id,
-          external_id: "contact-#{i + 1}",
-        )
-      end
-      companies = (1..3).map { |i| hubspot_company(format("c%03d", i), name: "Acme") }
-      stub_hubspot_company_batch_read(companies)
-      Hubspot::ContactImport.new(configuration).refresh_companies(companies.pluck("id"))
-      stub_hubspot_company_batch_read(
-        [companies.first, hubspot_company("c002", name: "Updated")],
-        ids: %w[c001 c002],
-      )
-      stub_hubspot_company_batch_read([companies.last], ids: %w[c003])
-      stub_const(Hubspot::Api, :PAGE_SIZE, 2) do
-        described_class.new.execute(
-          configuration_id: configuration.id,
-          reason: "scheduled",
-          companies_after: "",
-          started_at: Time.current.iso8601,
-        )
-        described_class.new.execute(enqueued_args.last.symbolize_keys)
-      end
-
-      expect(DiscourseCrm::SyncAttempt.where(user_id: nil).sole).to have_attributes(
-        reason: "unchanged_summary",
-        diagnostics: {
-          "count" => 2,
-        },
-      )
-      expect(DiscourseCrm::SyncAttempt.where.not(user_id: nil).sole).to have_attributes(
-        reason: "imported_company",
-        user_id: other_user.id,
-      )
-      expect(company_data.fetch("c002")).to eq("name" => "Updated")
-    end
-
-    it "records one company refresh for a user with multiple linked contacts" do
-      reference_companies(2)
-      [1, 2].each do |id|
-        DiscourseCrm::RecordLink.create!(
-          provider: "hubspot",
-          account: "12345",
-          object: "contact",
-          direction: "inbound",
-          user_id: user.id,
-          external_id: "contact-#{id}",
-        )
-      end
-      stub_hubspot_company_batch_read(
-        [hubspot_company("c001", name: "Acme"), hubspot_company("c002", name: "Other")],
-        ids: %w[c001 c002],
-      )
-      described_class.new.execute(
-        configuration_id: configuration.id,
-        reason: "scheduled",
-        companies_after: "",
-      )
-      expect(DiscourseCrm::SyncAttempt.sole).to have_attributes(
-        user_id: user.id,
-        reason: "imported_company",
-        diagnostics: {
-        },
-      )
-    end
-
-    it "summarizes missing company checks from the first scheduled pull while recording company changes" do
-      configuration.update!(last_synced_at: nil)
-      Fabricate(:secondary_email, user: user, email: "other@example.org")
-      contacts = [
-        hubspot_contact(501, user.email, associatedcompanyid: "c001"),
-        hubspot_contact(502, "other@example.org", associatedcompanyid: "c002"),
-      ]
-      stub_hubspot_contact_list(contacts)
-      stub_hubspot_company_batch_read(
-        [hubspot_company("c001", name: "Acme")],
-        errors: [{ category: "OBJECT_NOT_FOUND", context: { ids: ["c002"] } }],
-      )
-
-      started_at = Time.current.change(usec: 0)
-      args = {
-        configuration_id: configuration.id,
-        reason: "scheduled",
-        started_at: started_at.iso8601,
-      }
-      described_class.new.execute(args)
-      described_class.new.execute(enqueued_args.last.symbolize_keys)
-      described_class.new.execute(
-        args.merge(companies_after: "", started_at: (started_at + 1.hour).iso8601),
-      )
-
-      attempts = DiscourseCrm::SyncAttempt.where(configuration_id: configuration.id)
-      expect(attempts.where(user_id: user.id).order(:id).pluck(:reason)).to eq(
-        %w[imported imported_company],
-      )
-      expect(attempts.where(user_id: nil).order(:created_at).pluck(:reason, :diagnostics)).to eq(
-        [
-          ["missing_companies_summary", { "count" => 1 }],
-          ["missing_companies_summary", { "count" => 1 }],
-        ],
-      )
-      expect(configuration.records.count).to eq(2)
-      expect(company_data).to eq("c001" => { "name" => "Acme" })
-    end
-
-    it "counts the same missing companies whether they are fetched together or on separate pages" do
-      reference_companies(2)
-      ids = %w[c001 c002]
-      ids.size.times do |index|
-        DiscourseCrm::RecordLink.create!(
-          provider: "hubspot",
-          account: "12345",
-          object: "contact",
-          direction: "inbound",
-          user_id: user.id,
-          external_id: "contact-#{index + 1}",
-        )
-      end
-      [ids, *ids.map { |id| [id] }].each do |batch|
-        stub_hubspot_company_batch_read(
-          [],
-          ids: batch,
-          errors: [{ category: "OBJECT_NOT_FOUND", context: { ids: batch } }],
-        )
-      end
-
-      [1, 2].each do |page_size|
-        stub_const(Hubspot::Api, :PAGE_SIZE, page_size) do
-          args = {
-            configuration_id: configuration.id,
-            reason: "scheduled",
-            companies_after: "",
-            started_at: page_size.hours.ago.iso8601,
-          }
-          ids.each_slice(page_size) do
-            described_class.new.execute(args)
-            args = enqueued_args.last.symbolize_keys
-          end
-        end
-      end
-
-      expect(
-        DiscourseCrm::SyncAttempt.where(reason: "missing_companies_summary").pluck(:diagnostics),
-      ).to eq([{ "count" => 2 }, { "count" => 2 }])
-    end
-
-    it "refreshes referenced companies one chunk at a time after the last page of a scheduled run" do
-      freeze_time Time.utc(2026, 11, 2, 12)
-      reference_companies(101)
-      stub_hubspot_contact_search([])
-      (1..101)
-        .map { |index| format("c%03d", index) }
-        .each_slice(100) do |ids|
-          stub_hubspot_company_batch_read(
-            [],
-            ids: ids,
-            errors: [{ category: "OBJECT_NOT_FOUND", context: { ids: ids } }],
-          )
-        end
-
-      described_class.new.execute(configuration_id: configuration.id, reason: "scheduled")
-
-      expect(configuration.reload.last_synced_at).to eq_time(Time.utc(2026, 11, 1, 12))
-      expect(enqueued_args).to eq(
-        [
-          {
-            "configuration_id" => configuration.id,
-            "reason" => "scheduled",
-            "started_at" => Time.zone.now.iso8601,
-            "companies_after" => "",
-          },
-        ],
-      )
-
-      described_class.new.execute(enqueued_args.first.symbolize_keys)
-      expect(enqueued_args.last["companies_after"]).to eq("c100")
-      described_class.new.execute(enqueued_args.last.symbolize_keys)
-      expect(enqueued_args.last["companies_after"]).to eq("c101")
-      expect(configuration.reload.last_synced_at).to eq_time(Time.utc(2026, 11, 1, 12))
-
-      described_class.new.execute(enqueued_args.last.symbolize_keys)
-
-      expect(configuration.reload.last_synced_at).to eq_time(Time.utc(2026, 11, 2, 12))
-      expect(company_batch_of(100)).to have_been_made.once
-      expect(company_batch_of(1)).to have_been_made.once
-      expect(enqueued_args.size).to eq(3)
-    end
-
-    it "retries only the rate limited company chunk" do
-      reference_companies(1)
-      stub_request(:post, hubspot_url("objects/companies/batch/read")).to_return(
-        status: 429,
-        headers: {
-          "Retry-After" => "9",
-        },
-      )
-      freeze_time
-
-      described_class.new.execute(
-        configuration_id: configuration.id,
-        reason: "scheduled",
-        started_at: Time.zone.now.iso8601,
-        companies_after: "",
-      )
-
-      job = Jobs::Hubspot::SyncConfiguration.jobs.sole
-      expect(job["at"] - Time.now.to_f).to be_within(1).of(9)
-      expect(job["args"].first).to include("companies_after" => "")
-      expect(a_request(:post, hubspot_url("objects/contacts/search"))).not_to have_been_made
-    end
-
-    it "records a failing company chunk on the configuration without moving the sync time" do
-      reference_companies(1)
-      stub_request(:post, hubspot_url("objects/companies/batch/read")).to_return(
-        status: 500,
-        body: "boom",
-      )
-
-      expect {
-        described_class.new.execute(
-          configuration_id: configuration.id,
-          reason: "scheduled",
-          started_at: Time.zone.now.iso8601,
-          companies_after: "",
-        )
-      }.to raise_error(Hubspot::InvalidApiResponse)
-
-      expect(configuration.reload.slice(:last_synced_at, :last_error)).to eq(
-        "last_synced_at" => Time.utc(2026, 11, 1, 12),
-        "last_error" => "Hubspot::InvalidApiResponse",
-      )
-      expect(enqueued_args).to be_empty
-    end
-
-    it "enters the company phase after a search window restart finishes" do
-      freeze_time Time.utc(2026, 11, 2, 12)
-      stub_hubspot_contact_search([])
-
-      described_class.new.execute(
-        configuration_id: configuration.id,
-        reason: "scheduled",
-        since: Time.utc(2026, 11, 2, 9, 30).iso8601,
-        started_at: Time.zone.now.iso8601,
-      )
-
-      expect(enqueued_args.sole).to include("companies_after" => "")
-    end
-
-    it "skips the company phase on a backfill" do
-      freeze_time Time.utc(2026, 11, 2, 12)
-      reference_companies(1)
-      stub_hubspot_contact_list([])
-
-      described_class.new.execute(configuration_id: configuration.id, reason: "backfill")
-
-      expect(configuration.reload.last_synced_at).to eq_time(Time.utc(2026, 11, 2, 12))
-      expect(enqueued_args).to be_empty
-      expect(a_request(:post, hubspot_url("objects/companies/batch/read"))).not_to have_been_made
-    end
-  end
-
   it "records an unmatched pull once, even when its last page is empty" do
     stub_hubspot_contact_list([hubspot_contact(123, "unmatched@example.com")], after: "100")
     described_class.new.execute(configuration_id: configuration.id, reason: "scheduled")
@@ -806,7 +435,7 @@ RSpec.describe Jobs::Hubspot::SyncConfiguration do
     )
   end
 
-  it "finishes a scheduled run without a company phase when only contact properties are selected" do
+  it "finishes a scheduled run when no contact changed" do
     freeze_time Time.utc(2026, 11, 2, 12)
     configuration.update!(last_synced_at: Time.utc(2026, 11, 1, 12))
     stub_hubspot_contact_search([])

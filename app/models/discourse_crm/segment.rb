@@ -91,7 +91,8 @@ module DiscourseCrm
     end
 
     def configuration_is_a_pull
-      errors.add(:configuration_id, :not_pull) if configuration && !configuration.inbound?
+      return if !configuration || (configuration.inbound? && configuration.kind == "users")
+      errors.add(:configuration_id, :not_pull)
     end
 
     def conditions_shape

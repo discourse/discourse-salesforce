@@ -61,7 +61,7 @@ if defined?(DiscourseWorkflows)
               icon: "address-card",
               color: "blue",
             },
-            available: -> { DiscourseCrm::SyncConfiguration.active.inbound.exists? },
+            available: -> { DiscourseCrm::SyncConfiguration.active.user_pulls.exists? },
             unavailable_reason_key: "discourse_workflows.node_unavailable.requires_crm_pull",
             output_contracts: [{ schema: OUTPUT_SCHEMA }],
             capabilities: {

@@ -22,7 +22,7 @@ module ::Salesforce
             object: Contact::OBJECT_NAME,
             user_id: user.id,
           }
-          link = DiscourseCrm::RecordLink.where(**scope).live.first
+          link = DiscourseCrm::RecordLink.where(**scope, direction: "outbound").live.first
           if fields.where.not(value: expected_id).exists? ||
                (link && link.external_id != expected_id)
             raise ContactLinkChanged

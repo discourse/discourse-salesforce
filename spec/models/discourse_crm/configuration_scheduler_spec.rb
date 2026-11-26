@@ -108,25 +108,27 @@ RSpec.describe DiscourseCrm::ConfigurationScheduler do
       )
     end
 
-    it "backfills when the pull's properties change" do
+    it "pulls every record again when a pull's mappings change and backfill is on, ignoring renumbered rows" do
       Jobs::Hubspot::SyncConfiguration.clear
-      hubspot.update!(
-        mappings:
-          hubspot.mappings + [{ "id" => 3, "object" => "company", "source" => "plan_tier" }],
-      )
 
+      hubspot.update!(name: "Renamed")
+      described_class.configuration_saved(hubspot, group_ids_changed: false)
+      hubspot.update!(mappings: [{ "id" => 3, "object" => "contact", "source" => "jobtitle" }])
+      described_class.configuration_saved(hubspot, group_ids_changed: false)
+      hubspot.update!(mappings: [{ "id" => 1, "object" => "contact", "source" => "jobtitle" }])
+      described_class.configuration_saved(hubspot, group_ids_changed: false)
+      hubspot.update!(backfill: false)
+      hubspot.update!(mappings: [{ "object" => "contact", "source" => "city" }])
       described_class.configuration_saved(hubspot, group_ids_changed: false)
 
-      expect(
-        Jobs::Hubspot::SyncConfiguration.jobs.map do |job|
-          job["args"].first.slice("configuration_id", "reason")
-        end,
-      ).to eq([{ "configuration_id" => hubspot.id, "reason" => "backfill" }])
+      expect(Jobs::Hubspot::SyncConfiguration.jobs.map { |job| job["args"].first["reason"] }).to eq(
+        ["backfill"],
+      )
     end
 
     it "enqueues user matching for every user change except group-driven ones" do
       user = Fabricate(:user)
-      Jobs::Hubspot::SyncUser.clear
+      Jobs::DiscourseCrm::PullUser.clear
       Jobs::SyncSalesforceUser.clear
 
       described_class.enqueue_user(user, reason: "change", inbound: true)
@@ -140,7 +142,7 @@ RSpec.describe DiscourseCrm::ConfigurationScheduler do
       )
 
       expect(Jobs::SyncSalesforceUser.jobs).to be_empty
-      expect(Jobs::Hubspot::SyncUser.jobs.map { |job| job["args"].first }).to contain_exactly(
+      expect(Jobs::DiscourseCrm::PullUser.jobs.map { |job| job["args"].first }).to contain_exactly(
         hash_including(
           "configuration_id" => hubspot.id,
           "user_id" => user.id,
@@ -153,18 +155,18 @@ RSpec.describe DiscourseCrm::ConfigurationScheduler do
     it "matches users on email changes and sign-ups but not on other profile or group changes" do
       user = Fabricate(:user)
       group = Fabricate(:group)
-      Jobs::Hubspot::SyncUser.clear
+      Jobs::DiscourseCrm::PullUser.clear
 
       DiscourseEvent.trigger(:user_updated, user, %w[bio_raw])
       DiscourseEvent.trigger(:user_updated, user)
       DiscourseEvent.trigger(:user_added_to_group, user, group)
       DiscourseEvent.trigger(:user_removed_from_group, user, group)
-      expect(Jobs::Hubspot::SyncUser.jobs).to be_empty
+      expect(Jobs::DiscourseCrm::PullUser.jobs).to be_empty
 
       DiscourseEvent.trigger(:user_updated, user, %w[email])
       DiscourseEvent.trigger(:user_confirmed_email, user, EmailToken.scopes[:email_change])
       DiscourseEvent.trigger(:user_first_logged_in, user)
-      expect(Jobs::Hubspot::SyncUser.jobs.map { |job| job["args"].first["reason"] }).to eq(
+      expect(Jobs::DiscourseCrm::PullUser.jobs.map { |job| job["args"].first["reason"] }).to eq(
         %w[change change change],
       )
     end

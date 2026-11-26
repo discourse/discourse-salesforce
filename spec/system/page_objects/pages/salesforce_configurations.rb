@@ -18,37 +18,38 @@ module PageObjects
       end
 
       def has_pull_object?(label)
-        has_css?('[data-name="object"] .form-kit__control-menu-trigger', text: label)
+        has_css?('[data-name="target"] .form-kit__control-menu-trigger', text: label)
       end
 
-      def enable_company_pull
-        PageObjects::Components::FormKitField.new('[data-name="pull_companies"]').check
+      def choose_pull_target(value)
+        PageObjects::Components::FormKitField.new('[data-name="target"]').select(value)
         self
       end
 
-      def has_company_pull?
-        PageObjects::Components::FormKitField.new('[data-name="pull_companies"]').checked?
-      end
-
-      def has_no_company_properties?
-        has_no_css?('[data-name="company_properties"]')
-      end
-
-      def select_property(label, object: "contact")
-        find("[data-name=\"#{object}_properties\"] .d-multi-select-trigger__expand-btn").click
-        find(".d-multi-select__search-input").fill_in(with: label)
-        find(".hubspot-sync-configuration__property", text: label).click
-        find(".hubspot-sync-configuration__heading").click
+      def add_property(name)
+        find("[data-test-add-pull-field]").click
+        index = all(".salesforce-sync-configuration__mapping-row").size - 1
+        choose_menu_item("[data-name=\"pull_mappings.#{index}.source\"]", name)
         self
       end
 
-      def has_selected_properties?(*labels, object: "contact")
-        labels.all? do |label|
-          has_css?(
-            "[data-name=\"#{object}_properties\"] .d-multi-select-trigger__selected-item",
-            text: label,
-          )
-        end
+      def choose_destination(property, value)
+        choose_menu_item("[data-test-mapping=\"#{property}\"] [data-name$=\".destination\"]", value)
+        self
+      end
+
+      def choose_policy(property, value)
+        choose_menu_item("[data-test-mapping=\"#{property}\"] [data-name$=\".policy\"]", value)
+        self
+      end
+
+      def has_property?(property, destination: nil)
+        row = "[data-test-mapping=\"#{property}\"]"
+        destination ? has_css?(row, text: destination) : has_css?(row)
+      end
+
+      def has_mapping_error?(index, text)
+        has_css?("[data-name=\"pull_mappings.#{index}.destination\"] .form-kit__errors", text: text)
       end
 
       def choose_schedule(value)
@@ -69,6 +70,11 @@ module PageObjects
         has_css?("[data-test-configuration]", text: name) &&
           has_css?("[data-test-configuration]", text: type) &&
           has_css?("[data-test-configuration] [data-test-configuration-scope]", text: scope)
+      end
+
+      def choose_menu_item(field, value)
+        find("#{field} .form-kit__control-menu-trigger").click
+        find(".form-kit__control-menu-item[data-value=\"#{value}\"] button").click
       end
 
       def open_configuration(name)

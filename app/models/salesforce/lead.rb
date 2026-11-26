@@ -72,7 +72,8 @@ module ::Salesforce
         account: SiteSetting.salesforce_instance_url,
         user_id: user.id,
       }
-      contact_link = DiscourseCrm::RecordLink.find_by(**scope, object: "Contact")
+      contact_link =
+        DiscourseCrm::RecordLink.find_by(**scope, object: "Contact", direction: "outbound")
       if contact_link && contact_link.external_id != contact_id
         Rails.logger.warn(
           "Skipping converted Salesforce Lead reconciliation for Discourse user #{user.id}: an existing Contact link conflicts",
@@ -80,7 +81,7 @@ module ::Salesforce
         return true
       end
 
-      lead_link = DiscourseCrm::RecordLink.find_by(**scope, object: "Lead")
+      lead_link = DiscourseCrm::RecordLink.find_by(**scope, object: "Lead", direction: "outbound")
       if lead_link && lead_link.external_id != converted_lead["Id"]
         Rails.logger.warn(
           "Skipping converted Salesforce Lead reconciliation for Discourse user #{user.id}: an existing Lead link conflicts",

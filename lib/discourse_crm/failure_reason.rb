@@ -9,6 +9,7 @@ module DiscourseCrm
       "Faraday::TimeoutError" => "timeout",
       "Timeout::Error" => "timeout",
       "Faraday::ConnectionFailed" => "connection",
+      "DiscourseCrm::InvalidDestinationValue" => "invalid_destination",
     }.freeze
     HTTP_ERRORS = {
       400 => "validation",
@@ -30,6 +31,11 @@ module DiscourseCrm
     end
 
     def message
+      if attempt.error_class == InvalidDestinationValue.name
+        fields =
+          Array(diagnostics["destinations"]).map { |field| UserSyncDestinations.label(field) }
+        return translate("invalid_destination_fields", fields: fields.join(", ")) if fields.any?
+      end
       codes = identifiers("codes")
       keys = codes.filter_map { |code| self.class::CODES[code] }
       return translate("provider_code", code: codes.join(", ")) if codes.any? && keys.empty?

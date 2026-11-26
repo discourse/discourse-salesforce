@@ -131,6 +131,38 @@ RSpec.describe DiscourseCrm::SegmentsController do
       )
     end
 
+    context "with a Salesforce pull" do
+      include_context "with salesforce spec helper"
+
+      it "labels Salesforce fields next to HubSpot properties" do
+        SiteSetting.enable_guided_sync_configuration = true
+        Fabricate(:salesforce_pull_configuration)
+        stub_request(:get, "#{api_path}/Contact/describe").to_return(
+          body: {
+            fields: [
+              { name: "Title", label: "Job Title", type: "string", custom: false },
+              { name: "Name", label: "Full Name", type: "string", custom: false },
+            ],
+          }.to_json,
+        )
+
+        get "/salesforce/admin/guided-sync/segments.json"
+
+        expect(response.status).to eq(200)
+        expect(response.parsed_body["properties"].map { |item| item["label"] }).to include(
+          "Job Title",
+          "Full Name",
+        )
+
+        # A malformed signing key falls back to field names instead of failing the page.
+        Salesforce::Api.any_instance.unstub(:jwt_assertion)
+        Discourse.redis.del(Salesforce::Api::ACCESS_TOKEN_KEY)
+        Discourse.cache.clear
+        get "/salesforce/admin/guided-sync/segments.json"
+        expect(response.status).to eq(200)
+      end
+    end
+
     it "is hidden from non-admins and while the feature is off" do
       sign_in(user)
       get "/salesforce/admin/guided-sync/segments.json"

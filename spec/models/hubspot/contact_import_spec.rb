@@ -61,14 +61,26 @@ RSpec.describe ::Hubspot::ContactImport do
       )
     end
 
-    it "removes the stored data of a contact that no longer matches anyone" do
+    it "removes the stored data of a contact that no longer matches anyone, and its company" do
       import = described_class.new(configuration)
-      import.import_page([hubspot_contact(501, "ada@example.com", lifecyclestage: "lead")])
+      import.import_page(
+        [
+          hubspot_contact(
+            501,
+            "ada@example.com",
+            lifecyclestage: "lead",
+            associatedcompanyid: "900",
+          ),
+        ],
+      )
+      DiscourseCrm::Record.store_many!(
+        [scope.merge(object: "company", external_id: "900", company_external_id: nil, data: {})],
+      )
 
       import.import_page([hubspot_contact(501, "gone@example.com", lifecyclestage: "lead")])
 
       expect(configuration.record_links).to be_empty
-      expect(configuration.records).to be_empty
+      expect(DiscourseCrm::Record.where(provider: "hubspot")).to be_empty
     end
 
     it "unlinks a previously imported contact whose email was cleared" do
@@ -117,7 +129,7 @@ RSpec.describe ::Hubspot::ContactImport do
       )
     end
 
-    it "keeps the company id on contacts without requesting companies when none of their properties are selected" do
+    it "keeps the company id on contacts without requesting companies" do
       described_class.new(configuration).import_page(
         [hubspot_contact(501, "ada@example.com", associatedcompanyid: "900")],
       )
@@ -127,284 +139,124 @@ RSpec.describe ::Hubspot::ContactImport do
     end
   end
 
-  context "with company properties" do
-    let!(:configuration) do
-      Fabricate(
-        :hubspot_sync_configuration,
-        mappings: [
-          { "id" => 1, "object" => "contact", "source" => "lifecyclestage" },
-          { "id" => 2, "object" => "company", "source" => "name" },
-          { "id" => 3, "object" => "company", "source" => "plan_tier" },
-        ],
-      )
-    end
-    let(:company_scope) { scope.merge(object: "company") }
-
-    def company_data
-      DiscourseCrm::Record.within(**company_scope).pluck(:external_id, :data).to_h
+  describe "mapped Discourse fields" do
+    fab!(:title_field) { Fabricate(:user_field, name: "Job title", field_type: "text") }
+    fab!(:tier_field) do
+      Fabricate(:user_field, name: "Tier", field_type: "dropdown").tap do |field|
+        field.user_field_options.create!(value: "Gold")
+      end
     end
 
-    it "pulls the companies of matched contacts with the selected properties" do
-      stub_hubspot_company_batch_read(
-        [hubspot_company(900, name: "Acme", plan_tier: "enterprise", domain: "acme.com")],
-        ids: %w[900],
-      )
-
-      described_class.new(configuration).import_page(
-        [
-          hubspot_contact(
-            501,
-            "ada@example.com",
-            lifecyclestage: "customer",
-            associatedcompanyid: "900",
-          ),
-          hubspot_contact(502, "grace@example.com", associatedcompanyid: "900"),
-          hubspot_contact(503, "nobody@example.com", associatedcompanyid: "901"),
-        ],
-      )
-
-      expect(
-        a_request(:post, hubspot_url("objects/companies/batch/read")).with(
-          body: hash_including("properties" => %w[name plan_tier hs_merged_object_ids]),
-        ),
-      ).to have_been_made.once
-      expect(company_data).to eq("900" => { "name" => "Acme", "plan_tier" => "enterprise" })
-      expect(configuration.records.pluck(:external_id, :company_external_id)).to contain_exactly(
-        %w[501 900],
-        %w[502 900],
-      )
-      expect(configuration.records.find_by(external_id: "501").company.data).to eq(
-        "name" => "Acme",
-        "plan_tier" => "enterprise",
-      )
-    end
-
-    it "links a merged company to contacts referencing either ID" do
-      stub_hubspot_company_batch_read(
-        [hubspot_company(902, name: "Acme", hs_merged_object_ids: "899;900")],
-        ids: %w[900 902],
-      )
-      described_class.new(configuration).import_page(
-        [
-          hubspot_contact(501, "ada@example.com", associatedcompanyid: "900"),
-          hubspot_contact(502, "grace@example.com", associatedcompanyid: "902"),
-        ],
-      )
-      expect(configuration.records.map { |contact| contact.company.data }).to eq(
-        [{ "name" => "Acme" }, { "name" => "Acme" }],
-      )
-    end
-
-    it "identifies an unexpected company without recording company data" do
-      stub_hubspot_company_batch_read([hubspot_company(901, name: "Private")], ids: %w[900])
-      expect { described_class.new(configuration).refresh_companies(%w[900]) }.to raise_error(
-        Hubspot::InvalidApiResponse,
-      ) { |error| expect(error.diagnostics).to eq(codes: ["UNEXPECTED_COMPANY"]) }
-    end
-
-    it "identifies two companies claiming the same merged ID" do
-      stub_hubspot_company_batch_read(
-        [
-          hubspot_company(901, hs_merged_object_ids: "900"),
-          hubspot_company(902, hs_merged_object_ids: "900"),
-        ],
-        ids: %w[900],
-      )
-      expect { described_class.new(configuration).refresh_companies(%w[900]) }.to raise_error(
-        Hubspot::InvalidApiResponse,
-      ) { |error| expect(error.diagnostics).to eq(codes: ["CONFLICTING_COMPANY_IDS"]) }
-    end
-
-    it "keeps returned companies and reports unresolved missing IDs once" do
-      stub_hubspot_company_batch_read(
-        [hubspot_company(902, name: "Acme", hs_merged_object_ids: "900")],
-        ids: %w[900 901 902],
-        errors: [{ category: "OBJECT_NOT_FOUND", context: { ids: %w[900 901 901 902] } }],
-      )
-
-      expect(described_class.new(configuration).refresh_companies(%w[900 901 902]).missing).to eq(
-        %w[901],
-      )
-      expect(company_data).to eq("900" => { "name" => "Acme" }, "902" => { "name" => "Acme" })
-    end
-
-    it "drops a company once no contact points at it and keeps one that is still referenced" do
-      import = described_class.new(configuration)
-      stub_hubspot_company_batch_read(
-        [hubspot_company(900, name: "Acme"), hubspot_company(901, name: "Globex")],
-        ids: %w[900 901],
-      )
-      import.import_page(
-        [
-          hubspot_contact(501, "ada@example.com", associatedcompanyid: "900"),
-          hubspot_contact(502, "grace@example.com", associatedcompanyid: "901"),
-        ],
-      )
-      stub_hubspot_company_batch_read([hubspot_company(901, name: "Globex")], ids: %w[901])
-
-      import.import_page([hubspot_contact(501, "ada@example.com", associatedcompanyid: "901")])
-
-      expect(company_data.keys).to eq(%w[901])
-      expect(configuration.records.pluck(:external_id, :company_external_id)).to contain_exactly(
-        %w[501 901],
-        %w[502 901],
-      )
-    end
-
-    it "imports contact changes and records a separate failure when HubSpot omits a requested company" do
-      import = described_class.new(configuration)
-      stub_hubspot_company_batch_read([hubspot_company(900, name: "Acme")], ids: %w[900])
-      import.import_page(
-        [
-          hubspot_contact(
-            501,
-            "ada@example.com",
-            associatedcompanyid: "900",
-            lifecyclestage: "lead",
-          ),
-        ],
-      )
-      contacts = [
-        hubspot_contact(
-          501,
-          "ada@example.com",
-          associatedcompanyid: "901",
-          lifecyclestage: "customer",
-        ),
-      ]
-      stub_hubspot_company_batch_read([], ids: %w[901])
-      import.import_page(contacts)
-      expect(DiscourseCrm::SyncAttempt.sole.diagnostics).to include(
-        "codes" => ["INCOMPLETE_COMPANY_BATCH_READ"],
-      )
-      expect(company_data).to be_empty
-      expect(configuration.records.find_by!(external_id: "501").data).to eq(
-        "lifecyclestage" => "customer",
-      )
-      stub_hubspot_company_batch_read([hubspot_company(901, name: "Globex")], ids: %w[901])
-      stub_hubspot_contact_list(contacts)
-      Jobs::Hubspot::SyncConfiguration.new.execute(
-        configuration_id: configuration.id,
-        reason: "backfill",
-      )
-      history =
-        DiscourseCrm::SyncAttempt.find_by!(configuration_id: configuration.id, user_id: user.id)
-      expect(history).to have_attributes(reason: "imported", diagnostics: {})
-      expect(configuration.records.find_by!(external_id: "501").data).to include(
-        "lifecyclestage" => "customer",
-      )
-      expect(company_data).to eq("901" => { "name" => "Globex" })
-    end
-
-    it "removes a company HubSpot reports as missing and leaves its contacts without a company" do
-      import = described_class.new(configuration)
-      stub_hubspot_company_batch_read([hubspot_company(900, name: "Acme")])
-      import.import_page([hubspot_contact(501, "ada@example.com", associatedcompanyid: "900")])
-      stub_hubspot_company_batch_read(
-        [],
-        errors: [{ category: "OBJECT_NOT_FOUND", context: { ids: %w[900] } }],
-      )
-
-      import.import_page([hubspot_contact(501, "ada@example.com", associatedcompanyid: "900")])
-
-      expect(company_data).to eq({})
-      expect(configuration.records.find_by(external_id: "501").company).to be_nil
-    end
-
-    it "keeps stored companies when the company batch fails for another reason" do
-      import = described_class.new(configuration)
-      stub_hubspot_company_batch_read([hubspot_company(900, name: "Acme")])
-      import.import_page([hubspot_contact(501, "ada@example.com", associatedcompanyid: "900")])
-      stub_hubspot_company_batch_read(
-        [],
-        errors: [{ category: "VALIDATION_ERROR", context: { ids: %w[900] } }],
-      )
-
-      import.import_page([hubspot_contact(501, "ada@example.com", associatedcompanyid: "900")])
-      expect(DiscourseCrm::SyncAttempt.sole.outcome).to eq("failed")
-
-      expect(company_data).to eq("900" => { "name" => "Acme" })
-    end
-
-    it "removes the orphaned company of a contact the user no longer has" do
-      import = described_class.new(configuration)
-      old_email = UserEmail.create!(user: user, email: "old@example.com")
-      stub_hubspot_company_batch_read(
-        [hubspot_company(900, name: "Acme"), hubspot_company(901, name: "Globex")],
-        ids: %w[900 901],
-      )
-      import.import_page(
-        [
-          hubspot_contact(501, "ada@example.com", associatedcompanyid: "900"),
-          hubspot_contact(502, "old@example.com", associatedcompanyid: "901"),
-        ],
-      )
-      old_email.destroy!
-      stub_hubspot_batch_read([hubspot_contact(501, "ada@example.com", associatedcompanyid: "900")])
-      stub_hubspot_company_batch_read([hubspot_company(900, name: "Acme")], ids: %w[900])
-
-      import.import_user(user.reload)
-
-      expect(configuration.records.pluck(:external_id)).to eq(%w[501])
-      expect(company_data.keys).to eq(%w[900])
-    end
-
-    it "drops stored companies once no company property is selected any more" do
-      stub_hubspot_company_batch_read([hubspot_company(900, name: "Acme")])
-      described_class.new(configuration).import_page(
-        [hubspot_contact(501, "ada@example.com", associatedcompanyid: "900")],
-      )
+    before do
       configuration.update!(
-        mappings: [{ "id" => 1, "object" => "contact", "source" => "lifecyclestage" }],
-      )
-
-      described_class.new(configuration).import_page(
-        [hubspot_contact(502, "grace@example.com", associatedcompanyid: "900")],
-      )
-
-      expect(company_data).to eq({})
-      expect(configuration.records.pluck(:company_external_id).uniq).to eq(%w[900])
-      expect(a_request(:post, hubspot_url("objects/companies/batch/read"))).to have_been_made.once
-    end
-
-    it "refreshes the companies contacts reference and drops the ones reported gone" do
-      import = described_class.new(configuration)
-      stub_hubspot_company_batch_read(
-        [hubspot_company(900, plan_tier: "pro"), hubspot_company(901, plan_tier: "pro")],
-      )
-      import.import_page(
-        [
-          hubspot_contact(501, "ada@example.com", associatedcompanyid: "900"),
-          hubspot_contact(502, "grace@example.com", associatedcompanyid: "901"),
+        mappings: [
+          {
+            "object" => "contact",
+            "source" => "jobtitle",
+            "destination" => "user_field_#{title_field.id}",
+            "policy" => "overwrite",
+          },
+          {
+            "object" => "contact",
+            "source" => "tier",
+            "destination" => "user_field_#{tier_field.id}",
+            "policy" => "overwrite",
+          },
+          { "object" => "contact", "source" => "lifecyclestage" },
         ],
       )
-      stub_hubspot_company_batch_read(
-        [hubspot_company(900, plan_tier: "enterprise")],
-        ids: %w[900 901],
+    end
+
+    it "fills Discourse fields from the user's most recently modified contact and stores its pulled properties" do
+      UserEmail.create!(user: user, email: "ada.work@example.com")
+      older = hubspot_contact(501, "ada@example.com", jobtitle: "Engineer", tier: "Gold")
+      newer =
+        hubspot_contact(502, "ada.work@example.com", jobtitle: "CTO", lifecyclestage: "customer")
+      newer["properties"]["lastmodifieddate"] = "2026-11-02T10:00:00.000Z"
+
+      page = described_class.new(configuration).import_page([newer, older])
+
+      expect(user.reload.user_fields[title_field.id.to_s]).to eq("CTO")
+      expect(user.user_fields[tier_field.id.to_s]).to be_nil
+      expect(configuration.records.find_by(external_id: "502").data).to eq(
+        "jobtitle" => "CTO",
+        "lifecyclestage" => "customer",
       )
-      expect { import.refresh_companies(%w[900 901]) }.to raise_error(
-        Hubspot::InvalidApiResponse,
-        "Incomplete company batch read response",
+      expect(page.changed_user_ids).to eq([user.id])
+      expect(page.destination_errors).to be_empty
+    end
+
+    it "fills Discourse fields from the newest contact whichever page it arrives on" do
+      UserEmail.create!(user: user, email: "ada.work@example.com")
+      older = hubspot_contact(501, "ada@example.com", jobtitle: "Engineer")
+      newer = hubspot_contact(502, "ada.work@example.com", jobtitle: "CTO")
+      newer["properties"]["lastmodifieddate"] = "2026-11-02T10:00:00.000Z"
+      # Modified at the same moment as the older one; the higher id wins.
+      tied = hubspot_contact(502, "ada.work@example.com", jobtitle: "CTO")
+
+      [newer, tied].each do |winner|
+        [[[winner], [older]], [[older], [winner]], [[older, winner]]].each do |pages|
+          DiscourseCrm::Record.delete_all
+          DiscourseCrm::RecordLink.delete_all
+          user.user_custom_fields.delete_all
+          import = described_class.new(configuration)
+
+          pages.each { |page| import.import_page(page) }
+
+          expect(user.reload.user_fields[title_field.id.to_s]).to eq("CTO")
+        end
+      end
+    end
+
+    it "ignores a response older than the stored version of the same contact" do
+      newer = hubspot_contact(501, "ada@example.com", jobtitle: "CTO")
+      newer["properties"]["lastmodifieddate"] = "2026-11-02T10:00:00.000Z"
+      older = hubspot_contact(501, "ada@example.com", jobtitle: "Engineer")
+      import = described_class.new(configuration)
+      import.import_page([newer])
+
+      import.import_page([older])
+
+      expect(configuration.records.find_by(external_id: "501").data).to include("jobtitle" => "CTO")
+      expect(user.reload.user_fields[title_field.id.to_s]).to eq("CTO")
+    end
+
+    it "keeps the newest stored contact's values and link when the user's own pull skips an outdated version" do
+      UserEmail.create!(user: user, email: "ada.work@example.com")
+      newest = hubspot_contact(501, "ada@example.com", jobtitle: "CTO")
+      newest["properties"]["lastmodifieddate"] = "2026-11-03T10:00:00.000Z"
+      described_class.new(configuration).import_page([newest])
+      outdated = hubspot_contact(501, "ada@example.com", jobtitle: "Engineer")
+      other = hubspot_contact(502, "ada.work@example.com", jobtitle: "Intern")
+      other["properties"]["lastmodifieddate"] = "2026-11-02T10:00:00.000Z"
+      stub_hubspot_batch_read([outdated, other])
+
+      described_class.new(configuration).import_user(user)
+
+      expect(user.reload.user_fields[title_field.id.to_s]).to eq("CTO")
+      expect(configuration.record_links.pluck(:external_id)).to contain_exactly("501", "502")
+    end
+
+    it "joins the first and last name for the combined full name" do
+      configuration.update!(
+        mappings: [
+          {
+            "object" => "contact",
+            "source" => Hubspot::InboundUsersFlow::FULL_NAME,
+            "destination" => "name",
+            "policy" => "overwrite",
+          },
+        ],
       )
-      expect(company_data).to eq(
-        "900" => {
-          "plan_tier" => "pro",
-        },
-        "901" => {
-          "plan_tier" => "pro",
-        },
-      )
-      stub_hubspot_company_batch_read(
-        [hubspot_company(900, plan_tier: "enterprise")],
-        ids: %w[900 901],
-        errors: [{ category: "OBJECT_NOT_FOUND", context: { ids: %w[901] } }],
+      import = described_class.new(configuration)
+
+      import.import_page(
+        [hubspot_contact(501, "ada@example.com", firstname: "Augusta", lastname: "King")],
       )
 
-      expect(import.referenced_company_ids(after: "")).to eq(%w[900 901])
-      expect(import.referenced_company_ids(after: "900")).to eq(%w[901])
-      import.refresh_companies(%w[900 901])
-
-      expect(company_data).to eq("900" => { "plan_tier" => "enterprise" })
+      expect(import.requested_properties).to include("firstname", "lastname")
+      expect(import.requested_properties).not_to include(Hubspot::InboundUsersFlow::FULL_NAME)
+      expect(user.reload.name).to eq("Augusta King")
     end
   end
 

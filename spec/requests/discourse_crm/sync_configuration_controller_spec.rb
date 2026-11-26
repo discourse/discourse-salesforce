@@ -657,7 +657,56 @@ RSpec.describe DiscourseCrm::SyncConfigurationController do
       )
     end
 
-    it "creates, lists and rejects hubspot configurations" do
+    it "saves Discourse destinations and rejects mappings that would loop" do
+      sign_in(admin)
+      stub_hubspot_properties(%w[lifecyclestage jobtitle])
+      title = Fabricate(:user_field, name: "Job title", field_type: "text")
+      destination = "user_field_#{title.id}"
+      Fabricate(
+        :sync_configuration,
+        provider: "hubspot",
+        account: "12345",
+        object: "contact",
+        name: "Push titles",
+        mappings: [
+          { "source" => destination, "destination" => "jobtitle", "policy" => "overwrite" },
+        ],
+      )
+      configuration[:mappings][1].merge!(destination: destination, policy: "overwrite")
+
+      post "/salesforce/admin/guided-sync/configurations.json",
+           params: {
+             configuration: configuration,
+           },
+           as: :json
+
+      expect(response).to have_http_status(:unprocessable_entity)
+      expect(response.parsed_body).to eq(
+        "errors" => [
+          "These mappings would keep copying a value back to where it came from: HubSpot contact.jobtitle → Discourse Job title → HubSpot contact.jobtitle. Remove one of these mappings or set one of them to keep the existing value.",
+        ],
+        "error_type" => "invalid_mapping",
+        "mapping_index" => 1,
+      )
+
+      DiscourseCrm::SyncConfiguration.outbound.delete_all
+      post "/salesforce/admin/guided-sync/configurations.json",
+           params: {
+             configuration: configuration,
+           },
+           as: :json
+
+      expect(response).to have_http_status(:created)
+      expect(response.parsed_body.dig("configuration", "mappings", 1)).to eq(
+        "id" => 2,
+        "object" => "contact",
+        "source" => "jobtitle",
+        "destination" => destination,
+        "policy" => "overwrite",
+      )
+    end
+
+    it "creates, lists and rejects hubspot configurations, including a malformed group list" do
       sign_in(admin)
       stub_hubspot_properties(%w[lifecyclestage jobtitle])
 
@@ -749,7 +798,121 @@ RSpec.describe DiscourseCrm::SyncConfigurationController do
       expect(response.parsed_body["targets"]).to eq(
         [{ "provider" => "hubspot", "object" => "contact" }],
       )
+      expect(response.parsed_body["pull_targets"]).to eq(
+        [
+          { "provider" => "hubspot", "object" => "contact" },
+          { "provider" => "hubspot", "object" => "company" },
+        ],
+      )
       expect(response.parsed_body["configurations"].size).to eq(2)
+    end
+  end
+
+  describe "salesforce pull configurations" do
+    include_context "with salesforce spec helper"
+
+    let(:fields) do
+      [
+        { name: "Name", label: "Full Name", type: "string" },
+        { name: "FirstName", label: "First Name", type: "string" },
+        { name: "Title", label: "Title", type: "string" },
+        { name: "Birthdate", label: "Birthdate", type: "date" },
+        { name: "MailingAddress", label: "Mailing Address", type: "address" },
+      ]
+    end
+
+    let(:configuration) do
+      {
+        provider: "salesforce",
+        direction: "inbound",
+        kind: "users",
+        object: "Contact",
+        name: "Pull contacts",
+        schedule: "daily",
+        backfill: false,
+        mappings: [
+          { id: 1, object: "Contact", source: "Name", destination: "name", policy: "keep" },
+          { id: 2, object: "Contact", source: "Title" },
+        ],
+      }
+    end
+
+    before do
+      sign_in(admin)
+      stub_request(:get, "#{api_path}/Contact/describe").to_return(body: { fields: fields }.to_json)
+    end
+
+    it "serves readable fields and Discourse destinations for pulls" do
+      get "/salesforce/admin/guided-sync/fields.json",
+          params: {
+            object: "Contact",
+            direction: "inbound",
+          }
+
+      expect(response).to have_http_status(:ok)
+      expect(response.parsed_body["fields"].map { |field| field["name"] }).to eq(
+        %w[Name FirstName Title Birthdate],
+      )
+      expect(
+        response.parsed_body["fields"].to_h { |field| [field["name"], field["source_type"]] },
+      ).to include("Title" => "text", "Birthdate" => "date")
+      expect(
+        response.parsed_body["destinations"].find { |field| field["id"] == "name" },
+      ).to include("accepts" => %w[text number])
+      expect(response.parsed_body["destinations"].map { |field| field["id"] }).to include(
+        "name",
+        "bio",
+      )
+    end
+
+    it "rejects unusable fields, creates one pull per object and lists Salesforce objects as pull targets" do
+      # Unreadable field types, and types a Discourse field cannot hold.
+      [
+        { id: 1, object: "Contact", source: "MailingAddress" },
+        { id: 1, object: "Contact", source: "Birthdate", destination: "name", policy: "keep" },
+      ].each do |mapping|
+        post "/salesforce/admin/guided-sync/configurations.json",
+             params: {
+               configuration: configuration.merge(mappings: [mapping]),
+             },
+             as: :json
+        expect(response).to have_http_status(:bad_request)
+      end
+
+      post "/salesforce/admin/guided-sync/configurations.json",
+           params: {
+             configuration: configuration,
+           },
+           as: :json
+
+      expect(response).to have_http_status(:created)
+      expect(response.parsed_body.dig("configuration", "mappings")).to eq(
+        [
+          {
+            "id" => 1,
+            "object" => "Contact",
+            "source" => "Name",
+            "destination" => "name",
+            "policy" => "keep",
+          },
+          { "id" => 2, "object" => "Contact", "source" => "Title" },
+        ],
+      )
+
+      post "/salesforce/admin/guided-sync/configurations.json",
+           params: {
+             configuration: configuration.merge(name: "Second pull"),
+           },
+           as: :json
+      expect(response).to have_http_status(:bad_request)
+
+      get "/salesforce/admin/guided-sync/configurations.json"
+      expect(response.parsed_body["pull_targets"]).to eq(
+        [
+          { "provider" => "salesforce", "object" => "Lead" },
+          { "provider" => "salesforce", "object" => "Contact" },
+        ],
+      )
     end
   end
 end

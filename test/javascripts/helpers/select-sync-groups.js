@@ -13,5 +13,10 @@ export default async function selectSyncGroups(...names) {
     await fillIn(".d-multi-select__search-input", name);
     await click(".d-multi-select__result");
   }
-  await click(".salesforce-sync-configuration__heading");
+  // Clicking the form heading closes the group menu in either sync form.
+  await click(
+    find(".salesforce-sync-configuration__heading")
+      ? ".salesforce-sync-configuration__heading"
+      : ".crm-pull-configuration__heading"
+  );
 }

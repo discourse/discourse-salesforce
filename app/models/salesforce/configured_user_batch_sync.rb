@@ -162,7 +162,7 @@ module Salesforce
           ids = user_batch.filter_map { |user| links[user.id]&.external_id }.uniq
           conditions = ["Email IN (#{quoted(user_batch.map(&:email))})"]
           conditions << "Id IN (#{quoted(ids)})" if ids.present?
-          query_records(
+          @api.query_all(
             "SELECT #{fields.join(",")} FROM #{@object} WHERE #{conditions.join(" OR ")}",
           )
         end
@@ -175,9 +175,9 @@ module Salesforce
           .each_slice(25)
           .flat_map do |entries|
             emails = entries.map { |user, _, _| user.email }
-            query_records(
-              "SELECT Email FROM Contact WHERE Email IN (#{quoted(emails)})",
-            ).map { |record| record.fetch("Email").downcase }
+            @api
+              .query_all("SELECT Email FROM Contact WHERE Email IN (#{quoted(emails)})")
+              .map { |record| record.fetch("Email").downcase }
           end
           .to_set
 
@@ -188,20 +188,6 @@ module Salesforce
         processed(user)
         true
       end
-    end
-
-    def query_records(query)
-      result = @api.query(query)
-      records = result.fetch("records")
-      while result["nextRecordsUrl"]
-        path = result.fetch("nextRecordsUrl")
-        unless path.start_with?("#{@api.prefix}/query/")
-          raise InvalidApiResponse.new("Invalid query continuation")
-        end
-        result = @api.get(path.delete_prefix("#{@api.prefix}/"))
-        records.concat(result.fetch("records"))
-      end
-      records
     end
 
     def quoted(values)

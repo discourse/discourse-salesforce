@@ -39,6 +39,17 @@ hu:
         discard_changes: "Változások elvetése"
         keep_editing: "Szerkesztés tovább"
         cancel_setup: "Mégse"
+        segments:
+          value: "Érték"
+          objects:
+            contact: "Kapcsolat"
+          preview_more: "és még további %{count}"
+          group: "Csoport"
+          no_group: "Egyik sem"
+          columns:
+            conditions: "Feltételek"
+            group: "Csoport"
+            members: "Tagok"
         group_name: "Csoport neve"
         email: "E-mail"
         custom_field: "Egyéni"

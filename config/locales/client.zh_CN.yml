@@ -56,6 +56,16 @@ zh_CN:
         keep_editing: "继续编辑"
         cancel_setup: "取消"
         configure: "配置"
+        segments:
+          value: "值"
+          objects:
+            contact: "联系人"
+          group: "群组"
+          no_group: "无"
+          columns:
+            conditions: "条件"
+            group: "群组"
+            members: "成员"
         save_changes: "保存配置"
         group_name: "群组名称"
         email: "电子邮件"

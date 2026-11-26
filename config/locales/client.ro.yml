@@ -37,6 +37,18 @@ ro:
         discard_changes: "Renunță la modificări"
         keep_editing: "Continuă editarea"
         cancel_setup: "Anulare"
+        segments:
+          value: "Valoare"
+          choose_group: "Alege un grup"
+          objects:
+            contact: "Contact"
+          preview_more: "și încă %{count}"
+          group: "Grup"
+          no_group: "Nimic"
+          columns:
+            conditions: "Condiții"
+            group: "Grup"
+            members: "Membri"
         group_name: "Nume grup"
         email: "E-mail"
         custom_field: "Personalizat"

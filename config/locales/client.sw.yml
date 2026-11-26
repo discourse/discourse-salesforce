@@ -30,6 +30,15 @@ sw:
           contact: "Wasiliana"
       guided_sync:
         cancel_setup: "Ghairi"
+        segments:
+          value: "Thamani"
+          objects:
+            contact: "Wasiliana"
+          group: "Kikundi"
+          no_group: "Hakuna"
+          columns:
+            group: "Kikundi"
+            members: "Wanachama"
         group_name: "Jina la kikundi"
         email: "Barua pepe"
         custom_field: "Binafsi"

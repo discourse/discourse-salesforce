@@ -32,6 +32,14 @@ hr:
         all_users: "Svi korisnici"
         keep_editing: "Nastavite uređivati"
         cancel_setup: "Odustani"
+        segments:
+          value: "Vrijednost"
+          preview_more: "i %{count} više"
+          group: "Grupa"
+          no_group: "Ništa"
+          columns:
+            group: "Grupa"
+            members: "Članovi"
         group_name: "Ime grupe"
         email: "E-mail"
         custom_field: "Posebna"

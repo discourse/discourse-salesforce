@@ -28,6 +28,14 @@ th:
           skipped: "ข้าม"
       guided_sync:
         cancel_setup: "ยกเลิก"
+        segments:
+          value: "ค่า"
+          group: "กลุ่ม"
+          no_group: "ไม่มี"
+          columns:
+            conditions: "เงื่อนไข"
+            group: "กลุ่ม"
+            members: "สมาชิก"
         group_name: "ชื่อกลุ่ม"
         email: "อีเมล"
         overwrite: "ดิสคอส"

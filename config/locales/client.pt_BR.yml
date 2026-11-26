@@ -52,6 +52,18 @@ pt_BR:
         keep_editing: "Continuar editando"
         cancel_setup: "Cancelar"
         configure: "Configurar"
+        segments:
+          value: "Valor"
+          choose_group: "Fechar grupo"
+          objects:
+            contact: "Contato"
+          preview_more: "e mais %{count}"
+          group: "Grupo"
+          no_group: "Nenhum"
+          columns:
+            conditions: "Condições"
+            group: "Grupo"
+            members: "Membros"
         group_name: "Nome do grupo"
         email: "E-mail"
         custom_field: "Personalizadas"

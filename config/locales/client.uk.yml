@@ -42,6 +42,18 @@ uk:
         keep_editing: "Продовжити редагування"
         cancel_setup: "Скасувати"
         configure: "Налаштувати"
+        segments:
+          value: "Значення"
+          objects:
+            contact: "Контакти"
+          join_all: " та "
+          preview_more: "і більше %{count}"
+          group: "Група"
+          no_group: "Немає"
+          columns:
+            conditions: "Умови"
+            group: "Група"
+            members: "Учасники"
         save_changes: "Зберегти конфігурацію"
         group_name: "Назва групи"
         email: "E-mail"

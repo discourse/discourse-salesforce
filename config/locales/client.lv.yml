@@ -27,6 +27,13 @@ lv:
           skipped: "Izlaists"
       guided_sync:
         cancel_setup: "Atcelt"
+        segments:
+          value: "Vērtība"
+          group: "Grupa"
+          no_group: "Nav"
+          columns:
+            group: "Grupa"
+            members: "Dalībnieki"
         group_name: "Grupas nosaukums"
         email: "E-pasts"
         overwrite: "Discourse"

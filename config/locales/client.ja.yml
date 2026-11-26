@@ -52,6 +52,17 @@ ja:
         keep_editing: "編集を続ける"
         cancel_setup: "キャンセル"
         configure: "構成"
+        segments:
+          value: "値"
+          choose_group: "グループを選択"
+          objects:
+            contact: "連絡先"
+          preview_more: "および他 %{count} 人"
+          group: "グループ"
+          no_group: "なし"
+          columns:
+            group: "グループ"
+            members: "メンバー"
         group_name: "グループ名"
         email: "メール"
         custom_field: "カスタム"

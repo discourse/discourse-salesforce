@@ -56,6 +56,18 @@ ar:
         keep_editing: "الاستمرار في التعديل"
         cancel_setup: "ألغِ"
         configure: "التهيئة"
+        segments:
+          value: "القيمة"
+          choose_group: "اختر مجموعة"
+          objects:
+            contact: "تواصل معنا"
+          preview_more: "و%{count} أخرى"
+          group: "المجموعة"
+          no_group: "لا يوجد"
+          columns:
+            conditions: "الشروط"
+            group: "المجموعة"
+            members: "الأعضاء"
         group_name: "اسم المجموعة"
         email: "البريد الإلكتروني"
         custom_field: "مخصَّصة"

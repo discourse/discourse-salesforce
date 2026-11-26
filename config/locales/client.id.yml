@@ -34,6 +34,12 @@ id:
       title: Salesforce
       guided_sync:
         cancel_setup: "Batal"
+        segments:
+          objects:
+            contact: "Kontak"
+          no_group: "Tidak ada"
+          columns:
+            members: "Anggota"
         group_name: "Nama grup"
         email: "Surel"
         overwrite: "Discourse"

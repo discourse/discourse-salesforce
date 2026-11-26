@@ -28,6 +28,13 @@ bg:
           skipped: "Пропусни"
       guided_sync:
         cancel_setup: "Прекрати"
+        segments:
+          value: "Стойност"
+          group: "Група"
+          no_group: "Без"
+          columns:
+            group: "Група"
+            members: "Членове"
         group_name: "Име на групата"
         email: "Имейл "
         custom_field: "По избор"

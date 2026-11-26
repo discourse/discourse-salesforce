@@ -31,6 +31,13 @@ nb_NO:
       guided_sync:
         keep_editing: "Fortsett å redigere"
         cancel_setup: "Avbryt"
+        segments:
+          value: "Verdi"
+          group: "Gruppe"
+          no_group: "Ingen"
+          columns:
+            group: "Gruppe"
+            members: "Medlemmer"
         group_name: "Gruppenavn"
         email: "E-post"
         custom_field: "Egendefinert"

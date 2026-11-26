@@ -42,6 +42,18 @@ pl_PL:
         keep_editing: "Kontynuuj edycję"
         cancel_setup: "Anuluj"
         configure: "Konfiguruj"
+        segments:
+          value: "Wartość"
+          objects:
+            contact: "Dane kontaktowe"
+          join_all: " i "
+          preview_more: "i %{count} więcej"
+          group: "Grupa"
+          no_group: "Brak"
+          columns:
+            conditions: "Warunki"
+            group: "Grupa"
+            members: "Członkowie"
         save_changes: "Zapisz konfigurację"
         group_name: "Nazwa grupy"
         email: "E-mail"

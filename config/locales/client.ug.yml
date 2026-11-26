@@ -35,6 +35,15 @@ ug:
         keep_editing: "تەھرىرلەشنى داۋاملاشتۇر"
         cancel_setup: "ۋاز كەچ"
         configure: "سەپلە"
+        segments:
+          value: "قىممەت"
+          preview_more: "ۋە باشقا %{count}"
+          group: "گۇرۇپپا"
+          no_group: "يوق"
+          columns:
+            conditions: "شەرت"
+            group: "گۇرۇپپا"
+            members: "ئەزا"
         group_name: "گۇرۇپپا ئىسمى"
         email: "ئېلخەت"
         custom_field: "ئىختىيارى"

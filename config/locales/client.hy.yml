@@ -33,6 +33,15 @@ hy:
       guided_sync:
         keep_editing: "Շարունակել խմբագրումը"
         cancel_setup: "Չեղարկել"
+        segments:
+          value: "Արժեք"
+          objects:
+            contact: "Կապ"
+          group: "Խմբավորել"
+          no_group: "Ոչ մի"
+          columns:
+            group: "Խմբավորել"
+            members: "Անդամներ"
         group_name: "Խմբի անուն"
         email: "Էլ. փոստ"
         custom_field: "Մասնավոր"

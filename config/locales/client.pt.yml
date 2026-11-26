@@ -45,6 +45,15 @@ pt:
       guided_sync:
         keep_editing: "Prosseguir a edição"
         cancel_setup: "Cancelar"
+        segments:
+          value: "Valor"
+          objects:
+            contact: "Contacte-nos"
+          group: "Grupo"
+          no_group: "Nenhuma"
+          columns:
+            group: "Grupo"
+            members: "Membros"
         group_name: "Nome do grupo"
         email: "Email"
         custom_field: "Personalizar"

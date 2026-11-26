@@ -39,6 +39,15 @@ fa_IR:
         all_users: "همه کاربران"
         keep_editing: "ادامه ویرایش"
         cancel_setup: "انصراف"
+        segments:
+          value: "مقدار"
+          objects:
+            contact: "تماس"
+          group: "گروه"
+          no_group: "هیچ کدام"
+          columns:
+            group: "گروه"
+            members: "اعضاء"
         group_name: "نام گروه"
         email: "ایمیل"
         custom_field: "سفارشی"

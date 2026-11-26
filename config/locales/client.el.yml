@@ -41,6 +41,18 @@ el:
         keep_editing: "Συνέχιση επεξεργασίας"
         cancel_setup: "Ακύρωση"
         configure: "Διαμόρφωση"
+        segments:
+          value: "Τιμή"
+          choose_group: "Επιλέξτε μια ομάδα"
+          objects:
+            contact: "Επικοινωνία"
+          preview_more: "και %{count} ακόμα"
+          group: "Ομάδα"
+          no_group: "Κανένα"
+          columns:
+            conditions: "Συνθήκες"
+            group: "Ομάδα"
+            members: "Μέλη"
         group_name: "Όνομα ομάδας"
         email: "Email"
         custom_field: "Προσαρμοσμένο"

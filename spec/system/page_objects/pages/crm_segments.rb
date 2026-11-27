@@ -72,6 +72,43 @@ module PageObjects
         has_css?("[data-test-preview]", text: text)
       end
 
+      def enable_flair
+        form.field("flair_enabled").check
+        self
+      end
+
+      def has_flair_enabled?
+        form.field("flair_enabled").checked?
+      end
+
+      def choose_flair_text(property_id)
+        form.field("flair_text_property").select(property_id)
+        self
+      end
+
+      def has_flair_text?(property_id)
+        form.field("flair_text_property").has_value?(property_id)
+      end
+
+      def choose_flair_property(label)
+        pick_from_multi_select("flair_properties", label)
+      end
+
+      def choose_flair_group(group)
+        pick_from_multi_select("flair_group_ids", group.name)
+      end
+
+      def has_flair_group?(group)
+        has_css?(
+          '[data-name="flair_group_ids"] .d-multi-select-trigger__selected-item',
+          text: group.name,
+        )
+      end
+
+      def has_flair_preview?(text)
+        has_css?("[data-test-flair-preview] .crm-flair__text", exact_text: text)
+      end
+
       def has_condition_value?(index, value)
         form.collection_field("conditions", index, "value").has_value?(value)
       end
@@ -81,14 +118,15 @@ module PageObjects
         self
       end
 
-      def has_segment?(name, configuration: nil, group: nil, status: nil)
+      def has_segment?(name, configuration: nil, group: nil, status: nil, flair: nil)
         row = "[data-test-segment]"
         has_css?(row, text: name) &&
           (
             configuration.nil? ||
               has_css?("#{row} [data-test-segment-configuration]", text: configuration.name)
           ) && (group.nil? || has_css?(row, text: group.name)) &&
-          (status.nil? || has_css?("#{row} [data-test-segment-status='#{status}']"))
+          (status.nil? || has_css?("#{row} [data-test-segment-status='#{status}']")) &&
+          (flair.nil? || has_css?("#{row} [data-test-segment-flair]", text: flair))
       end
 
       def has_no_segment?(name)
@@ -114,6 +152,14 @@ module PageObjects
       end
 
       private
+
+      def pick_from_multi_select(field, text)
+        find("[data-name=\"#{field}\"] .d-multi-select-trigger__expand-btn").click
+        find(".d-multi-select__search-input").fill_in(with: text)
+        find(".d-multi-select__result", text: text).click
+        find(".crm-segment-editor__heading").click
+        self
+      end
 
       def form
         PageObjects::Components::FormKit.new(".crm-segment-editor__form")

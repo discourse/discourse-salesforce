@@ -97,6 +97,111 @@ RSpec.describe DiscourseCrm::Segment do
     end
   end
 
+  describe "flair validations" do
+    it "requires existing groups and well-formed properties while the flair is on" do
+      segment = Fabricate.build(:crm_segment, configuration:, flair_enabled: true)
+      expect(segment).to be_valid
+
+      segment.flair_group_ids = [group.id, -1]
+      expect(segment).to be_invalid
+      expect(segment.errors.full_messages).to eq(
+        ["Flair group ids must only name groups that exist"],
+      )
+      segment.flair_group_ids = [group.id, Group::AUTO_GROUPS[:admins]]
+      expect(segment).to be_valid
+
+      segment.flair_text_property = "plan_tier"
+      expect(segment).to be_invalid
+      segment.flair_text_property = "company.plan_tier"
+      expect(segment).to be_valid
+
+      segment.flair_properties = %w[company.plan_tier company.plan_tier]
+      expect(segment).to be_invalid
+      segment.flair_properties = ["jobtitle"]
+      expect(segment).to be_invalid
+      segment.flair_properties = (1..11).map { |index| "contact.property_#{index}" }
+      expect(segment).to be_invalid
+      segment.flair_properties = %w[contact.jobtitle company.plan_tier]
+      expect(segment).to be_valid
+
+      segment.flair_enabled = false
+      segment.flair_group_ids = []
+      segment.flair_properties = ["jobtitle"]
+      expect(segment).to be_invalid
+    end
+
+    it "rejects the everyone and anonymous groups and duplicate groups" do
+      segment = Fabricate.build(:crm_segment, configuration:, flair_enabled: true)
+
+      segment.flair_group_ids = [Group::AUTO_GROUPS[:everyone]]
+      expect(segment).to be_invalid
+      segment.flair_group_ids = [Group::AUTO_GROUPS[:anonymous_users]]
+      expect(segment).to be_invalid
+      segment.flair_group_ids = [group.id, group.id]
+      expect(segment).to be_invalid
+      segment.flair_group_ids = [Group::AUTO_GROUPS[:trust_level_1], group.id]
+      expect(segment).to be_valid
+    end
+
+    it "keeps a stored group that was deleted but rejects adding an unknown group" do
+      other = Fabricate(:group)
+      segment =
+        Fabricate(:crm_segment, configuration:, flair_enabled: true, flair_group_ids: [other.id])
+      other.destroy!
+
+      segment.reload.name = "Renamed"
+      expect(segment).to be_valid
+      segment.flair_group_ids = [other.id, group.id]
+      expect(segment).to be_valid
+      segment.flair_group_ids = [other.id, other.id + 1000]
+      expect(segment).to be_invalid
+    end
+  end
+
+  describe "group destruction" do
+    it "drops the group from the sync target but keeps it in the flair groups" do
+      other = Fabricate(:group)
+      segment =
+        Fabricate(
+          :crm_segment,
+          configuration:,
+          group_id: group.id,
+          remove_unmatched: true,
+          flair_enabled: true,
+          flair_group_ids: [group.id, other.id],
+        )
+
+      group.destroy!
+
+      expect(segment.reload).to have_attributes(
+        group_id: nil,
+        remove_unmatched: false,
+        flair_group_ids: [group.id, other.id],
+      )
+    end
+  end
+
+  describe "#missing_flair_properties" do
+    it "lists the flair text and tooltip properties the pull does not keep while the flair is on" do
+      segment =
+        Fabricate.build(
+          :crm_segment,
+          configuration:,
+          flair_enabled: true,
+          flair_group_ids: [group.id],
+          flair_text_property: "contact.lifecyclestage",
+          flair_properties: %w[company.plan_tier company.domain],
+        )
+      pulled = [{ object: "company", name: "plan_tier" }]
+
+      expect(segment.missing_flair_properties(pulled)).to eq(
+        %w[contact.lifecyclestage company.domain],
+      )
+      segment.flair_enabled = false
+      expect(segment.missing_flair_properties(pulled)).to be_empty
+    end
+  end
+
   describe "#missing_properties" do
     it "lists condition properties the pull does not keep" do
       segment =

@@ -174,6 +174,52 @@ RSpec.describe Jobs::Hubspot::SyncConfiguration do
     )
   end
 
+  it "refreshes the stored property labels on the first page of a run only" do
+    stub_request(:get, hubspot_url("properties/contacts")).to_return(
+      body: {
+        results: [
+          {
+            name: "lifecyclestage",
+            label: "Lifecycle stage",
+            type: "enumeration",
+            options: [{ value: "lead", label: "Lead" }],
+          },
+          { name: "jobtitle", label: "Job title", type: "string" },
+        ],
+      }.to_json,
+    )
+    stub_hubspot_contact_list([hubspot_contact(501, "ada@example.com")], after: "100")
+
+    described_class.new.execute(configuration_id: configuration.id, reason: "backfill")
+
+    expect(configuration.reload.property_metadata).to eq(
+      "contact" => {
+        "lifecyclestage" => {
+          "label" => "Lifecycle stage",
+          "options" => {
+            "lead" => "Lead",
+          },
+        },
+        "jobtitle" => {
+          "label" => "Job title",
+          "options" => {
+          },
+        },
+      },
+    )
+
+    configuration.update_columns(property_metadata: {})
+    stub_hubspot_contact_list([], query: { after: "100" })
+    described_class.new.execute(enqueued_args.first.symbolize_keys)
+
+    expect(configuration.reload.property_metadata).to eq({})
+    expect(a_request(:get, hubspot_url("properties/contacts"))).to have_been_made.once
+
+    described_class.new.execute(configuration_id: configuration.id, reason: "backfill")
+
+    expect(a_request(:get, hubspot_url("properties/contacts"))).to have_been_made.twice
+  end
+
   it "lists every contact on backfill, follows the cursor and records the run start as the sync time" do
     freeze_time Time.utc(2026, 11, 2, 12)
     started_at = Time.zone.now
@@ -389,6 +435,8 @@ RSpec.describe Jobs::Hubspot::SyncConfiguration do
         mappings: [{ "id" => 1, "object" => "company", "source" => "name" }],
       )
     end
+
+    before { stub_hubspot_properties(%w[name], object: "company") }
 
     def reference_companies(count)
       DiscourseCrm::Record.store_many!(

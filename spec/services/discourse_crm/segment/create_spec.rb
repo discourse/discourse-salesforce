@@ -41,6 +41,10 @@ RSpec.describe DiscourseCrm::Segment::Create do
         },
         group_id: group.id,
         remove_unmatched: true,
+        flair_enabled: true,
+        flair_text_property: "company.plan_tier",
+        flair_properties: ["company.plan_tier"],
+        flair_group_ids: [group.id],
       }
     end
     let(:dependencies) { { guardian: admin.guardian } }
@@ -98,6 +102,30 @@ RSpec.describe DiscourseCrm::Segment::Create do
       it { is_expected.to fail_a_policy(:properties_are_pulled) }
     end
 
+    context "when the flair group ids are not integers" do
+      let(:params) { super().merge(flair_group_ids: ["abc"]) }
+
+      it { is_expected.to fail_a_contract }
+    end
+
+    context "when the flair properties are not strings" do
+      let(:params) { super().merge(flair_properties: ["1"]) }
+
+      it { is_expected.to fail_a_contract }
+    end
+
+    context "when the flair uses a property the pull does not keep" do
+      let(:params) do
+        super().merge(
+          flair_enabled: true,
+          flair_group_ids: [group.id],
+          flair_properties: ["contact.jobtitle"],
+        )
+      end
+
+      it { is_expected.to fail_a_policy(:properties_are_pulled) }
+    end
+
     context "when everything is ok" do
       it { is_expected.to run_successfully }
 
@@ -108,6 +136,10 @@ RSpec.describe DiscourseCrm::Segment::Create do
           name: "Enterprise customers",
           group_id: group.id,
           remove_unmatched: true,
+          flair_enabled: true,
+          flair_text_property: "company.plan_tier",
+          flair_properties: ["company.plan_tier"],
+          flair_group_ids: [group.id],
           conditions: {
             "all" => [
               {
@@ -123,6 +155,19 @@ RSpec.describe DiscourseCrm::Segment::Create do
         expect(
           Jobs::DiscourseCrm::EvaluateSegments.jobs.map { |job| job["args"].first },
         ).to contain_exactly(hash_including("configuration_id" => configuration.id))
+      end
+    end
+
+    context "when the flair is off" do
+      let(:params) { super().merge(flair_enabled: false) }
+
+      it "stores no flair text or tooltip properties" do
+        expect(result[:segment]).to have_attributes(
+          flair_enabled: false,
+          flair_text_property: nil,
+          flair_properties: [],
+          flair_group_ids: [group.id],
+        )
       end
     end
   end

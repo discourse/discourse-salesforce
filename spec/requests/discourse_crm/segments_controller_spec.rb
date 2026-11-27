@@ -30,6 +30,15 @@ RSpec.describe DiscourseCrm::SegmentsController do
         { "id" => 1, "object" => "contact", "source" => "jobtitle" },
         { "id" => 2, "object" => "company", "source" => "plan_tier" },
       ],
+      property_metadata: {
+        "contact" => {
+          "jobtitle" => {
+            "label" => "Job title",
+            "options" => {
+            },
+          },
+        },
+      },
     )
   end
 
@@ -59,6 +68,10 @@ RSpec.describe DiscourseCrm::SegmentsController do
             "group_id" => group.id,
             "group_name" => "enterprise",
             "remove_unmatched" => true,
+            "flair_enabled" => false,
+            "flair_text_property" => nil,
+            "flair_properties" => [],
+            "flair_group_ids" => [],
             "member_count" => 1,
             "last_evaluated_at" => nil,
             "connection_changed" => false,
@@ -76,21 +89,31 @@ RSpec.describe DiscourseCrm::SegmentsController do
             "configuration_id" => configuration.id,
             "object" => "contact",
             "name" => "jobtitle",
-            "label" => "Jobtitle",
+            "label" => "Job title",
           },
           {
             "id" => "company.plan_tier",
             "configuration_id" => configuration.id,
             "object" => "company",
             "name" => "plan_tier",
-            "label" => "Plan tier",
+            "label" => "plan_tier",
           },
         ],
       )
-      expect(response.parsed_body["groups"].map { |item| item["name"] }).to include("enterprise")
-      expect(response.parsed_body["groups"].map { |item| item["id"] }).not_to include(
-        *Group::AUTO_GROUP_IDS.keys,
+      expect(response.parsed_body["groups"]).to include(
+        { "id" => group.id, "name" => "enterprise", "user_count" => 0, "automatic" => false },
+        {
+          "id" => Group::AUTO_GROUPS[:admins],
+          "name" => "admins",
+          "user_count" => 1,
+          "automatic" => true,
+        },
       )
+      expect(response.parsed_body["groups"].map { |item| item["id"] }).not_to include(
+        Group::AUTO_GROUPS[:everyone],
+        Group::AUTO_GROUPS[:anonymous_users],
+      )
+      expect(a_request(:get, hubspot_url("properties/contacts"))).not_to have_been_made
     end
 
     it "flags a segment whose pull was configured under a previous portal" do
@@ -106,8 +129,7 @@ RSpec.describe DiscourseCrm::SegmentsController do
       )
     end
 
-    it "falls back to property names and flags stale conditions when HubSpot is unreachable" do
-      stub_request(:get, hubspot_url("properties/companies")).to_return(status: 500)
+    it "flags a segment whose conditions use a property that is no longer pulled" do
       segment =
         Fabricate(
           :crm_segment,
@@ -122,9 +144,6 @@ RSpec.describe DiscourseCrm::SegmentsController do
       get "/salesforce/admin/guided-sync/segments.json"
 
       expect(response.status).to eq(200)
-      expect(response.parsed_body["properties"].map { |item| item["label"] }).to eq(
-        %w[jobtitle plan_tier],
-      )
       expect(response.parsed_body["segments"].first).to include(
         "id" => segment.id,
         "missing_properties" => ["contact.city"],
@@ -165,6 +184,10 @@ RSpec.describe DiscourseCrm::SegmentsController do
              conditions:,
              group_id: group.id,
              remove_unmatched: true,
+             flair_enabled: true,
+             flair_text_property: "company.plan_tier",
+             flair_properties: %w[contact.jobtitle company.plan_tier],
+             flair_group_ids: [group.id, Group::AUTO_GROUPS[:admins]],
            },
            as: :json
 
@@ -173,6 +196,10 @@ RSpec.describe DiscourseCrm::SegmentsController do
         "name" => "Enterprise",
         "group_name" => "enterprise",
         "remove_unmatched" => true,
+        "flair_enabled" => true,
+        "flair_text_property" => "company.plan_tier",
+        "flair_properties" => %w[contact.jobtitle company.plan_tier],
+        "flair_group_ids" => [group.id, Group::AUTO_GROUPS[:admins]],
         "member_count" => 0,
         "missing_properties" => [],
       )

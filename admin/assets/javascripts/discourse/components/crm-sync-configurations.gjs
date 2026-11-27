@@ -470,6 +470,7 @@ export default class CrmSyncConfigurations extends Component {
         {{#if this.segmentsEnabled}}
           <CrmSegments
             @configurations={{@segmentConfigurations}}
+            @groups={{@segmentGroups}}
             @properties={{@segmentProperties}}
             @segments={{this.segments}}
             @onAdd={{if this.canDefineSegments this.addSegment}}

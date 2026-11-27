@@ -11,15 +11,18 @@ import DButton from "discourse/ui-kit/d-button";
 import DMultiSelect from "discourse/ui-kit/d-multi-select";
 import { i18n } from "discourse-i18n";
 import CrmCreateGroupModal from "discourse/plugins/discourse-salesforce/discourse/components/crm-create-group-modal";
+import CrmFlair from "discourse/plugins/discourse-salesforce/discourse/components/crm-flair";
 import SyncConfigurationHeading from "discourse/plugins/discourse-salesforce/discourse/components/sync-configuration-heading";
 import {
   conditionNeedsValue,
   conditionsPayload,
   configurationProperties,
+  flairGroups,
   OPERATORS,
   previewSegment,
   propertyLabel,
 } from "discourse/plugins/discourse-salesforce/discourse/lib/crm-segments";
+import { providerIcon } from "discourse/plugins/discourse-salesforce/discourse/lib/sync-configuration";
 
 const PREFIX = "salesforce.guided_sync.segments";
 const PREVIEW_DELAY = 300;
@@ -75,6 +78,34 @@ export default class CrmSegmentEditor extends Component {
     return group ? [group] : [];
   }
 
+  get selectedFlairGroups() {
+    return flairGroups(this.segment.flair_group_ids, this.groups);
+  }
+
+  get selectedFlairProperties() {
+    return this.segment.flair_properties
+      .map((id) => this.properties.find((item) => item.id === id))
+      .filter(Boolean);
+  }
+
+  get flairPreview() {
+    const provider = this.args.configurations.find(
+      (item) => String(item.id) === String(this.segment.configuration_id)
+    )?.provider;
+    const textProperty = this.properties.find(
+      (item) => item.id === this.segment.flair_text_property
+    );
+    return {
+      provider,
+      icon: providerIcon(provider),
+      text: textProperty?.shortLabel || this.title,
+      properties: this.selectedFlairProperties.map((property) => ({
+        label: property.shortLabel,
+        value: i18n(`${PREFIX}.flair_preview_value`),
+      })),
+    };
+  }
+
   get configurationProperties() {
     return configurationProperties(
       this.args.properties,
@@ -117,6 +148,7 @@ export default class CrmSegmentEditor extends Component {
   get properties() {
     return this.configurationProperties.map((property) => ({
       ...property,
+      shortLabel: property.label,
       label: i18n(`${PREFIX}.property_option`, {
         object: i18n(`${PREFIX}.objects.${property.object}`, {
           defaultValue: property.object,
@@ -184,9 +216,32 @@ export default class CrmSegmentEditor extends Component {
   @action
   async findGroups(query) {
     const term = (query || "").toLowerCase();
+    return this.groups.filter(
+      (group) => !group.automatic && group.name.toLowerCase().includes(term)
+    );
+  }
+
+  @action
+  async findFlairGroups(query) {
+    const term = (query || "").toLowerCase();
     return this.groups.filter((group) =>
       group.name.toLowerCase().includes(term)
     );
+  }
+
+  @action
+  async findFlairProperties(query) {
+    const term = (query || "").toLowerCase();
+    return this.properties.filter(
+      (property) =>
+        property.label.toLowerCase().includes(term) ||
+        property.name.toLowerCase().includes(term)
+    );
+  }
+
+  @action
+  compareProperties(a, b) {
+    return a.id === b.id;
   }
 
   @action
@@ -204,6 +259,20 @@ export default class CrmSegmentEditor extends Component {
     const groupId = group ? group.id : null;
     this.#form?.set("group_id", groupId);
     this.segment = { ...this.segment, group_id: groupId };
+  }
+
+  @action
+  selectFlairGroups(groups) {
+    const ids = groups.map((group) => group.id);
+    this.#form?.set("flair_group_ids", ids);
+    this.segment = { ...this.segment, flair_group_ids: ids };
+  }
+
+  @action
+  selectFlairProperties(properties) {
+    const ids = properties.map((property) => property.id);
+    this.#form?.set("flair_properties", ids);
+    this.segment = { ...this.segment, flair_properties: ids };
   }
 
   @action
@@ -610,6 +679,133 @@ export default class CrmSegmentEditor extends Component {
               >
                 <field.Control />
               </form.Field>
+            {{/if}}
+          </div>
+        </section>
+
+        <section
+          class="crm-segment-editor__section"
+          aria-labelledby="crm-segment-flair-title"
+        >
+          <h3 id="crm-segment-flair-title">{{i18n
+              "salesforce.guided_sync.segments.flair_title"
+            }}</h3>
+          <p class="crm-segment-editor__description">{{i18n
+              "salesforce.guided_sync.segments.flair_description"
+            }}</p>
+          <div class="crm-segment-editor__group-fields">
+            <form.Field
+              @format="full"
+              @name="flair_enabled"
+              @onSet={{this.setField}}
+              @title={{i18n "salesforce.guided_sync.segments.show_flair"}}
+              @type="checkbox"
+              as |field|
+            >
+              <field.Control />
+            </form.Field>
+            {{#if this.segment.flair_enabled}}
+              <form.Field
+                class="crm-segment-editor__flair-text"
+                @format="large"
+                @helpText={{i18n
+                  "salesforce.guided_sync.segments.flair_text_help"
+                }}
+                @name="flair_text_property"
+                @onSet={{this.setField}}
+                @showOptional={{false}}
+                @title={{i18n "salesforce.guided_sync.segments.flair_text"}}
+                @type="select"
+                as |field|
+              >
+                <field.Control
+                  @includeNone={{true}}
+                  @nonePlaceholder={{i18n
+                    "salesforce.guided_sync.segments.flair_segment_name"
+                  }}
+                  as |select|
+                >
+                  {{#each this.properties key="id" as |property|}}
+                    <select.Option
+                      @value={{property.id}}
+                    >{{property.label}}</select.Option>
+                  {{/each}}
+                </field.Control>
+              </form.Field>
+              <form.Field
+                class="crm-segment-editor__flair-properties"
+                @format="full"
+                @helpText={{i18n
+                  "salesforce.guided_sync.segments.flair_properties_help"
+                }}
+                @name="flair_properties"
+                @showOptional={{false}}
+                @title={{i18n
+                  "salesforce.guided_sync.segments.flair_properties"
+                }}
+                @type="custom"
+                as |field|
+              >
+                <field.Control>
+                  <DMultiSelect
+                    @compareFn={{this.compareProperties}}
+                    @label={{i18n
+                      "salesforce.guided_sync.segments.choose_flair_properties"
+                    }}
+                    @loadFn={{this.findFlairProperties}}
+                    @matchTriggerWidth={{true}}
+                    @onChange={{this.selectFlairProperties}}
+                    @selection={{this.selectedFlairProperties}}
+                  >
+                    <:selection
+                      as |property|
+                    >{{property.shortLabel}}</:selection>
+                    <:result as |property|>
+                      <span class="crm-segment-editor__property-label">
+                        {{property.label}}
+                        <code>{{property.name}}</code>
+                      </span>
+                    </:result>
+                  </DMultiSelect>
+                </field.Control>
+              </form.Field>
+              <form.Field
+                class="crm-segment-editor__flair-groups"
+                @format="full"
+                @helpText={{i18n
+                  "salesforce.guided_sync.segments.flair_groups_help"
+                }}
+                @name="flair_group_ids"
+                @showOptional={{false}}
+                @title={{i18n "salesforce.guided_sync.segments.flair_groups"}}
+                @type="custom"
+                as |field|
+              >
+                <field.Control>
+                  <DMultiSelect
+                    @compareFn={{this.compareGroups}}
+                    @label={{i18n
+                      "salesforce.guided_sync.segments.choose_flair_groups"
+                    }}
+                    @loadFn={{this.findFlairGroups}}
+                    @matchTriggerWidth={{true}}
+                    @onChange={{this.selectFlairGroups}}
+                    @selection={{this.selectedFlairGroups}}
+                  >
+                    <:selection as |group|>{{group.name}}</:selection>
+                    <:result as |group|>{{group.name}}</:result>
+                  </DMultiSelect>
+                </field.Control>
+              </form.Field>
+              <div
+                class="crm-segment-editor__flair-preview"
+                data-test-flair-preview
+              >
+                <span class="crm-segment-editor__description">{{i18n
+                    "salesforce.guided_sync.segments.flair_preview"
+                  }}</span>
+                <CrmFlair @flair={{this.flairPreview}} />
+              </div>
             {{/if}}
           </div>
         </section>

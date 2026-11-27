@@ -10,3 +10,67 @@
   width: 16px;
   height: 16px;
 }
+
+.crm-flair,
+.crm-flair__tooltip {
+  --crm-flair-color: var(--tertiary);
+
+  &.--hubspot {
+    --crm-flair-color: light-dark(#ff7a59, #ff9a7f);
+  }
+}
+
+.crm-flair {
+  display: inline-flex;
+  margin-inline-start: var(--space-1);
+  color: var(--crm-flair-color);
+  font-size: var(--font-down-1);
+
+  &__chip {
+    display: inline-flex;
+    align-items: center;
+    gap: var(--space-1);
+    cursor: default;
+
+    .d-icon {
+      color: var(--crm-flair-color);
+    }
+  }
+
+  &__text {
+    font-weight: var(--token-font-weight-medium);
+  }
+
+  &__tooltip {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-3);
+    min-width: 10em;
+    padding: var(--space-1);
+  }
+
+  &__row {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-1);
+  }
+
+  &__label {
+    color: var(--primary-medium);
+    font-size: var(--font-down-2);
+    letter-spacing: 0.05em;
+    text-transform: uppercase;
+  }
+
+  &__value {
+    color: var(--primary);
+    overflow-wrap: anywhere;
+  }
+
+  &__link {
+    display: inline-flex;
+    align-items: center;
+    gap: var(--space-1);
+    color: var(--crm-flair-color);
+  }
+}

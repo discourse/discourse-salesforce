@@ -9,6 +9,11 @@ module DiscourseCrm
     VALUELESS_OPERATORS = %w[set not_set].freeze
     CONDITION_KEYS = %w[id object property operator value].freeze
     MAX_CONDITIONS = 20
+    MAX_FLAIR_PROPERTIES = 10
+    UNSUPPORTED_FLAIR_GROUP_IDS = [
+      Group::AUTO_GROUPS[:everyone],
+      Group::AUTO_GROUPS[:anonymous_users],
+    ].freeze
     MAX_NAME_LENGTH = 60
     MAX_VALUE_LENGTH = 255
 
@@ -22,6 +27,9 @@ module DiscourseCrm
     validate :configuration_is_a_pull
     validate :conditions_shape
     validate :group_shape
+    validate :flair_shape
+
+    scope :with_flair, -> { where(flair_enabled: true) }
 
     def conditions=(value)
       super(value.is_a?(Hash) ? value.deep_stringify_keys : value)
@@ -46,6 +54,20 @@ module DiscourseCrm
         .map { |condition| property_id(condition["object"], condition["property"]) }
         .uniq
         .reject { |id| pulled_ids.include?(id) }
+    end
+
+    def flair_property_ids
+      return [] unless flair_enabled
+      [flair_text_property, *flair_properties].compact.uniq
+    end
+
+    def flair_visible_to?(user)
+      flair_group_ids.empty? || (user.present? && user.in_any_groups?(flair_group_ids))
+    end
+
+    def missing_flair_properties(pulled)
+      pulled_ids = pulled.map { |property| property_id(property[:object], property[:name]) }
+      flair_property_ids.reject { |id| pulled_ids.include?(id) }
     end
 
     def matches?(records)
@@ -129,6 +151,29 @@ module DiscourseCrm
         errors.add(:remove_unmatched, :requires_group)
       end
     end
+
+    def flair_shape
+      unless flair_text_property.nil? || property_id?(flair_text_property)
+        errors.add(:flair_text_property, :invalid)
+      end
+      unless flair_properties.is_a?(Array) && flair_properties.all? { |id| property_id?(id) } &&
+               flair_properties.uniq.size == flair_properties.size
+        errors.add(:flair_properties, :invalid)
+      end
+      if flair_properties.is_a?(Array) && flair_properties.size > MAX_FLAIR_PROPERTIES
+        errors.add(:flair_properties, :too_many, count: MAX_FLAIR_PROPERTIES)
+      end
+      ids = Array(flair_group_ids)
+      added = ids - Array(flair_group_ids_in_database)
+      if ids.any? { |id| !id.is_a?(Integer) || UNSUPPORTED_FLAIR_GROUP_IDS.include?(id) } ||
+           ids.uniq.size != ids.size || Group.where(id: added).count != added.size
+        errors.add(:flair_group_ids, :invalid)
+      end
+    end
+
+    def property_id?(value)
+      value.is_a?(String) && value.match?(/\A[^.\s]+\.\S+\z/)
+    end
   end
 end
 
@@ -136,15 +181,19 @@ end
 #
 # Table name: crm_segments
 #
-#  id                :bigint           not null, primary key
-#  conditions        :jsonb            not null
-#  last_evaluated_at :datetime
-#  name              :string           not null
-#  remove_unmatched  :boolean          default(FALSE), not null
-#  created_at        :datetime         not null
-#  updated_at        :datetime         not null
-#  configuration_id  :bigint           not null
-#  group_id          :integer
+#  id                  :bigint           not null, primary key
+#  conditions          :jsonb            not null
+#  flair_enabled       :boolean          default(FALSE), not null
+#  flair_group_ids     :integer          default([]), not null, is an Array
+#  flair_properties    :jsonb            not null
+#  flair_text_property :string
+#  last_evaluated_at   :datetime
+#  name                :string           not null
+#  remove_unmatched    :boolean          default(FALSE), not null
+#  created_at          :datetime         not null
+#  updated_at          :datetime         not null
+#  configuration_id    :bigint           not null
+#  group_id            :integer
 #
 # Indexes
 #

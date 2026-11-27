@@ -37,8 +37,13 @@ module ::Hubspot
         end
     end
 
-    def self.property_labels(object)
-      Api.cached_properties(object).to_h { |property| [property[:name], property[:label]] }
+    def self.property_metadata(object, names, refresh: false)
+      Api
+        .cached_properties(object, refresh:)
+        .select { |property| names.include?(property[:name]) }
+        .to_h do |property|
+          [property[:name], { "label" => property[:label], "options" => property[:options] }]
+        end
     end
 
     def self.configuration_job

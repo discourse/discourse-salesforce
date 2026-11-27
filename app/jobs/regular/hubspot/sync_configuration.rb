@@ -27,6 +27,7 @@ module Jobs
         if args[:companies_after]
           return refresh_companies(configuration, import, args, next_args, started_at)
         end
+        configuration.refresh_property_metadata!(refresh: true) if args[:after].blank?
         since = search_window(configuration, args)
         page =
           if since

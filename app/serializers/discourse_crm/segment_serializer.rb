@@ -10,6 +10,10 @@ module DiscourseCrm
                :group_id,
                :group_name,
                :remove_unmatched,
+               :flair_enabled,
+               :flair_text_property,
+               :flair_properties,
+               :flair_group_ids,
                :member_count,
                :last_evaluated_at,
                :connection_changed,
@@ -33,7 +37,8 @@ module DiscourseCrm
     end
 
     def missing_properties
-      object.missing_properties(object.configuration.pulled_properties)
+      pulled = object.configuration.pulled_properties
+      object.missing_properties(pulled) | object.missing_flair_properties(pulled)
     end
   end
 end

@@ -253,6 +253,90 @@ RSpec.describe DiscourseCrm::SyncConfiguration do
       end
     end
 
+    it "stores the labels of the mapped properties when saved and refreshed" do
+      stub_request(:get, hubspot_url("properties/contacts")).to_return(
+        body: {
+          results: [
+            {
+              name: "lifecyclestage",
+              label: "Lifecycle stage",
+              type: "enumeration",
+              options: [{ value: "lead", label: "Lead" }, { value: "customer", label: "Customer" }],
+            },
+            { name: "jobtitle", label: "Job title", type: "string" },
+            { name: "city", label: "City", type: "string" },
+          ],
+        }.to_json,
+      )
+      params = {
+        provider: "hubspot",
+        direction: "inbound",
+        kind: "users",
+        object: "contact",
+        name: "Import contacts",
+        schedule: "weekly",
+        backfill: true,
+        mappings: [
+          { id: 1, object: "contact", source: "lifecyclestage" },
+          { id: 2, object: "contact", source: "jobtitle" },
+        ],
+      }
+
+      record =
+        described_class.create_or_update!(params, id: nil, guardian: Fabricate(:admin).guardian)
+
+      expect(record.reload.property_metadata).to eq(
+        "contact" => {
+          "lifecyclestage" => {
+            "label" => "Lifecycle stage",
+            "options" => {
+              "lead" => "Lead",
+              "customer" => "Customer",
+            },
+          },
+          "jobtitle" => {
+            "label" => "Job title",
+            "options" => {
+            },
+          },
+        },
+      )
+      expect(record.property_label("contact", "lifecyclestage")).to eq("Lifecycle stage")
+      expect(record.property_label("contact", "city")).to eq("city")
+      expect(record.value_label("contact", "lifecyclestage", "lead")).to eq("Lead")
+      expect(record.value_label("contact", "lifecyclestage", "other")).to eq("other")
+      expect(record.value_label("contact", "jobtitle", "CTO")).to eq("CTO")
+
+      stub_request(:get, hubspot_url("properties/contacts")).to_return(status: 500)
+      record.refresh_property_metadata!
+      expect(record.reload.property_metadata.dig("contact", "jobtitle", "label")).to eq("Job title")
+
+      Rails.cache.clear
+      stub_request(:get, hubspot_url("properties/contacts")).to_return(
+        body: {
+          results: [
+            { name: "lifecyclestage", label: "Stage", type: "string" },
+            { name: "jobtitle", label: "Title", type: "string" },
+          ],
+        }.to_json,
+      )
+      record.refresh_property_metadata!
+      expect(record.reload.property_metadata).to eq(
+        "contact" => {
+          "lifecyclestage" => {
+            "label" => "Stage",
+            "options" => {
+            },
+          },
+          "jobtitle" => {
+            "label" => "Title",
+            "options" => {
+            },
+          },
+        },
+      )
+    end
+
     it "lists the properties its mappings keep" do
       hubspot =
         Fabricate(

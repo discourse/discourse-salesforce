@@ -113,48 +113,35 @@ module DiscourseCrm
     end
 
     def render_property_not_pulled(segment, pulled_properties)
+      missing =
+        segment.missing_properties(pulled_properties) +
+          segment.missing_flair_properties(pulled_properties)
       render_json_error(
-        I18n.t(
-          "salesforce.segments.errors.property_not_pulled",
-          property: segment.missing_properties(pulled_properties).first,
-        ),
+        I18n.t("salesforce.segments.errors.property_not_pulled", property: missing.first),
         status: :unprocessable_entity,
       )
     end
 
     def available_properties(configurations)
       configurations.flat_map do |configuration|
-        properties = configuration.pulled_properties
-        labels = property_labels(configuration.provider_definition, properties)
-        properties.map do |property|
+        configuration.pulled_properties.map do |property|
           {
             id: "#{property[:object]}.#{property[:name]}",
             configuration_id: configuration.id,
             object: property[:object],
             name: property[:name],
-            label: labels.dig(property[:object], property[:name]) || property[:name],
+            label: configuration.property_label(property[:object], property[:name]),
           }
         end
       end
     end
 
-    def property_labels(definition, properties)
-      flow = definition.flow("inbound", "users")
-      return {} if flow.nil?
-      properties
-        .map { |property| property[:object] }
-        .uniq
-        .to_h { |object| [object, flow.property_labels(object)] }
-    rescue ::Hubspot::InvalidCredentials, ::Hubspot::InvalidApiResponse, Faraday::Error
-      {}
-    end
-
     def available_groups
       Group
-        .where(automatic: false)
+        .where.not(id: Segment::UNSUPPORTED_FLAIR_GROUP_IDS)
         .order(:name)
-        .pluck(:id, :name, :user_count)
-        .map { |id, name, user_count| { id:, name:, user_count: } }
+        .pluck(:id, :name, :user_count, :automatic)
+        .map { |id, name, user_count, automatic| { id:, name:, user_count:, automatic: } }
     end
   end
 end

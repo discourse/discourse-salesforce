@@ -1,6 +1,7 @@
 export default {
   enabledSetting: "hubspot_enabled",
   name: "HubSpot",
+  icon: "fab-hubspot",
   emailField: "email",
   metadataUrl: "/salesforce/admin/hubspot/properties.json",
   targets: {

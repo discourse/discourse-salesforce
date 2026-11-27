@@ -16,6 +16,10 @@ export function providerLabel(id) {
   return providers.get(id)?.name ?? id;
 }
 
+export function providerIcon(id) {
+  return providers.get(id)?.icon;
+}
+
 export function guidedSyncEnabled(siteSettings) {
   return (
     siteSettings.enable_guided_sync_configuration &&

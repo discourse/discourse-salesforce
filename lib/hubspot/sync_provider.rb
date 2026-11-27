@@ -2,8 +2,18 @@
 
 module ::Hubspot
   class SyncProvider
+    OBJECT_TYPE_IDS = { "contact" => "0-1", "company" => "0-2" }.freeze
+
     def self.key
       "hubspot"
+    end
+
+    def self.icon
+      "fab-hubspot"
+    end
+
+    def self.record_url(record)
+      "https://app.hubspot.com/contacts/#{record.account}/record/#{OBJECT_TYPE_IDS.fetch(record.object)}/#{record.external_id}"
     end
 
     def self.failure_reason_class

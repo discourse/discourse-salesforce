@@ -12,6 +12,7 @@ import { i18n } from "discourse-i18n";
 import {
   configurationProperties,
   describeConditions,
+  flairVisibility,
   propertyLabel,
 } from "discourse/plugins/discourse-salesforce/discourse/lib/crm-segments";
 
@@ -29,6 +30,10 @@ export default class CrmSegments extends Component {
       return {
         ...segment,
         conditions: describeConditions(segment, properties),
+        flair: segment.flair_enabled
+          ? flairVisibility(segment, this.args.groups) ||
+            i18n(`${PREFIX}.flair_everyone`)
+          : "",
         missingProperty:
           segment.missing_properties[0] &&
           propertyLabel(segment.missing_properties[0], properties),
@@ -72,6 +77,7 @@ export default class CrmSegments extends Component {
                   "salesforce.guided_sync.segments.columns.conditions"
                 }}</th>
               <th>{{i18n "salesforce.guided_sync.segments.columns.group"}}</th>
+              <th>{{i18n "salesforce.guided_sync.segments.columns.flair"}}</th>
               <th>{{i18n
                   "salesforce.guided_sync.segments.columns.members"
                 }}</th>
@@ -135,6 +141,15 @@ export default class CrmSegments extends Component {
                       class="crm-segments__muted"
                     >{{i18n
                         "salesforce.guided_sync.segments.no_group"
+                      }}</span>{{/if}}</td>
+                <td class="d-table__cell --detail" data-test-segment-flair><div
+                    class="d-table__mobile-label"
+                  >{{i18n
+                      "salesforce.guided_sync.segments.columns.flair"
+                    }}</div>{{#if segment.flair}}{{segment.flair}}{{else}}<span
+                      class="crm-segments__muted"
+                    >{{i18n
+                        "salesforce.guided_sync.segments.no_flair"
                       }}</span>{{/if}}</td>
                 <td class="d-table__cell --detail"><div
                     class="d-table__mobile-label"

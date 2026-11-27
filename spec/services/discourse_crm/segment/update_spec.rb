@@ -91,6 +91,30 @@ RSpec.describe DiscourseCrm::Segment::Update do
       it { is_expected.to fail_a_policy(:properties_are_pulled) }
     end
 
+    context "when the flair group ids are not integers" do
+      let(:params) { super().merge(flair_group_ids: ["abc"]) }
+
+      it { is_expected.to fail_a_contract }
+    end
+
+    context "when the flair properties are not strings" do
+      let(:params) { super().merge(flair_properties: ["1"]) }
+
+      it { is_expected.to fail_a_contract }
+    end
+
+    context "when the flair uses a property the pull does not keep" do
+      let(:params) do
+        super().merge(
+          flair_enabled: true,
+          flair_group_ids: [new_group.id],
+          flair_properties: ["contact.jobtitle"],
+        )
+      end
+
+      it { is_expected.to fail_a_policy(:properties_are_pulled) }
+    end
+
     context "when everything is ok" do
       it { is_expected.to run_successfully }
 

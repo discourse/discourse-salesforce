@@ -23,7 +23,7 @@ module PageObjects
       end
 
       def has_property?(label, value)
-        has_css?("#{TOOLTIP} .crm-flair__row", text: label) &&
+        has_css?("#{TOOLTIP} .crm-flair__row", text: /#{Regexp.escape(label)}/i) &&
           has_css?("#{TOOLTIP} .crm-flair__row .crm-flair__value", exact_text: value)
       end
 

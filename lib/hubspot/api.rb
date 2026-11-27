@@ -164,8 +164,13 @@ module ::Hubspot
           label: property["label"],
           type: property["type"],
           group: property["groupName"],
+          options: option_labels(property),
         }
       end
+    end
+
+    def option_labels(property)
+      Array(property["options"]).to_h { |option| [option["value"].to_s, option["label"].to_s] }
     end
 
     def cached_writable_fields(object, refresh: false)

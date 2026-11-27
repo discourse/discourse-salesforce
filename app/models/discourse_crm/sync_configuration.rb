@@ -170,6 +170,7 @@ module DiscourseCrm
 
       flow.validate_mappings!(record)
       record.account = definition.account
+      record.refresh_property_metadata!
 
       previous_group_ids = record.persisted? ? record.group_ids.sort : []
       new_group_ids = groups.map(&:id).sort
@@ -320,6 +321,29 @@ module DiscourseCrm
       mappings.map { |mapping| { object: mapping["object"], name: mapping["source"] } }.uniq
     end
 
+    def refresh_property_metadata!(refresh: false)
+      return unless inbound?
+      metadata =
+        pulled_properties
+          .group_by { |property| property[:object] }
+          .to_h do |object, properties|
+            names = properties.map { |property| property[:name] }
+            [object, flow.property_metadata(object, names, refresh:)]
+          end
+      self.property_metadata = metadata
+      update_column(:property_metadata, metadata) if persisted?
+    rescue ::Hubspot::InvalidCredentials, ::Hubspot::InvalidApiResponse, Faraday::Error
+      nil
+    end
+
+    def property_label(object, name)
+      property_metadata.dig(object, name, "label").presence || name
+    end
+
+    def value_label(object, name, value)
+      property_metadata.dig(object, name, "options", value.to_s).presence || value
+    end
+
     def record_link_for(user_id)
       record_links.find_by(user_id:)
     end
@@ -391,6 +415,7 @@ end
 #  mappings          :jsonb            not null
 #  name              :string           not null
 #  object            :string           not null
+#  property_metadata :jsonb            not null
 #  provider          :string           not null
 #  schedule          :string           not null
 #  created_at        :datetime         not null

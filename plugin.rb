@@ -32,6 +32,7 @@ register_asset "stylesheets/common/salesforce-sync-configuration.scss", :admin
 add_admin_route "salesforce.title", "discourse-salesforce", use_new_show_route: true
 
 register_svg_icon "fab-salesforce"
+register_svg_icon "fab-hubspot"
 register_svg_icon "address-card"
 register_svg_icon "link-slash"
 
@@ -126,6 +127,8 @@ after_initialize do
   # rubocop:disable Discourse/Plugins/UsePluginInstanceOn
   DiscourseEvent.on(:user_anonymized) do |user:, **|
     DiscourseCrm::SyncAttempt.scrub_rejected_values(user.id)
+    DiscourseCrm::RecordLink.where(user_id: user.id, direction: "inbound").delete_all
+    DiscourseCrm::SegmentMember.where(user_id: user.id).delete_all
   end
 
   DiscourseEvent.on(:user_destroyed) do |user|
@@ -148,6 +151,39 @@ after_initialize do
       remove_unmatched: false,
     )
   end
+
+  TopicView.on_preload do |topic_view|
+    next unless SiteSetting.crm_segments_enabled
+    topic_view.set_preloaded_post_data(
+      :crm_flair,
+      DiscourseCrm::Flair.for_users(
+        topic_view.posts.map(&:user_id).compact.uniq,
+        guardian: topic_view.guardian,
+      ),
+    )
+  end
+
+  add_to_class(:guardian, :crm_flair_segments) do
+    @crm_flair_segments ||= DiscourseCrm::Flair.visible_segments(self)
+  end
+
+  add_to_class(:post_serializer, :crm_flair_payload) do
+    return @crm_flair_payload if defined?(@crm_flair_payload)
+    @crm_flair_payload =
+      if (preloaded = topic_view&.preloaded_post_data(:crm_flair))
+        preloaded[object.user_id]
+      else
+        DiscourseCrm::Flair.for_users([object.user_id], guardian: scope)[object.user_id]
+      end
+  end
+
+  add_to_serializer(
+    :post,
+    :crm_flair,
+    include_condition: -> do
+      SiteSetting.crm_segments_enabled && object.user_id.present? && crm_flair_payload.present?
+    end,
+  ) { crm_flair_payload }
 
   on(:user_removed_from_group) do |user, group, *args|
     DiscourseCrm::ConfigurationScheduler.enqueue_user(user, reason: "change", inbound: false)

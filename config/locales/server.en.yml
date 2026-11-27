@@ -130,6 +130,13 @@ en:
               taken: "is already targeted by another segment"
             remove_unmatched:
               requires_group: "needs a group to sync to"
+            flair_text_property:
+              invalid: "is not a pulled property"
+            flair_properties:
+              invalid: "must be a list of pulled properties"
+              too_many: "can have at most %{count} properties"
+            flair_group_ids:
+              invalid: "must only name groups that exist"
   dashboard:
     problem:
       salesforce_invalid_credentials: "There was an issue with the Salesforce credentials. Please confirm the validity of the Salesforce consumer key and client secret settings"

@@ -9,9 +9,13 @@ RSpec.describe "Define CRM segments" do
   fab!(:group) { Fabricate(:group, name: "enterprise-customers") }
   fab!(:enterprise_user) { Fabricate(:verified_user, username: "ada") }
   fab!(:business_user) { Fabricate(:verified_user, username: "grace") }
+  fab!(:enterprise_post) { Fabricate(:post, user: enterprise_user) }
 
   let(:segments_page) { PageObjects::Pages::CrmSegments.new }
   let(:group_members_page) { PageObjects::Pages::GroupMembers.new }
+  let(:topic_page) { PageObjects::Pages::Topic.new }
+  let(:flair) { PageObjects::Components::CrmFlair.new(enterprise_post) }
+  let(:admins) { Group.find(Group::AUTO_GROUPS[:admins]) }
 
   let!(:configuration) do
     Fabricate(
@@ -20,6 +24,22 @@ RSpec.describe "Define CRM segments" do
         { "id" => 1, "object" => "contact", "source" => "jobtitle" },
         { "id" => 2, "object" => "company", "source" => "plan_tier" },
       ],
+      property_metadata: {
+        "contact" => {
+          "jobtitle" => {
+            "label" => "Job title",
+            "options" => {
+            },
+          },
+        },
+        "company" => {
+          "plan_tier" => {
+            "label" => "Plan tier",
+            "options" => {
+            },
+          },
+        },
+      },
     )
   end
 
@@ -71,7 +91,7 @@ RSpec.describe "Define CRM segments" do
     sign_in(admin)
   end
 
-  it "lets an admin define a segment, see who it matches and keep a group in sync with it" do
+  it "lets an admin define a segment, see who it matches, keep a group in sync with it and flair its members" do
     segments_page.visit.define_segment
 
     expect(segments_page).to have_configuration(configuration)
@@ -84,9 +104,22 @@ RSpec.describe "Define CRM segments" do
     expect(segments_page).to have_preview("Matches 1 of 2 users with CRM data")
     expect(segments_page).to have_preview("ada")
 
-    segments_page.choose_group(group).enable_removal.save
+    segments_page.choose_group(group).enable_removal
+    segments_page
+      .enable_flair
+      .choose_flair_text("company.plan_tier")
+      .choose_flair_property("Job title")
+      .choose_flair_group(admins)
+    expect(segments_page).to have_flair_preview("Plan tier")
 
-    expect(segments_page).to have_segment("New segment", group: group, status: "pending")
+    segments_page.save
+
+    expect(segments_page).to have_segment(
+      "New segment",
+      group: group,
+      status: "pending",
+      flair: "admins",
+    )
 
     page.refresh
 
@@ -95,6 +128,7 @@ RSpec.describe "Define CRM segments" do
       configuration: configuration,
       group: group,
       status: "pending",
+      flair: "admins",
     )
 
     Jobs::DiscourseCrm::EvaluateSegments.new.execute(configuration_id: configuration.id)
@@ -110,11 +144,32 @@ RSpec.describe "Define CRM segments" do
     expect(segments_page).to have_match("any")
     expect(segments_page).to have_group(group)
     expect(segments_page).to have_removal_enabled
+    expect(segments_page).to have_flair_enabled
+    expect(segments_page).to have_flair_text("company.plan_tier")
+    expect(segments_page).to have_flair_group(admins)
 
     group_members_page.visit(group)
 
     expect(group_members_page).to have_member(enterprise_user)
     expect(group_members_page).to have_no_member(business_user)
+
+    topic_page.visit_topic(enterprise_post.topic)
+
+    expect(flair).to have_text("Enterprise")
+
+    flair.hover
+
+    expect(flair).to have_property("Job title", "CTO")
+    expect(flair).to have_crm_link(
+      "Open in HubSpot",
+      "https://app.hubspot.com/contacts/12345/record/0-1/500",
+    )
+
+    sign_in(business_user)
+    topic_page.visit_topic(enterprise_post.topic)
+
+    expect(topic_page).to have_post_number(enterprise_post.post_number)
+    expect(flair).to have_no_flair
   end
 
   it "lets an admin delete a segment from the list" do

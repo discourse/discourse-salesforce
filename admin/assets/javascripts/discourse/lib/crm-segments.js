@@ -26,6 +26,10 @@ export function createSegment(configurationId) {
     sync_group: true,
     group_id: null,
     remove_unmatched: false,
+    flair_enabled: false,
+    flair_text_property: "",
+    flair_properties: [],
+    flair_group_ids: [],
   };
 }
 
@@ -45,6 +49,10 @@ export function segmentForm(segment) {
     sync_group: !!segment.group_id,
     group_id: segment.group_id,
     remove_unmatched: segment.remove_unmatched,
+    flair_enabled: segment.flair_enabled,
+    flair_text_property: segment.flair_text_property || "",
+    flair_properties: segment.flair_properties,
+    flair_group_ids: segment.flair_group_ids,
   };
 }
 
@@ -72,7 +80,34 @@ export function segmentPayload(form) {
     conditions: conditionsPayload(form),
     group_id: form.sync_group ? form.group_id : null,
     remove_unmatched: form.sync_group && form.remove_unmatched,
+    ...flairPayload(form),
+    flair_group_ids: form.flair_group_ids,
   };
+}
+
+export function flairPayload(form) {
+  return {
+    flair_enabled: form.flair_enabled,
+    flair_text_property: form.flair_text_property || null,
+    flair_properties: form.flair_properties,
+  };
+}
+
+export function flairGroups(ids, groups) {
+  return ids.map(
+    (id) =>
+      groups.find((group) => String(group.id) === String(id)) || {
+        id,
+        name: i18n(`${PREFIX}.flair_deleted_group`, { id }),
+        deleted: true,
+      }
+  );
+}
+
+export function flairVisibility(segment, groups) {
+  return flairGroups(segment.flair_group_ids, groups)
+    .map((group) => group.name)
+    .join(", ");
 }
 
 export function configurationProperties(properties, configurationId) {

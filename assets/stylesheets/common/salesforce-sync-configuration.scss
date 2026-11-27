@@ -485,8 +485,20 @@
   }
 
   &__group .form-kit__container-content,
-  &__group .form-kit__container-help-text {
+  &__group .form-kit__container-help-text,
+  &__flair-properties .form-kit__container-content,
+  &__flair-properties .form-kit__container-help-text,
+  &__flair-groups .form-kit__container-content,
+  &__flair-groups .form-kit__container-help-text {
     max-width: 40em;
+  }
+
+  &__flair-preview {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: var(--space-2);
+    margin-block-start: 1em;
   }
 
   &__conditions {

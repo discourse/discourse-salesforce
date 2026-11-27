@@ -87,6 +87,8 @@ RSpec.describe ::Hubspot::Api do
           label: "Lifecyclestage",
           type: "string",
           group: "contactinformation",
+          options: {
+          },
         )
 
         described_class.cached_properties("contact")
@@ -94,6 +96,26 @@ RSpec.describe ::Hubspot::Api do
         expect(a_request(:get, hubspot_url("properties/contacts"))).to have_been_made.once
         described_class.cached_properties("contact", refresh: true)
         expect(a_request(:get, hubspot_url("properties/contacts"))).to have_been_made.twice
+      end
+
+      it "maps enumeration options to their labels" do
+        stub_request(:get, hubspot_url("properties/contacts")).to_return(
+          body: {
+            results: [
+              {
+                name: "lifecyclestage",
+                label: "Lifecycle stage",
+                type: "enumeration",
+                options: [{ value: "lead", label: "Lead" }, { value: 123, label: "Partner" }],
+              },
+            ],
+          }.to_json,
+        )
+
+        expect(api.cached_properties("contact").first[:options]).to eq(
+          "lead" => "Lead",
+          "123" => "Partner",
+        )
       end
 
       it "caches company properties separately from contact properties" do

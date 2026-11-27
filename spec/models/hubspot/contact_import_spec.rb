@@ -283,6 +283,7 @@ RSpec.describe ::Hubspot::ContactImport do
       )
       stub_hubspot_company_batch_read([hubspot_company(901, name: "Globex")], ids: %w[901])
       stub_hubspot_contact_list(contacts)
+      stub_hubspot_properties(%w[name], object: "company")
       Jobs::Hubspot::SyncConfiguration.new.execute(
         configuration_id: configuration.id,
         reason: "backfill",

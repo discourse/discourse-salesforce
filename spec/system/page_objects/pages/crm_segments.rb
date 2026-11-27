@@ -19,13 +19,11 @@ module PageObjects
       end
 
       def choose_property(index, property_id)
-        form.collection_field("conditions", index, "property").select(property_id)
-        self
+        pick_from_menu(form.collection_field("conditions", index, "property"), property_id)
       end
 
       def choose_operator(index, operator)
-        form.collection_field("conditions", index, "operator").select(operator)
-        self
+        pick_from_menu(form.collection_field("conditions", index, "operator"), operator)
       end
 
       def fill_value(index, value)
@@ -94,6 +92,13 @@ module PageObjects
         pick_from_multi_select("flair_properties", label)
       end
 
+      def has_flair_property?(label)
+        has_css?(
+          '[data-name="flair_properties"] .d-multi-select-trigger__selected-item',
+          text: label,
+        )
+      end
+
       def choose_flair_group(group)
         pick_from_multi_select("flair_group_ids", group.name)
       end
@@ -152,6 +157,13 @@ module PageObjects
       end
 
       private
+
+      # A closing menu hands focus back to its trigger, which scrambles text typed before then.
+      def pick_from_menu(form_field, value)
+        form_field.select(value)
+        form_field.component.find(".form-kit__control-menu-trigger:focus")
+        self
+      end
 
       def pick_from_multi_select(field, text)
         find("[data-name=\"#{field}\"] .d-multi-select-trigger__expand-btn").click

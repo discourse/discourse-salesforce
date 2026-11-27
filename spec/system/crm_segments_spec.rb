@@ -91,7 +91,7 @@ RSpec.describe "Define CRM segments" do
     sign_in(admin)
   end
 
-  it "lets an admin define a segment, see who it matches, keep a group in sync with it and flair its members" do
+  it "lets an admin define a segment, see who it matches and pick a group for it" do
     segments_page.visit.define_segment
 
     expect(segments_page).to have_configuration(configuration)
@@ -104,22 +104,9 @@ RSpec.describe "Define CRM segments" do
     expect(segments_page).to have_preview("Matches 1 of 2 users with CRM data")
     expect(segments_page).to have_preview("ada")
 
-    segments_page.choose_group(group).enable_removal
-    segments_page
-      .enable_flair
-      .choose_flair_text("company.plan_tier")
-      .choose_flair_property("Job title")
-      .choose_flair_group(admins)
-    expect(segments_page).to have_flair_preview("Plan tier")
+    segments_page.choose_group(group).save
 
-    segments_page.save
-
-    expect(segments_page).to have_segment(
-      "New segment",
-      group: group,
-      status: "pending",
-      flair: "admins",
-    )
+    expect(segments_page).to have_segment("New segment", group: group, status: "pending")
 
     page.refresh
 
@@ -128,48 +115,88 @@ RSpec.describe "Define CRM segments" do
       configuration: configuration,
       group: group,
       status: "pending",
-      flair: "admins",
     )
-
-    Jobs::DiscourseCrm::EvaluateSegments.new.execute(configuration_id: configuration.id)
-    page.refresh
-
-    expect(segments_page).to have_segment("New segment", group: group, status: "synced")
-    expect(segments_page).to have_member_count("New segment", 1)
 
     segments_page.open_segment("New segment")
 
-    expect(segments_page).to have_configuration(configuration)
     expect(segments_page).to have_condition_value(0, "enterprise")
     expect(segments_page).to have_match("any")
     expect(segments_page).to have_group(group)
+  end
+
+  it "lets an admin edit a segment's removal and flair settings" do
+    Fabricate(:crm_segment, configuration:, name: "Enterprise customers", group_id: group.id)
+
+    segments_page
+      .visit
+      .open_segment("Enterprise customers")
+      .enable_removal
+      .enable_flair
+      .choose_flair_text("company.plan_tier")
+      .choose_flair_property("Job title")
+      .choose_flair_group(admins)
+    expect(segments_page).to have_flair_preview("Plan tier")
+
+    segments_page.save
+
+    expect(segments_page).to have_segment("Enterprise customers", flair: "admins")
+
+    page.refresh
+    segments_page.open_segment("Enterprise customers")
+
     expect(segments_page).to have_removal_enabled
     expect(segments_page).to have_flair_enabled
     expect(segments_page).to have_flair_text("company.plan_tier")
+    expect(segments_page).to have_flair_property("Job title")
     expect(segments_page).to have_flair_group(admins)
+  end
 
-    group_members_page.visit(group)
+  context "when a segment has been evaluated" do
+    before do
+      Fabricate(
+        :crm_segment,
+        configuration:,
+        name: "Enterprise customers",
+        group_id: group.id,
+        flair_enabled: true,
+        flair_text_property: "company.plan_tier",
+        flair_properties: %w[contact.jobtitle],
+        flair_group_ids: [admins.id],
+      )
+      Jobs::DiscourseCrm::EvaluateSegments.new.execute(configuration_id: configuration.id)
+    end
 
-    expect(group_members_page).to have_member(enterprise_user)
-    expect(group_members_page).to have_no_member(business_user)
+    it "shows an admin how many users it matched and lists them in its group" do
+      segments_page.visit
 
-    topic_page.visit_topic(enterprise_post.topic)
+      expect(segments_page).to have_segment("Enterprise customers", group: group, status: "synced")
+      expect(segments_page).to have_member_count("Enterprise customers", 1)
 
-    expect(flair).to have_text("Enterprise")
+      group_members_page.visit(group)
 
-    flair.hover
+      expect(group_members_page).to have_member(enterprise_user)
+      expect(group_members_page).to have_no_member(business_user)
+    end
 
-    expect(flair).to have_property("Job title", "CTO")
-    expect(flair).to have_crm_link(
-      "Open in HubSpot",
-      "https://app.hubspot.com/contacts/12345/record/0-1/500",
-    )
+    it "shows its flair on a member's posts only to the groups allowed to see it" do
+      topic_page.visit_topic(enterprise_post.topic)
 
-    sign_in(business_user)
-    topic_page.visit_topic(enterprise_post.topic)
+      expect(flair).to have_text("Enterprise")
 
-    expect(topic_page).to have_post_number(enterprise_post.post_number)
-    expect(flair).to have_no_flair
+      flair.hover
+
+      expect(flair).to have_property("Job title", "CTO")
+      expect(flair).to have_crm_link(
+        "Open in HubSpot",
+        "https://app.hubspot.com/contacts/12345/record/0-1/500",
+      )
+
+      sign_in(business_user)
+      topic_page.visit_topic(enterprise_post.topic)
+
+      expect(topic_page).to have_post_number(enterprise_post.post_number)
+      expect(flair).to have_no_flair
+    end
   end
 
   it "lets an admin delete a segment from the list" do

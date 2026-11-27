@@ -5,7 +5,7 @@ import { setupRenderingTest } from "discourse/tests/helpers/component-test";
 import pretender from "discourse/tests/helpers/create-pretender";
 import CrmSyncConfigurations from "discourse/plugins/discourse-salesforce/discourse/components/crm-sync-configurations";
 import {
-  createHubspotSyncConfiguration,
+  createPullConfiguration,
   createSyncConfiguration,
 } from "discourse/plugins/discourse-salesforce/discourse/lib/sync-configuration";
 import selectSyncGroups from "../../helpers/select-sync-groups";
@@ -44,6 +44,11 @@ module("Integration | Component | CrmSyncConfigurations", function (hooks) {
       { id: 1, name: "community-members", user_count: 248 },
       { id: 2, name: "customers", user_count: 86 },
       { id: 3, name: "partners", user_count: 32 },
+    ];
+    this.pullTargets = [
+      { provider: "hubspot", object: "contact" },
+      { provider: "salesforce", object: "Lead" },
+      { provider: "salesforce", object: "Contact" },
     ];
     this.providers = [{ name: "salesforce", credentials_configured: true }];
     this.allProviders = [
@@ -437,7 +442,7 @@ module("Integration | Component | CrmSyncConfigurations", function (hooks) {
       .exists("keeps the other configuration");
   });
 
-  test("offers the CRM pull only while HubSpot is enabled and unconfigured", async function (assert) {
+  test("offers a pull for each CRM object until every one is configured", async function (assert) {
     pretender.get("/salesforce/admin/hubspot/properties.json", () => [
       200,
       { "Content-Type": "application/json" },
@@ -446,10 +451,12 @@ module("Integration | Component | CrmSyncConfigurations", function (hooks) {
       }),
     ]);
     this.records = [];
+    this.noPullTargets = [];
     await render(
       <template>
         <CrmSyncConfigurations
           @targets={{this.targets}}
+          @pullTargets={{this.noPullTargets}}
           @groups={{this.groups}}
           @providers={{this.providers}}
           @records={{this.records}}
@@ -458,12 +465,20 @@ module("Integration | Component | CrmSyncConfigurations", function (hooks) {
     );
     assert
       .dom("[data-test-pull-crm]")
-      .doesNotExist("hides the pull while HubSpot is disabled");
+      .isDisabled("cannot pull without a CRM that offers pulls");
 
+    this.records = [
+      {
+        ...createPullConfiguration({ provider: "hubspot", object: "contact" }),
+        id: "hubspot",
+        name: "Pull HubSpot contacts",
+      },
+    ];
     await render(
       <template>
         <CrmSyncConfigurations
           @targets={{this.targets}}
+          @pullTargets={{this.pullTargets}}
           @groups={{this.groups}}
           @providers={{this.allProviders}}
           @records={{this.records}}
@@ -473,38 +488,10 @@ module("Integration | Component | CrmSyncConfigurations", function (hooks) {
     );
     assert
       .dom("[data-test-pull-crm]")
-      .hasText("Pull contacts from CRM", "offers the pull");
-    await click("[data-test-pull-crm]");
-    assert
-      .dom(".hubspot-sync-configuration .d-page-subheader__title")
-      .hasText("Pull contacts", "opens the HubSpot editor with a default name");
-    await click("[data-test-configurations-back]");
-    await click(".dialog-footer .btn-danger");
-
-    this.records = [
-      {
-        ...createHubspotSyncConfiguration(),
-        id: "hubspot",
-        name: "Pull contacts",
-      },
-    ];
-    await render(
-      <template>
-        <CrmSyncConfigurations
-          @targets={{this.targets}}
-          @groups={{this.groups}}
-          @providers={{this.allProviders}}
-          @records={{this.records}}
-        />
-      </template>
-    );
-    assert
-      .dom("[data-test-pull-crm]")
-      .isDisabled("allows a single HubSpot pull");
-    assert.dom("[data-test-pull-crm]").hasText("Already configured");
+      .hasText("Pull from CRM", "offers the objects not pulled yet");
     assert
       .dom('[data-test-configuration="hubspot"]')
-      .includesText("Pull contacts from CRM", "labels the type");
+      .includesText("Pull users from CRM", "labels the type");
     assert
       .dom('[data-test-configuration="hubspot"]')
       .includesText("HubSpot - Contacts", "labels the CRM object");
@@ -513,13 +500,43 @@ module("Integration | Component | CrmSyncConfigurations", function (hooks) {
         '[data-test-configuration="hubspot"] [data-test-configuration-scope]'
       )
       .includesText("All users", "pulls apply to every user");
-    await click('[data-test-configuration="hubspot"] button');
+    await click("[data-test-pull-crm]");
     assert
-      .dom(".hubspot-sync-configuration")
-      .exists("opens saved HubSpot configurations in the HubSpot editor");
+      .dom(".crm-pull-configuration .d-page-subheader__title")
+      .hasText(
+        "Pull Salesforce leads",
+        "starts with the first object that has no pull"
+      );
+    await click("[data-test-configurations-back]");
+    await click(".dialog-footer .btn-danger");
+
+    this.records = this.pullTargets.map((target) => ({
+      ...createPullConfiguration(target),
+      id: `${target.provider}-${target.object}`,
+      name: "Pull",
+    }));
+    await render(
+      <template>
+        <CrmSyncConfigurations
+          @targets={{this.targets}}
+          @pullTargets={{this.pullTargets}}
+          @groups={{this.groups}}
+          @providers={{this.allProviders}}
+          @records={{this.records}}
+        />
+      </template>
+    );
+    assert
+      .dom("[data-test-pull-crm]")
+      .isDisabled("allows one pull per CRM object");
+    assert.dom("[data-test-pull-crm]").hasText("Already configured");
+    await click('[data-test-configuration="hubspot-contact"] button');
+    assert
+      .dom(".crm-pull-configuration")
+      .exists("opens saved pulls in the pull editor");
   });
 
-  test("opens a new HubSpot configuration from a direct link", async function (assert) {
+  test("opens a new pull from a direct link", async function (assert) {
     pretender.get("/salesforce/admin/hubspot/properties.json", () => [
       200,
       { "Content-Type": "application/json" },
@@ -531,19 +548,21 @@ module("Integration | Component | CrmSyncConfigurations", function (hooks) {
           @targets={{this.targets}}
           @groups={{this.groups}}
           @providers={{this.allProviders}}
-          @selectedId="new-hubspot-users"
+          @pullTargets={{this.pullTargets}}
+          @selectedId="new-crm-pull"
         />
       </template>
     );
-    assert.dom(".hubspot-sync-configuration").exists();
+    assert.dom(".crm-pull-configuration").exists();
     assert.dom(".salesforce-sync-configuration").doesNotExist();
   });
   test("opens a HubSpot push in the shared outbound editor alongside an existing pull", async function (assert) {
     this.targets = [{ provider: "hubspot", object: "contact" }];
     this.providers = [{ name: "hubspot", credentials_configured: true }];
+    this.pullTargets = [{ provider: "hubspot", object: "contact" }];
     this.records = [
       {
-        ...createHubspotSyncConfiguration(),
+        ...createPullConfiguration(this.pullTargets[0]),
         id: "pull",
         name: "Pull contacts",
       },
@@ -568,6 +587,7 @@ module("Integration | Component | CrmSyncConfigurations", function (hooks) {
       <template>
         <CrmSyncConfigurations
           @targets={{this.targets}}
+          @pullTargets={{this.pullTargets}}
           @providers={{this.providers}}
           @records={{this.records}}
         />
@@ -588,6 +608,6 @@ module("Integration | Component | CrmSyncConfigurations", function (hooks) {
     assert
       .dom(".salesforce-sync-configuration__locked-mapping code")
       .hasText("email");
-    assert.dom(".hubspot-sync-configuration").doesNotExist();
+    assert.dom(".crm-pull-configuration").doesNotExist();
   });
 });

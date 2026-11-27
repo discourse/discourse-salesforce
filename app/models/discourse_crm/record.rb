@@ -31,6 +31,26 @@ module DiscourseCrm
         returning: %w[external_id],
       ).pluck("external_id")
     end
+
+    # Kept apart from store_many!, so a record whose stored fields did not change is not
+    # reported as changed when only its modification time moved.
+    def self.store_crm_modified!(provider:, account:, object:, modified_by_id:)
+      rows =
+        modified_by_id.filter_map do |external_id, time|
+          { external_id:, modified: time.utc.iso8601(6) } if time
+        end
+      return if rows.empty?
+      DB.exec(<<~SQL, provider:, account:, object:, rows: rows.to_json)
+        UPDATE crm_records r
+        SET crm_modified_at = v.modified
+        FROM jsonb_to_recordset(CAST(:rows AS jsonb)) AS v(external_id text, modified timestamp)
+        WHERE r.provider = :provider
+          AND r.account = :account
+          AND r.object = :object
+          AND r.external_id = v.external_id
+          AND r.crm_modified_at IS DISTINCT FROM v.modified
+      SQL
+    end
   end
 end
 
@@ -40,6 +60,7 @@ end
 #
 #  id                  :bigint           not null, primary key
 #  account             :string           not null
+#  crm_modified_at     :datetime
 #  data                :jsonb            not null
 #  object              :string           not null
 #  provider            :string           not null

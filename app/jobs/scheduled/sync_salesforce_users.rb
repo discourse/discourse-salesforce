@@ -75,11 +75,12 @@ module ::Jobs
             account: SiteSetting.salesforce_instance_url,
             user_id: field.user_id,
           }
-          previous = ::DiscourseCrm::RecordLink.find_by(**scope, object: object)
+          previous = ::DiscourseCrm::RecordLink.find_by(**scope, object:, direction: "outbound")
           destination_name = Salesforce::Person.for_object(destination_object)::ID_FIELD
           if object == "Lead"
             lead_link_matches = previous.nil? || previous.external_id == previous_id
-            contact_link = ::DiscourseCrm::RecordLink.find_by(**scope, object: "Contact")
+            contact_link =
+              ::DiscourseCrm::RecordLink.find_by(**scope, object: "Contact", direction: "outbound")
             contact_link_matches = contact_link.nil? || contact_link.external_id == id
             contact_field =
               UserCustomField.find_by(user_id: current.user_id, name: destination_name)

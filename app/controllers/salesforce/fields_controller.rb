@@ -8,12 +8,21 @@ module Salesforce
     def index
       raise Discourse::NotFound unless SyncProvider.enabled?
       object = params.require(:object)
-      raise Discourse::InvalidParameters.new(:object) if OutboundUsersFlow.objects.exclude?(object)
+      flow = params[:direction] == "inbound" ? InboundUsersFlow : OutboundUsersFlow
+      raise Discourse::InvalidParameters.new(:object) if flow.objects.exclude?(object)
 
-      render json: {
-               fields: Api.cached_writable_fields(object, refresh: params[:refresh] == "true"),
-               custom_sources: DiscourseCrm::UserSyncSources.custom_sources,
-             }
+      refresh = params[:refresh] == "true"
+      if params[:direction] == "inbound"
+        render json: {
+                 fields: InboundUsersFlow.pull_fields(object, refresh: refresh),
+                 destinations: DiscourseCrm::UserSyncDestinations.all,
+               }
+      else
+        render json: {
+                 fields: Api.cached_writable_fields(object, refresh: refresh),
+                 custom_sources: DiscourseCrm::UserSyncSources.custom_sources,
+               }
+      end
     rescue Salesforce::InvalidCredentials,
            Salesforce::InvalidApiResponse,
            Faraday::Error,

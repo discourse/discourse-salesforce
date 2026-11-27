@@ -23,7 +23,7 @@ RSpec.describe DiscourseCrm::SyncConfiguration do
     pull = Fabricate(:hubspot_sync_configuration)
     Jobs::SyncSalesforceUser.clear
     Jobs::Hubspot::PushUser.clear
-    Jobs::Hubspot::SyncUser.clear
+    Jobs::DiscourseCrm::PullUser.clear
 
     DiscourseCrm::ConfigurationScheduler.enqueue_user(user, reason: "change", inbound: true)
 
@@ -33,9 +33,9 @@ RSpec.describe DiscourseCrm::SyncConfiguration do
     expect(Jobs::Hubspot::PushUser.jobs.map { |job| job["args"].first["configuration_id"] }).to eq(
       [push.id],
     )
-    expect(Jobs::Hubspot::SyncUser.jobs.map { |job| job["args"].first["configuration_id"] }).to eq(
-      [pull.id],
-    )
+    expect(
+      Jobs::DiscourseCrm::PullUser.jobs.map { |job| job["args"].first["configuration_id"] },
+    ).to eq([pull.id])
   end
 
   it "isolates link directions during preloading, joins and inbound contact removal" do

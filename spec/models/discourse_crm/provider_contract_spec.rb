@@ -30,7 +30,7 @@ RSpec.describe DiscourseCrm::ConfigurationScheduler do
       "hubspot",
       "inbound",
       "contact",
-      Jobs::Hubspot::SyncUser,
+      Jobs::DiscourseCrm::PullUser,
       Jobs::Hubspot::SyncConfiguration,
       nil,
     ],

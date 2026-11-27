@@ -13,6 +13,7 @@ module DiscourseCrm
                :groups,
                :mappings,
                :connection_changed,
+               :active,
                :sync_status,
                :segment_count
     # AMS reserves `object` for the serialized record, so the CRM object name needs a key alias.

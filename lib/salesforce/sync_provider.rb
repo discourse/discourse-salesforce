@@ -23,7 +23,7 @@ module ::Salesforce
     end
 
     def self.flows
-      [OutboundUsersFlow]
+      [OutboundUsersFlow, InboundUsersFlow]
     end
 
     def self.flow(direction, kind)

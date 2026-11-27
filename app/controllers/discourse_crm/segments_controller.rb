@@ -9,7 +9,7 @@ module DiscourseCrm
     before_action :ensure_segments_enabled
 
     def index
-      configurations = SyncConfiguration.active.inbound.order(:id).to_a
+      configurations = SyncConfiguration.active.user_pulls.order(:id).to_a
       render json: {
                segments:
                  serialize_data(
@@ -145,7 +145,11 @@ module DiscourseCrm
         .map { |property| property[:object] }
         .uniq
         .to_h { |object| [object, flow.property_labels(object)] }
-    rescue ::Hubspot::InvalidCredentials, ::Hubspot::InvalidApiResponse, Faraday::Error
+    rescue ::Hubspot::InvalidCredentials,
+           ::Hubspot::InvalidApiResponse,
+           ::Salesforce::InvalidCredentials,
+           ::Salesforce::InvalidApiResponse,
+           Faraday::Error
       {}
     end
 

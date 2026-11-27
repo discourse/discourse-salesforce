@@ -23,7 +23,7 @@ module ::Hubspot
     end
 
     def self.flows
-      [InboundUsersFlow, OutboundUsersFlow]
+      [InboundUsersFlow, InboundCompaniesFlow, OutboundUsersFlow]
     end
 
     def self.flow(direction, kind)

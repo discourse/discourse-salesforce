@@ -39,4 +39,23 @@ export default {
         mappings.filter((mapping) => mapping.destination !== "Company"),
     },
   },
+  pull: {
+    metadataUrl: "/salesforce/admin/guided-sync/fields.json",
+    fields: (result) => result.fields,
+    objects: {
+      Lead: {
+        translationKey: "salesforce_lead",
+        createMappings: () => [
+          { source: "Name", destination: "name", policy: "keep" },
+          { source: "Website", destination: "website", policy: "keep" },
+        ],
+      },
+      Contact: {
+        translationKey: "salesforce_contact",
+        createMappings: () => [
+          { source: "Name", destination: "name", policy: "keep" },
+        ],
+      },
+    },
+  },
 };

@@ -166,5 +166,24 @@ RSpec.describe DiscourseCrm::SegmentEvaluation do
         usernames: [enterprise_user.username],
       )
     end
+
+    it "counts only users linked through the segment's own pull" do
+      DiscourseCrm::RecordLink.link_many!(
+        [
+          {
+            provider: "hubspot",
+            account: "12345",
+            object: "deal",
+            direction: "inbound",
+            user_id: manual_user.id,
+            external_id: "900",
+          },
+        ],
+      )
+
+      expect(described_class.preview(Fabricate.build(:crm_segment, configuration:))).to include(
+        total: 2,
+      )
+    end
   end
 end

@@ -258,6 +258,31 @@ module(
         .hasText("Customer contacts", "Escape discards the inline edit");
     });
 
+    test("shows a mapping the server refuses next to its field", async function (assert) {
+      this.save = () => ({
+        mappingError: { index: 1, message: "This would copy a value back." },
+      });
+      await render(
+        <template>
+          <CrmOutboundSyncConfiguration
+            @targets={{this.targets}}
+            @groups={{this.groups}}
+            @onSave={{this.save}}
+          />
+        </template>
+      );
+
+      await selectSyncGroups("customers");
+      await click("[data-test-save]");
+
+      assert
+        .dom('[data-name="mappings.1.destination"] .form-kit__errors')
+        .includesText(
+          "This would copy a value back.",
+          "shows the server's message on the refused mapping"
+        );
+    });
+
     test("generates and saves names from the selected groups and object", async function (assert) {
       let saved;
       this.save = (configuration) => {

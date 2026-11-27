@@ -11,11 +11,10 @@ import { extractError } from "discourse/lib/ajax-error";
 import { eq } from "discourse/truth-helpers";
 import DButton from "discourse/ui-kit/d-button";
 import DConditionalLoadingSpinner from "discourse/ui-kit/d-conditional-loading-spinner";
-import DMultiSelect from "discourse/ui-kit/d-multi-select";
 import dIcon from "discourse/ui-kit/helpers/d-icon";
 import { i18n } from "discourse-i18n";
-import CrmCreateGroupModal from "discourse/plugins/discourse-salesforce/discourse/components/crm-create-group-modal";
 import CrmFieldMenu from "discourse/plugins/discourse-salesforce/discourse/components/crm-field-menu";
+import CrmGroupSelect from "discourse/plugins/discourse-salesforce/discourse/components/crm-group-select";
 import CrmSourceMenu from "discourse/plugins/discourse-salesforce/discourse/components/crm-source-menu";
 import SyncConfigurationHeading from "discourse/plugins/discourse-salesforce/discourse/components/sync-configuration-heading";
 import {
@@ -40,7 +39,6 @@ function truncateName(value, limit) {
 export default class CrmOutboundSyncConfiguration extends Component {
   @service a11y;
   @service dialog;
-  @service modal;
 
   @tracked configuration = structuredClone(
     this.args.record || createSyncConfiguration(this.args.targets?.[0])
@@ -63,6 +61,8 @@ export default class CrmOutboundSyncConfiguration extends Component {
   #fieldsRequest = 0;
 
   #form;
+  // The row a refused save pointed at; any row edit can resolve it or shift its index.
+  #savedMappingErrorPath;
   #nextMappingId =
     Math.max(
       0,
@@ -201,46 +201,8 @@ export default class CrmOutboundSyncConfiguration extends Component {
   }
 
   @action
-  async createGroup(menu) {
-    await menu.close();
-    this.modal.show(CrmCreateGroupModal, {
-      model: { onCreated: this.groupCreated },
-    });
-  }
-
-  @action
-  groupCreated(group) {
+  rememberGroup(group) {
     this.createdGroups = [...this.createdGroups, group];
-    if (!this.configuration.group_ids.map(String).includes(String(group.id))) {
-      this.selectGroups([...this.selectedGroups, group]);
-    }
-    this.a11y.announce(i18n(`${PREFIX}.group_created`, { name: group.name }));
-  }
-
-  @action
-  async findGroups(query) {
-    try {
-      const result = await ajax("/salesforce/admin/guided-sync/groups.json", {
-        data: { q: query || "" },
-      });
-      return [
-        ...new Map(
-          [...result.groups, ...this.createdGroups].map((group) => [
-            String(group.id),
-            group,
-          ])
-        ).values(),
-      ];
-    } catch {
-      return this.groups.filter((group) =>
-        group.name.toLowerCase().includes((query || "").toLowerCase())
-      );
-    }
-  }
-
-  @action
-  compareGroups(a, b) {
-    return String(a.id) === String(b.id);
   }
 
   @action
@@ -351,8 +313,19 @@ export default class CrmOutboundSyncConfiguration extends Component {
     }
     this.saving = true;
     try {
-      if (await this.args.onSave({ ...this.configuration, name: this.title })) {
+      const result = await this.args.onSave({
+        ...this.configuration,
+        name: this.title,
+      });
+      if (result === true) {
         this.a11y.announce(i18n(`${PREFIX}.save_success`));
+      } else if (result?.mappingError) {
+        const { index, message } = result.mappingError;
+        this.#savedMappingErrorPath = `mappings.${index}.destination`;
+        this.#form.addError(this.#savedMappingErrorPath, {
+          title: i18n(`${PREFIX}.salesforce_field`),
+          message,
+        });
       }
     } finally {
       this.saving = false;
@@ -510,6 +483,10 @@ export default class CrmOutboundSyncConfiguration extends Component {
   }
 
   #setMappings(mappings) {
+    if (this.#savedMappingErrorPath) {
+      this.#form?.removeError(this.#savedMappingErrorPath);
+      this.#savedMappingErrorPath = null;
+    }
     this.#form?.set("mappings", mappings);
     this.configuration = { ...this.configuration, mappings };
   }
@@ -558,28 +535,12 @@ export default class CrmOutboundSyncConfiguration extends Component {
               as |field|
             >
               <field.Control>
-                <div class="salesforce-sync-configuration__group-controls">
-                  <DMultiSelect
-                    @compareFn={{this.compareGroups}}
-                    @label={{i18n "salesforce.guided_sync.group"}}
-                    @loadFn={{this.findGroups}}
-                    @matchTriggerWidth={{true}}
-                    @onChange={{this.selectGroups}}
-                    @selection={{this.selectedGroups}}
-                  >
-                    <:selection as |group|>{{group.name}}</:selection>
-                    <:result as |group|>{{group.name}}</:result>
-                    <:footer as |menu|>
-                      <DButton
-                        class="btn-flat salesforce-sync-configuration__create-group"
-                        data-test-create-group
-                        @action={{fn this.createGroup menu}}
-                        @icon="plus"
-                        @label="salesforce.guided_sync.create_group"
-                      />
-                    </:footer>
-                  </DMultiSelect>
-                </div>
+                <CrmGroupSelect
+                  @groups={{this.groups}}
+                  @onChange={{this.selectGroups}}
+                  @onCreated={{this.rememberGroup}}
+                  @selection={{this.selectedGroups}}
+                />
               </field.Control>
             </form.Field>
             <form.Field

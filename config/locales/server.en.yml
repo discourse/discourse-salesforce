@@ -43,6 +43,16 @@ en:
         batch_write: "HubSpot did not return a completed batch result. Some contacts may have been saved. Check later attempts for the result of individual retries."
         batch_unconfirmed: "HubSpot did not confirm this contact in the batch response. Check later attempts for the result of an individual retry."
         unknown: "The sync failed, but no specific reason was recorded. Check later attempts to see whether a retry succeeded."
+        invalid_destination: "Discourse rejected one or more pulled values. Check the mapped Discourse fields and their allowed values."
+        invalid_destination_fields: "Discourse rejected the pulled value for %{fields}. Check the field’s allowed values and length."
+    destinations:
+      name: "Name"
+      bio: "Bio"
+      website: "Website"
+    mapping_errors:
+      overridden_on_login: "%{field} is replaced from the login provider every time the user logs in, so it cannot be filled from the CRM."
+      duplicate_destination: "%{field} is already overwritten by the “%{configuration}” sync. Two pulls can only share a Discourse field when at least one of them keeps the existing value."
+      loop: "These mappings would keep copying a value back to where it came from: %{path}. Remove one of these mappings or set one of them to keep the existing value."
   site_settings:
     salesforce_leads_enabled: "Enable Salesforce Lead lookups, creation, conversion sync, feed items, and association cleanup. Disable for Salesforce organizations where the integration user cannot access Leads. Contact operations continue and existing Lead links are retained."
     enable_guided_sync_configuration: "Send Discourse user data to Salesforce or HubSpot using configurable field mappings, group membership, and a refresh schedule."
@@ -104,6 +114,7 @@ en:
       invalid_response: "Invalid response from Salesforce API"
       invalid_client_credentials: "There was an issue with the Salesforce credentials. Please confirm the validity of the Salesforce consumer key and client secret settings"
   hubspot:
+    full_name_property: "Full name (First Name + Last Name)"
     error:
       invalid_property_value: "The value mapped to HubSpot property %{property} is not an allowed option. Correct the mapping and save again."
       connection:

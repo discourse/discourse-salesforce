@@ -27,7 +27,7 @@ module DiscourseCrm
     end
 
     def fetch_configuration(params:)
-      DiscourseCrm::SyncConfiguration.active.inbound.find_by(id: params.configuration_id)
+      DiscourseCrm::SyncConfiguration.active.user_pulls.find_by(id: params.configuration_id)
     end
 
     def fetch_pulled_properties(configuration:)

@@ -111,7 +111,7 @@ the action is **Save configuration**.
 
 `DiscourseCrm::ConfigurationScheduler` dispatches through each provider’s flow definition.
 Salesforce pushes use `Jobs::SyncSalesforceUser`; HubSpot pushes use
-`Jobs::Hubspot::PushUser`, and pulls use `Jobs::Hubspot::SyncUser`. Salesforce reuses its API client,
+`Jobs::Hubspot::PushUser`, and pulls of either CRM use `Jobs::DiscourseCrm::PullUser`. Salesforce reuses its API client,
 Person email lookup, and Lead/Contact definitions. It does not change legacy global sync settings or case jobs.
 There is no Workflows dependency. The group picker uses the optional core `DMultiSelect`
 footer slot for group creation. Sync posts is Coming soon.
@@ -295,12 +295,18 @@ supplies `key`, `account`, `enabled?`, `credentials?`, `flows`, and `flow(direct
 The account identifies the remote connection; active configurations must match the current
 account. `flow` returns the matching definition, or `nil` for an unsupported combination.
 
-Each flow supplies `direction`, `kind`, `objects`, `requires_groups?`, and
-`validate_mappings!(configuration)`, plus `configuration_job` and `user_job` classes.
+Each flow supplies `direction`, `kind`, `objects`, `group_scope` (`:required`, `:optional`
+or `:none`), and `validate_mappings!(configuration)`, plus `configuration_job` and
+`user_job` classes (`user_job` is `nil` when user changes start no pull).
 Outbound user flows also supply `batch_job`. Configuration jobs receive `configuration_id`
 and `reason`; user jobs additionally receive `user_id`, and batch jobs receive `user_ids`.
 The shared outbound configuration job pages eligible group members and dispatches batches.
 Inbound flows own their configuration jobs because their remote pagination differs.
+Inbound user flows also supply `pull_fields`, an `importer` that turns API records into
+`DiscourseCrm::RecordImport` entries, and `stops_pull?(error)` for errors a retry cannot fix.
+They may define `source_fields` when one mapping source reads several CRM fields,
+`records_removed(configuration)` to clean up data that depended on removed records, and
+`removed(configuration)` to clean up when a configuration is deleted.
 Execution must recheck configuration availability, connection identity, and user eligibility.
 Provider dispatch behavior is covered by `spec/models/discourse_crm/provider_contract_spec.rb`.
 

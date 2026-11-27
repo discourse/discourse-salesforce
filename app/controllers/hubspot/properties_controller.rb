@@ -12,10 +12,14 @@ module ::Hubspot
       raise Discourse::InvalidParameters.new(:object) unless Api::OBJECT_PATHS.key?(object)
 
       api = Api.new
-      payload = { properties: api.cached_properties(object, refresh: params[:refresh] == "true") }
+      payload = {
+        properties:
+          InboundUsersFlow.pull_fields(object, api: api, refresh: params[:refresh] == "true"),
+      }
       if object == "contact"
         payload[:fields] = api.cached_writable_fields(object)
         payload[:custom_sources] = DiscourseCrm::UserSyncSources.custom_sources
+        payload[:destinations] = DiscourseCrm::UserSyncDestinations.all
       end
       render json: payload
     rescue InvalidCredentials, InvalidApiResponse, Faraday::Error => error

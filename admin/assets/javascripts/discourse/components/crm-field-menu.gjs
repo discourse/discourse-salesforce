@@ -32,27 +32,31 @@ export default class CrmFieldMenu extends Component {
           value?.toLowerCase().includes(query)
         )
       )
-      .map((field) => {
-        const assigned = this.args.mappings?.find(
-          (mapping) =>
-            mapping.id !== this.args.mappingId &&
-            mapping.destination === field.id
-        );
-        const source = this.args.sources?.find(
-          (item) => item.id === assigned?.source
-        );
-        return {
-          ...field,
-          selected: field.id === this.args.value,
-          label: field.label || field.id,
-          custom: field.custom || (field.label || field.id).endsWith("__c"),
-          description: assigned
-            ? i18n("salesforce.guided_sync.mapped_to", {
-                source: source?.label || assigned.source,
-              })
-            : null,
-        };
-      });
+      .map((field) => ({
+        ...field,
+        selected: field.id === this.args.value,
+        label: field.label || field.id,
+        custom: field.custom || (field.label || field.id).endsWith("__c"),
+        description: this.args.describe
+          ? this.args.describe(field.id, this.args.mappingId)
+          : this.#assignment(field),
+      }));
+  }
+
+  #assignment(field) {
+    const assigned = this.args.mappings?.find(
+      (mapping) =>
+        mapping.id !== this.args.mappingId && mapping.destination === field.id
+    );
+    if (!assigned) {
+      return null;
+    }
+    const source = this.args.sources?.find(
+      (item) => item.id === assigned.source
+    );
+    return i18n("salesforce.guided_sync.mapped_to", {
+      source: source?.label || assigned.source,
+    });
   }
 
   @action

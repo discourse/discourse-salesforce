@@ -217,8 +217,10 @@ module Salesforce
     end
 
     def conversion_link_conflict?(record, contact_id)
-      current_lead = DiscourseCrm::RecordLink.find_by(**link_scope(object: "Lead"))
-      current_contact = DiscourseCrm::RecordLink.find_by(**link_scope(object: "Contact"))
+      current_lead =
+        DiscourseCrm::RecordLink.find_by(**link_scope(object: "Lead"), direction: "outbound")
+      current_contact =
+        DiscourseCrm::RecordLink.find_by(**link_scope(object: "Contact"), direction: "outbound")
       legacy_lead_id = @user.salesforce_lead_id
       legacy_contact_id = @user.salesforce_contact_id
 

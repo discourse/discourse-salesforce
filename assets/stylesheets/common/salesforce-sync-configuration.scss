@@ -1,7 +1,7 @@
 @use "lib/viewport";
 
 .salesforce-sync-configuration,
-.hubspot-sync-configuration,
+.crm-pull-configuration,
 .crm-segment-editor {
   width: 100%;
   min-width: 0;
@@ -66,6 +66,11 @@
     display: grid;
     gap: 0;
     width: 100%;
+
+    // Rows have their own padding and divider, so FormKit's collection gutter would double the gap.
+    .form-kit__collection {
+      gap: 0;
+    }
   }
 
   &__mapping-row {
@@ -321,6 +326,9 @@
   overflow-x: hidden;
   overscroll-behavior: contain;
 
+  // The sticky search sits at the top edge; padding above it would let options scroll into view there.
+  padding-block-start: 0;
+
   .form-kit__control-menu-container:has(
     .salesforce-field-menu__search,
     .salesforce-source-menu__search
@@ -353,7 +361,6 @@
   .dropdown-menu {
     height: min(24rem, 60dvh);
     min-height: 0;
-    padding-block-start: 0;
     scrollbar-gutter: stable;
   }
 }
@@ -457,7 +464,7 @@
 }
 
 .salesforce-sync-configuration__section,
-.hubspot-sync-configuration__section,
+.crm-pull-configuration__section,
 .crm-segment-editor__section {
   min-width: 0;
   padding-block: 1.5em;
@@ -468,7 +475,7 @@
   }
 
   > .salesforce-sync-configuration__description,
-  > .hubspot-sync-configuration__description,
+  > .crm-pull-configuration__description,
   > .crm-segment-editor__description {
     margin-block: 0 1em;
     color: var(--primary-high);
@@ -591,7 +598,7 @@
   }
 }
 
-.hubspot-sync-configuration__properties .d-multi-select-trigger {
+.crm-pull-configuration__properties .d-multi-select-trigger {
   width: 100%;
   max-width: 40em;
   min-width: 0;
@@ -601,7 +608,7 @@
   }
 }
 
-.hubspot-sync-configuration__property {
+.crm-pull-configuration__property {
   display: flex;
   justify-content: space-between;
   align-items: center;
@@ -616,7 +623,7 @@
   }
 }
 
-.hubspot-sync-configuration__pull-fields {
+.crm-pull-configuration__pull-fields {
   display: flex;
   flex-direction: column;
   gap: 1em;
@@ -626,7 +633,7 @@
   }
 }
 
-.hubspot-sync-configuration__object-properties {
+.crm-pull-configuration__object-properties {
   display: flex;
   flex-direction: column;
   align-items: flex-start;
@@ -651,7 +658,7 @@
 }
 
 .salesforce-sync-configuration__behavior-fields,
-.hubspot-sync-configuration__behavior-fields {
+.crm-pull-configuration__behavior-fields {
   display: flex;
   flex-direction: column;
   gap: 1.5em;

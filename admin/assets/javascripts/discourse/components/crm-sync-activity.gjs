@@ -45,8 +45,9 @@ export default class CrmSyncActivity extends Component {
       });
     }
     const objectKey =
-      { contact: "contact", lead: "lead" }[attempt.object?.toLowerCase()] ||
-      "record";
+      { contact: "contact", lead: "lead", company: "company" }[
+        attempt.object?.toLowerCase()
+      ] || "record";
     return i18n(`salesforce.activity.reasons.${attempt.reason}`, {
       object: i18n(`salesforce.activity.objects.${objectKey}`),
     });

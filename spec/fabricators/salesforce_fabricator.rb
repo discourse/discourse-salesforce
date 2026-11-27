@@ -62,6 +62,48 @@ Fabricator(:hubspot_sync_configuration, class_name: DiscourseCrm::SyncConfigurat
   end
 end
 
+Fabricator(:hubspot_company_pull, class_name: DiscourseCrm::SyncConfiguration) do
+  provider "hubspot"
+  direction "inbound"
+  kind "companies"
+  account { SiteSetting.hubspot_portal_id }
+  name "Pull HubSpot companies"
+  object "company"
+  schedule "daily"
+  backfill true
+  active true
+  mappings do
+    [
+      { "id" => 1, "object" => "company", "source" => "name" },
+      { "id" => 2, "object" => "company", "source" => "plan_tier" },
+    ]
+  end
+end
+
+Fabricator(:salesforce_pull_configuration, class_name: DiscourseCrm::SyncConfiguration) do
+  provider "salesforce"
+  direction "inbound"
+  account { SiteSetting.salesforce_instance_url }
+  name "Pull contacts"
+  kind "users"
+  object "Contact"
+  schedule "daily"
+  backfill true
+  active true
+  mappings do
+    [
+      { "id" => 1, "object" => "Contact", "source" => "Title" },
+      {
+        "id" => 2,
+        "object" => "Contact",
+        "source" => "Name",
+        "destination" => "name",
+        "policy" => "overwrite",
+      },
+    ]
+  end
+end
+
 Fabricator(:crm_segment, class_name: DiscourseCrm::Segment) do
   name "Enterprise customers"
   conditions do

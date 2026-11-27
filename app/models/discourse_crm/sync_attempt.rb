@@ -98,6 +98,14 @@ module DiscourseCrm
         identifiers = diagnostic_identifiers(diagnostics[key])
         details[key] = identifiers if identifiers.any?
       end
+      # Destination ids can hold custom field names, which may contain spaces.
+      destinations =
+        Array(diagnostics[:destinations])
+          .grep(String)
+          .select { |value| value.length <= 200 && !value.match?(/[[:cntrl:]]/) }
+          .uniq
+          .first(20)
+      details[:destinations] = destinations if destinations.any?
       email = diagnostics[:rejected_email]
       # Hold the email row until the attempt commits so anonymization or deletion scrubs it afterward.
       if email.is_a?(String) && email.length <= 320 && !email.match?(/[[:cntrl:]]/) &&

@@ -80,6 +80,7 @@ module DiscourseCrm
       RecordLink.where(
         provider: @configuration.provider,
         account: @configuration.account,
+        object: @configuration.object,
         direction: "inbound",
       )
     end

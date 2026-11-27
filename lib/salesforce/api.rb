@@ -10,6 +10,8 @@ module ::Salesforce
     REQUEST_TIMEOUT = 30
     OPEN_TIMEOUT = 10
     WRITABLE_FIELDS_CACHE_TTL = 2.hours
+    # Compound and binary fields cannot be stored as a single value.
+    UNREADABLE_FIELD_TYPES = %w[address location base64].freeze
     INVALID_RESPONSE = "salesforce.error.invalid_response"
     ACCESS_TOKEN_KEY = "salesforce_access_token"
     CREDENTIAL_SETTINGS = %i[
@@ -50,8 +52,34 @@ module ::Salesforce
         end
     end
 
+    def readable_fields(object)
+      raise Discourse::InvalidParameters.new(:object) if %w[Lead Contact].exclude?(object)
+
+      get("sobjects/#{object}/describe")
+        .fetch("fields")
+        .filter_map do |field|
+          next if UNREADABLE_FIELD_TYPES.include?(field["type"])
+          field.slice("name", "label", "type", "custom")
+        end
+    end
+
     def query(soql)
       get("query/?q=#{CGI.escape(soql)}")
+    end
+
+    # Every record a query matches, following Salesforce's continuation links.
+    def query_all(soql)
+      result = query(soql)
+      records = result.fetch("records")
+      while result["nextRecordsUrl"]
+        path = result.fetch("nextRecordsUrl")
+        unless path.start_with?("#{prefix}/query/")
+          raise InvalidApiResponse.new("Invalid query continuation")
+        end
+        result = get(path.delete_prefix("#{prefix}/"))
+        records.concat(result.fetch("records"))
+      end
+      records
     end
 
     def get(path)
@@ -92,6 +120,18 @@ module ::Salesforce
     end
 
     def cached_writable_fields(object, refresh: false)
+      cached_fields("writable_fields", object, refresh:) { writable_fields(object) }
+    end
+
+    def self.cached_readable_fields(object, refresh: false)
+      new.cached_readable_fields(object, refresh: refresh)
+    end
+
+    def cached_readable_fields(object, refresh: false)
+      cached_fields("readable_fields", object, refresh:) { readable_fields(object) }
+    end
+
+    def cached_fields(kind, object, refresh:, &block)
       connection = [
         RailsMultisite::ConnectionManagement.current_db,
         SiteSetting.salesforce_authorization_server_url,
@@ -99,12 +139,11 @@ module ::Salesforce
         SiteSetting.salesforce_username,
         SiteSetting.salesforce_instance_url,
       ].join(":")
-      cache_key = "salesforce:writable_fields:v1:#{Digest::SHA256.hexdigest(connection)}:#{object}"
+      cache_key = "salesforce:#{kind}:v1:#{Digest::SHA256.hexdigest(connection)}:#{object}"
       Rails.cache.delete(cache_key) if refresh
-      Rails
-        .cache
-        .fetch(cache_key, expires_in: WRITABLE_FIELDS_CACHE_TTL) { writable_fields(object) }
+      Rails.cache.fetch(cache_key, expires_in: WRITABLE_FIELDS_CACHE_TTL, &block)
     end
+    private :cached_fields
 
     def set_access_token
       if !self.class.has_credentials?
@@ -176,6 +215,8 @@ module ::Salesforce
 
     def private_key
       OpenSSL::PKey::RSA.new(SiteSetting.salesforce_server_key_contents)
+    rescue OpenSSL::PKey::PKeyError
+      raise Salesforce::InvalidCredentials
     end
 
     def jwt_assertion
